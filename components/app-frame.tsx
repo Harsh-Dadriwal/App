@@ -50,7 +50,17 @@ export function AppFrame({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { configured, isLoading, session, profile, errorMessage, signOut } = useAuth();
+  const {
+    configured,
+    isLoading,
+    session,
+    profile,
+    tenantMemberships,
+    activeTenant,
+    errorMessage,
+    switchTenant,
+    signOut
+  } = useAuth();
   const notifications = useRows(
     async (client) => {
       if (!profile?.id) {
@@ -130,6 +140,21 @@ export function AppFrame({
     if (ok) notifications.refetch?.();
   }
 
+  async function handleTenantChange(tenantId: string) {
+    if (!tenantId || tenantId === activeTenant?.id) {
+      return;
+    }
+
+    const ok = await switchTenant(tenantId);
+
+    if (ok) {
+      notifications.refetch?.();
+      approvals.refetch?.();
+      adminRequests.refetch?.();
+      router.refresh();
+    }
+  }
+
   useEffect(() => {
     if (!configured || isLoading) {
       return;
@@ -161,12 +186,39 @@ export function AppFrame({
     <main className="workspace-shell">
       <aside className="workspace-sidebar">
         <div className="sidebar-brand">
-          <span className="brand-mark">ME</span>
+          <span className="brand-mark">
+            {(activeTenant?.app_name ?? "ME")
+              .split(" ")
+              .map((part) => part[0])
+              .join("")
+              .slice(0, 2)
+              .toUpperCase()}
+          </span>
           <div>
-            <p className="brand-name">Mahalaxmi Electricals</p>
-            <small>{roleLabels[role]} workspace</small>
+            <p className="brand-name">{activeTenant?.app_name ?? "Mahalaxmi Electricals"}</p>
+            <small>
+              {roleLabels[role]} workspace
+              {activeTenant?.display_name ? ` • ${activeTenant.display_name}` : ""}
+            </small>
           </div>
         </div>
+
+        {tenantMemberships.length > 1 ? (
+          <label className="field-shell">
+            <span className="field-label">Active business</span>
+            <select
+              className="input"
+              value={activeTenant?.id ?? ""}
+              onChange={(event) => void handleTenantChange(event.target.value)}
+            >
+              {tenantMemberships.map((membership) => (
+                <option key={membership.id} value={membership.tenant_id}>
+                  {membership.branding?.app_name ?? membership.tenant?.display_name ?? membership.tenant_id}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
         <nav className="sidebar-nav">
           {roleNav[role].map((item) => (
@@ -193,8 +245,16 @@ export function AppFrame({
       <section className="workspace-main">
         <header className="workspace-header">
           <div>
-            <span className="eyebrow">{roleLabels[role]}</span>
+            <span className="eyebrow">
+              {activeTenant?.app_name ?? "Mahalaxmi Electricals"} • {roleLabels[role]}
+            </span>
             <h1>{title ?? "Workspace"}</h1>
+            {activeTenant?.membership_role ? (
+              <p className="helper-copy">
+                Tenant access: {activeTenant.membership_role}
+                {activeTenant.slug ? ` • ${activeTenant.slug}` : ""}
+              </p>
+            ) : null}
           </div>
           <div className="header-aside">
             <div className="header-user-card">

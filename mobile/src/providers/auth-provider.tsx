@@ -1,5 +1,3 @@
-"use client";
-
 import {
   createContext,
   useContext,
@@ -8,13 +6,13 @@ import {
   useState,
   type ReactNode
 } from "react";
-import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase";
-import type { ActiveTenant, AuthSession, TenantMembership, UserProfile } from "@/lib/app-types";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import type { ActiveTenant, TenantMembership, UserProfile } from "@/lib/types";
 
 type AuthContextValue = {
   configured: boolean;
-  isLoading: boolean;
-  session: AuthSession;
+  loading: boolean;
+  session: any;
   profile: UserProfile | null;
   tenantMemberships: TenantMembership[];
   activeTenant: ActiveTenant | null;
@@ -28,17 +26,16 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function fetchProfile(userId: string) {
-  const supabase = await getSupabaseBrowserClient();
-  const profileSelect =
-    "id, auth_user_id, default_tenant_id, full_name, email, phone, role, city, state, company_name, verification_status, is_admin_verified";
-
   if (!supabase) {
     return { data: null, error: null };
   }
 
+  const selectString =
+    "id, auth_user_id, default_tenant_id, full_name, email, phone, role, city, state, company_name, verification_status, is_admin_verified";
+
   const authLinkedResult = await supabase
     .from("users")
-    .select(profileSelect)
+    .select(selectString)
     .eq("auth_user_id", userId)
     .maybeSingle();
 
@@ -46,16 +43,15 @@ async function fetchProfile(userId: string) {
     return authLinkedResult;
   }
 
-  const rpcResult = await (supabase as any).rpc("get_my_profile");
-  const rpcData = Array.isArray(rpcResult?.data) ? rpcResult.data[0] ?? null : rpcResult?.data ?? null;
-
-  if (rpcData && !rpcResult?.error) {
+  const rpcResult = await supabase.rpc("get_my_profile");
+  const rpcData = Array.isArray(rpcResult.data) ? rpcResult.data[0] ?? null : rpcResult.data ?? null;
+  if (rpcData && !rpcResult.error) {
     return { data: rpcData, error: null };
   }
 
   const directIdResult = await supabase
     .from("users")
-    .select(profileSelect)
+    .select(selectString)
     .eq("id", userId)
     .maybeSingle();
 
@@ -63,52 +59,35 @@ async function fetchProfile(userId: string) {
     return directIdResult;
   }
 
-  if (authLinkedResult.error || rpcResult?.error || directIdResult.error) {
-    return authLinkedResult.error
-      ? authLinkedResult
-      : rpcResult?.error
-        ? { data: null, error: rpcResult.error }
-        : directIdResult;
-  }
-
-  return {
-    data: null,
-    error: {
-      message:
-        "No app profile row is visible for this account. Run the auth profile SQL patch and try again."
-    }
-  };
+  return authLinkedResult.error
+    ? authLinkedResult
+    : rpcResult.error
+      ? { data: null, error: rpcResult.error }
+      : directIdResult;
 }
 
 async function fetchProfileWithRetry(userId: string, attempts = 8) {
   let lastError: unknown = null;
-
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const result = await fetchProfile(userId);
-
     if (result.data && !result.error) {
       return result;
     }
-
     lastError = result.error;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-
   return { data: null, error: lastError };
 }
 
-function AuthProvider({ children }: { children: ReactNode }) {
-  const configured = isSupabaseConfigured();
-  const [isLoading, setIsLoading] = useState(true);
-  const [session, setSession] = useState<AuthSession>(null);
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<any>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [tenantMemberships, setTenantMemberships] = useState<TenantMembership[]>([]);
   const [activeTenant, setActiveTenant] = useState<ActiveTenant | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
 
   async function fetchTenantContext(profileValue: UserProfile | null) {
-    const supabase = await getSupabaseBrowserClient();
-
     if (!supabase || !profileValue?.id) {
       setTenantMemberships([]);
       setActiveTenant(null);
@@ -191,25 +170,20 @@ function AuthProvider({ children }: { children: ReactNode }) {
     });
   }
 
-  async function refreshProfile(userIdOverride?: string) {
-    const userId = userIdOverride ?? session?.user?.id;
-
+  async function refreshProfile(userId?: string) {
     if (!userId) {
       setProfile(null);
       return null;
     }
 
-    const { data, error } = await fetchProfileWithRetry(userId);
-
-    if (error) {
-      setErrorMessage(
-        "Signed in, but the app profile could not be loaded. Run the SQL migrations in Supabase and try again."
-      );
+    const result = await fetchProfileWithRetry(userId);
+    if (result.error) {
       setProfile(null);
+      setErrorMessage("Signed in, but the mobile app profile could not be loaded.");
       return null;
     }
 
-    const nextProfile = (data ?? null) as UserProfile | null;
+    const nextProfile = (result.data ?? null) as UserProfile | null;
     setProfile(nextProfile);
     setErrorMessage("");
     await fetchTenantContext(nextProfile);
@@ -221,101 +195,57 @@ function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    if (!configured) {
-      setIsLoading(false);
+    if (!isSupabaseConfigured || !supabase) {
+      setLoading(false);
       return;
     }
 
     let mounted = true;
-    let unsubscribe: () => void = () => {};
 
     void (async () => {
-      const supabase = await getSupabaseBrowserClient();
+      const {
+        data: { session: nextSession }
+      } = await supabase.auth.getSession();
 
-      if (!supabase || !mounted) {
-        setIsLoading(false);
-        return;
+      if (!mounted) return;
+
+      setSession(nextSession);
+      if (nextSession?.user?.id) {
+        await refreshProfile(nextSession.user.id);
       }
-
-      const { data } = await supabase.auth.getSession();
-
-      if (!mounted) {
-        return;
-      }
-
-      setSession(data.session);
-
-      if (data.session?.user?.id) {
-        const profileResult = await fetchProfileWithRetry(data.session.user.id);
-
-        if (profileResult.error) {
-          setErrorMessage(
-            "Signed in, but the app profile could not be loaded. Run the SQL migrations in Supabase and try again."
-          );
-          setProfile(null);
-        } else {
-          const nextProfile = (profileResult.data ?? null) as UserProfile | null;
-          setProfile(nextProfile);
-          await fetchTenantContext(nextProfile);
-          setErrorMessage("");
-        }
-      }
-
-      setIsLoading(false);
-
-      const listener = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
-        setSession(nextSession);
-
-        if (nextSession?.user?.id) {
-          const profileResult = await fetchProfileWithRetry(nextSession.user.id);
-          const nextProfile = (profileResult.data ?? null) as UserProfile | null;
-          setProfile(nextProfile);
-          await fetchTenantContext(nextProfile);
-          setErrorMessage(
-            profileResult.error
-              ? "Signed in, but the app profile could not be loaded. Run the SQL migrations in Supabase and try again."
-              : ""
-          );
-        } else {
-          setProfile(null);
-          setTenantMemberships([]);
-          setActiveTenant(null);
-          setErrorMessage("");
-        }
-
-        setIsLoading(false);
-      });
-
-      unsubscribe = listener.data.subscription.unsubscribe;
+      setLoading(false);
     })();
+
+    const { data } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+      setSession(nextSession);
+      if (nextSession?.user?.id) {
+        await refreshProfile(nextSession.user.id);
+      } else {
+        setProfile(null);
+        setTenantMemberships([]);
+        setActiveTenant(null);
+        setErrorMessage("");
+      }
+      setLoading(false);
+    });
 
     return () => {
       mounted = false;
-      unsubscribe();
+      data.subscription.unsubscribe();
     };
-  }, [configured]);
+  }, []);
 
   async function signOut() {
-    const supabase = await getSupabaseBrowserClient();
-
-    if (!supabase) {
-      return;
-    }
-
+    if (!supabase) return;
     await supabase.auth.signOut();
     setSession(null);
     setProfile(null);
     setTenantMemberships([]);
     setActiveTenant(null);
-    setErrorMessage("");
   }
 
   async function switchTenant(tenantId: string) {
-    const supabase = await getSupabaseBrowserClient();
-
-    if (!supabase || !profile?.id) {
-      return false;
-    }
+    if (!supabase || !profile?.id) return false;
 
     const { error } = await supabase
       .from("users")
@@ -336,8 +266,8 @@ function AuthProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(
     () => ({
-      configured,
-      isLoading,
+      configured: isSupabaseConfigured,
+      loading,
       session,
       profile,
       tenantMemberships,
@@ -348,7 +278,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
       switchTenant,
       signOut
     }),
-    [configured, isLoading, session, profile, tenantMemberships, activeTenant, errorMessage]
+    [loading, session, profile, tenantMemberships, activeTenant, errorMessage]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -356,13 +286,8 @@ function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-
   if (!context) {
     throw new Error("useAuth must be used within AuthProvider");
   }
-
   return context;
 }
-
-export { AuthProvider };
-export default AuthProvider;

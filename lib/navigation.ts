@@ -47,6 +47,9 @@ export const roleNav: Record<
     { href: "/customer/tips/home", label: "Home Tips" },
     { href: "/customer/budget", label: "Budget Tracker", shortLabel: "Budget" },
     { href: "/customer/finance", label: "Finance Facility", shortLabel: "Finance" },
+    { href: "/customer/wallet", label: "Wallet", shortLabel: "Wallet" },
+    { href: "/customer/savings", label: "Savings Plans", shortLabel: "Savings" },
+    { href: "/customer/referrals", label: "Referrals", shortLabel: "Referrals" },
     { href: "/customer/approvals", label: "Items on Approval", shortLabel: "Approvals" },
     { href: "/customer/notes", label: "Project Notes", shortLabel: "Notes" }
   ],
@@ -73,6 +76,7 @@ export const roleNav: Record<
     { href: "/admin/orders", label: "Orders" },
     { href: "/admin/products", label: "Products & Inventory", shortLabel: "Products" },
     { href: "/admin/catalog", label: "Categories & Brands", shortLabel: "Catalog" },
+    { href: "/admin/fintech", label: "Wallets, Savings & Referrals", shortLabel: "Fintech" },
     { href: "/admin/requests", label: "Product Requests", shortLabel: "Requests" },
     { href: "/admin/substitutions", label: "Substitutions" },
     { href: "/admin/content", label: "Tips Content", shortLabel: "Content" },

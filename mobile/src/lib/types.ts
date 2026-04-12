@@ -49,8 +49,9 @@ export type ActiveTenant = {
   accent_color?: string | null;
 };
 
-export type AuthSession = {
-  user: {
-    id: string;
-  };
-} | null;
+export const roleLabels: Record<AppRole, string> = {
+  admin: "Admin",
+  customer: "Customer",
+  electrician: "Electrician",
+  architect: "Architect"
+};

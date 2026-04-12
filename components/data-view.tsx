@@ -3,6 +3,78 @@
 import { useEffect, useState, type DependencyList, type ReactNode } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
+export function FormFieldHint({ children }: { children: ReactNode }) {
+  return <p className="form-field-hint">{children}</p>;
+}
+
+export function FormSectionHeader({ title, lead }: { title: string; lead?: ReactNode }) {
+  return (
+    <>
+      <h3 className="form-section-title">{title}</h3>
+      {lead ? <div className="form-section-lead">{lead}</div> : null}
+    </>
+  );
+}
+
+export function FlowWizardSteps({
+  steps,
+  currentStep,
+  ariaLabel = "Form steps"
+}: {
+  steps: readonly { label: string; description: string }[];
+  currentStep: number;
+  ariaLabel?: string;
+}) {
+  return (
+    <div className="product-wizard-steps" role="list" aria-label={ariaLabel}>
+      {steps.map((step, index) => {
+        const n = index + 1;
+        const done = currentStep > n;
+        const current = currentStep === n;
+        return (
+          <div
+            key={`${step.label}-${index}`}
+            role="listitem"
+            className={`step-pill${done ? " is-done" : ""}${current ? " is-current" : ""}`}
+            aria-current={current ? "step" : undefined}
+          >
+            <span>{n}</span>
+            <div>
+              <p>{step.label}</p>
+              <FormFieldHint>{step.description}</FormFieldHint>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function ListSearchField({
+  value,
+  onChange,
+  placeholder,
+  ariaLabel
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  ariaLabel: string;
+}) {
+  return (
+    <div className="catalog-toolbar" style={{ marginBottom: 14 }}>
+      <input
+        className="catalog-search-input"
+        style={{ width: "100%", maxWidth: 480 }}
+        placeholder={placeholder}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        aria-label={ariaLabel}
+      />
+    </div>
+  );
+}
+
 type FetchResult<T> = {
   data: T[];
   error: string | null;

@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Mahalaxmi Electricals",
+    "slug": "mahalaxmi-electricals-mobile",
+    "scheme": "mahalaxmimobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#f4efe6"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#f4efe6"
+      }
+    },
+    "plugins": []
+  }
+}

@@ -1,13 +1,17 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import {
   CardGrid,
   DataCard,
+  FlowWizardSteps,
   FormCard,
+  FormFieldHint,
   FormGrid,
   FormNotice,
+  FormSectionHeader,
+  ListSearchField,
   PageSection,
   QueryState,
   useMutationAction,
@@ -15,6 +19,24 @@ import {
 } from "@/components/data-view";
 import type { AppRole } from "@/lib/app-types";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+
+const NOTE_STEPS = [
+  { label: "Where & who", description: "Site and recipient" },
+  { label: "Message", description: "Note text" }
+] as const;
+
+const ARCH_REQUEST_STEPS = [
+  { label: "Site & title", description: "What you need" },
+  { label: "Category", description: "Preferred group" },
+  { label: "Brand", description: "Preferred line" },
+  { label: "Details", description: "Description and send" }
+] as const;
+
+const ADMIN_ASSIGN_STEPS = [
+  { label: "Site", description: "Which project" },
+  { label: "Who", description: "Role and person" },
+  { label: "Status", description: "Save assignment" }
+] as const;
 
 function slugify(value: string) {
   return value
@@ -159,14 +181,39 @@ export function ProjectNotesPage({ role }: { role: AppRole }) {
   );
   const mutation = useMutationAction();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [noteCreateStep, setNoteCreateStep] = useState(1);
+  const [noteSearch, setNoteSearch] = useState("");
   const [form, setForm] = useState({
     site_id: "",
     recipient_role: role === "admin" ? "customer" : "admin",
     note_text: ""
   });
 
+  const defaultRecipient = role === "admin" ? "customer" : "admin";
+
+  const visibleNotes = useMemo(() => {
+    const q = noteSearch.trim().toLowerCase();
+    if (!q) return notes.data;
+    return notes.data.filter((note: any) =>
+      [note.site_name, note.note_text, note.sender_name, note.recipient_role].some((value) => String(value ?? "").toLowerCase().includes(q))
+    );
+  }, [notes.data, noteSearch]);
+
+  useEffect(() => {
+    if (editingId) return;
+    if (noteCreateStep >= 2 && !form.site_id) setNoteCreateStep(1);
+  }, [editingId, noteCreateStep, form.site_id]);
+
+  function resetNoteForm() {
+    setEditingId(null);
+    setNoteCreateStep(1);
+    setForm({ site_id: "", recipient_role: defaultRecipient, note_text: "" });
+    mutation.reset();
+  }
+
   async function saveNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!editingId && noteCreateStep < 2) return;
     const client = await getSupabaseBrowserClient();
     if (!client || !profileId) return;
 
@@ -185,8 +232,7 @@ export function ProjectNotesPage({ role }: { role: AppRole }) {
     }, editingId ? "Note updated." : "Note sent.");
 
     if (ok) {
-      setEditingId(null);
-      setForm({ site_id: "", recipient_role: role === "admin" ? "customer" : "admin", note_text: "" });
+      resetNoteForm();
       notes.refetch?.();
     }
   }
@@ -200,113 +246,180 @@ export function ProjectNotesPage({ role }: { role: AppRole }) {
     );
     if (ok) {
       if (editingId === noteId) {
-        setEditingId(null);
-        setForm({ site_id: "", recipient_role: role === "admin" ? "customer" : "admin", note_text: "" });
+        resetNoteForm();
       }
       notes.refetch?.();
     }
   }
 
+  const isNoteWizard = !editingId;
+
   return (
     <div className="page-stack">
-      <FormCard title={editingId ? "Edit note" : "Send a project note"} description="Keep site conversations inside the app between admin, customer, architect, and electrician.">
+      <FormCard
+        title={editingId ? "Edit note" : "Send a project note"}
+        description="Same guided layout on every role: choose the site and audience, then write the note."
+      >
         <form onSubmit={saveNote} className="auth-form">
-          <FormGrid>
-            <label>
-              Site
-              <select value={form.site_id} onChange={(event) => setForm((state) => ({ ...state, site_id: event.target.value }))} required>
-                <option value="">Select site</option>
-                {sites.data.map((site: any) => (
-                  <option key={site.id} value={site.id}>
-                    {site.site_name} {site.site_code ? `(${site.site_code})` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Send to
-              <select value={form.recipient_role} onChange={(event) => setForm((state) => ({ ...state, recipient_role: event.target.value }))}>
-                {getRecipientOptions(role).map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </FormGrid>
-          <label>
-            Note
-            <textarea value={form.note_text} onChange={(event) => setForm((state) => ({ ...state, note_text: event.target.value }))} required />
-          </label>
-          <div className="form-actions">
-            <button className="primary-button" disabled={mutation.isSubmitting}>
-              {mutation.isSubmitting ? "Saving..." : editingId ? "Update note" : "Send note"}
-            </button>
-            {editingId ? (
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => {
-                  setEditingId(null);
-                  setForm({ site_id: "", recipient_role: role === "admin" ? "customer" : "admin", note_text: "" });
-                  mutation.reset();
-                }}
-              >
-                Cancel edit
-              </button>
-            ) : null}
-          </div>
+          {isNoteWizard ? <FlowWizardSteps steps={NOTE_STEPS} currentStep={noteCreateStep} ariaLabel="Steps to send a note" /> : null}
+          {editingId ? <FormSectionHeader title="Note" lead={<>Update the message or routing, then save.</>} /> : null}
+
+          {isNoteWizard && noteCreateStep === 1 ? (
+            <div className="wizard-step-body">
+              <FormGrid>
+                <label>
+                  Site
+                  <select value={form.site_id} onChange={(event) => setForm((state) => ({ ...state, site_id: event.target.value }))} required autoFocus>
+                    <option value="">Select site</option>
+                    {sites.data.map((site: any) => (
+                      <option key={site.id} value={site.id}>
+                        {site.site_name} {site.site_code ? `(${site.site_code})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Send to
+                  <select value={form.recipient_role} onChange={(event) => setForm((state) => ({ ...state, recipient_role: event.target.value }))}>
+                    {getRecipientOptions(role).map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <FormFieldHint>Only roles you are allowed to message appear here.</FormFieldHint>
+                </label>
+              </FormGrid>
+              <div className="wizard-nav">
+                <button type="button" className="primary-button" disabled={!form.site_id} onClick={() => setNoteCreateStep(2)}>
+                  Continue
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {isNoteWizard && noteCreateStep === 2 ? (
+            <div className="wizard-step-body">
+              <label>
+                Note
+                <textarea
+                  value={form.note_text}
+                  onChange={(event) => setForm((state) => ({ ...state, note_text: event.target.value }))}
+                  required
+                  autoFocus
+                  placeholder="Your message to the project team"
+                />
+              </label>
+              <div className="wizard-nav">
+                <button type="button" className="secondary-button" onClick={() => setNoteCreateStep(1)}>
+                  Back
+                </button>
+                <button className="primary-button" disabled={mutation.isSubmitting || !form.note_text.trim()} type="submit">
+                  {mutation.isSubmitting ? "Saving..." : "Send note"}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {editingId ? (
+            <>
+              <FormGrid>
+                <label>
+                  Site
+                  <select value={form.site_id} onChange={(event) => setForm((state) => ({ ...state, site_id: event.target.value }))} required>
+                    <option value="">Select site</option>
+                    {sites.data.map((site: any) => (
+                      <option key={site.id} value={site.id}>
+                        {site.site_name} {site.site_code ? `(${site.site_code})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Send to
+                  <select value={form.recipient_role} onChange={(event) => setForm((state) => ({ ...state, recipient_role: event.target.value }))}>
+                    {getRecipientOptions(role).map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </FormGrid>
+              <label>
+                Note
+                <textarea value={form.note_text} onChange={(event) => setForm((state) => ({ ...state, note_text: event.target.value }))} required />
+              </label>
+              <div className="form-actions">
+                <button className="primary-button" disabled={mutation.isSubmitting} type="submit">
+                  {mutation.isSubmitting ? "Saving..." : "Update note"}
+                </button>
+                <button type="button" className="secondary-button" onClick={resetNoteForm}>
+                  Cancel edit
+                </button>
+              </div>
+            </>
+          ) : null}
           <FormNotice error={mutation.error} success={mutation.success} />
         </form>
       </FormCard>
 
-      <PageSection title="Notes feed" description="Only notes you can access for your assigned or owned sites appear here.">
+      <PageSection title="Notes feed" description="Search the thread. Same card layout for customer, electrician, architect, and admin.">
         <QueryState
           loading={notes.loading}
           error={notes.error}
           hasData={notes.data.length > 0}
           empty={{ title: "No notes yet", description: "Send your first site note to start collaboration inside the app." }}
         >
-          <CardGrid>
-            {notes.data.map((note: any) => (
-              <DataCard
-                key={note.id}
-                title={note.site_name}
-                subtitle={`${note.sender_name} (${note.sender_role})`}
-                meta={note.recipient_name ?? note.recipient_role ?? "All participants"}
-              >
-                <p>{note.note_text}</p>
-                <p>{new Date(note.created_at).toLocaleString("en-IN")}</p>
-                {note.sender_user_id === profileId || role === "admin" ? (
-                  <div className="inline-actions">
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => {
-                        setEditingId(note.id);
-                        setForm({
-                          site_id: note.site_id ?? "",
-                          recipient_role: note.recipient_role ?? (role === "admin" ? "customer" : "admin"),
-                          note_text: note.note_text ?? ""
-                        });
-                        mutation.reset();
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => void deleteNote(note.id)}
-                      disabled={mutation.isSubmitting}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                ) : null}
-              </DataCard>
-            ))}
-          </CardGrid>
+          <ListSearchField value={noteSearch} onChange={setNoteSearch} placeholder="Search notes" ariaLabel="Search notes" />
+          <QueryState
+            loading={false}
+            error={null}
+            hasData={visibleNotes.length > 0}
+            empty={{ title: "No matching notes", description: "Try different words or clear the search." }}
+          >
+            <CardGrid>
+              {visibleNotes.map((note: any) => (
+                <DataCard
+                  key={note.id}
+                  title={note.site_name}
+                  subtitle={`${note.sender_name} (${note.sender_role})`}
+                  meta={note.recipient_name ?? note.recipient_role ?? "All participants"}
+                >
+                  <p>{note.note_text}</p>
+                  <p>{new Date(note.created_at).toLocaleString("en-IN")}</p>
+                  {note.sender_user_id === profileId || role === "admin" ? (
+                    <div className="inline-actions">
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => {
+                          setEditingId(note.id);
+                          setNoteCreateStep(1);
+                          setForm({
+                            site_id: note.site_id ?? "",
+                            recipient_role: note.recipient_role ?? defaultRecipient,
+                            note_text: note.note_text ?? ""
+                          });
+                          mutation.reset();
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => void deleteNote(note.id)}
+                        disabled={mutation.isSubmitting}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ) : null}
+                </DataCard>
+              ))}
+            </CardGrid>
+          </QueryState>
         </QueryState>
       </PageSection>
     </div>
@@ -319,6 +432,8 @@ export function ArchitectProductRequestsPage() {
   const sites = useAccessibleSites("architect", profileId);
   const mutation = useMutationAction();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [archCreateStep, setArchCreateStep] = useState(1);
+  const [requestSearch, setRequestSearch] = useState("");
   const [form, setForm] = useState({
     site_id: "",
     title: "",
@@ -338,8 +453,33 @@ export function ArchitectProductRequestsPage() {
     [profileId]
   );
 
+  const visibleArchRequests = useMemo(() => {
+    const q = requestSearch.trim().toLowerCase();
+    if (!q) return requests.data;
+    return requests.data.filter((request: any) =>
+      [request.title, request.site_name, request.status, request.description, request.preferred_category, request.preferred_brand].some((value) =>
+        String(value ?? "").toLowerCase().includes(q)
+      )
+    );
+  }, [requests.data, requestSearch]);
+
+  useEffect(() => {
+    if (editingId) return;
+    if (archCreateStep >= 2 && (!form.site_id || !form.title.trim())) setArchCreateStep(1);
+  }, [editingId, archCreateStep, form.site_id, form.title]);
+
+  const emptyArchRequestForm = { site_id: "", title: "", preferred_category: "", preferred_brand: "", description: "" };
+
+  function resetArchRequestForm() {
+    setEditingId(null);
+    setArchCreateStep(1);
+    setForm({ ...emptyArchRequestForm });
+    mutation.reset();
+  }
+
   async function saveRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!editingId && archCreateStep < 4) return;
     const client = await getSupabaseBrowserClient();
     if (!client || !profileId) return;
 
@@ -360,8 +500,7 @@ export function ArchitectProductRequestsPage() {
     }, editingId ? "Request updated." : "Request sent to admin.");
 
     if (ok) {
-      setEditingId(null);
-      setForm({ site_id: "", title: "", preferred_category: "", preferred_brand: "", description: "" });
+      resetArchRequestForm();
       requests.refetch?.();
     }
   }
@@ -375,113 +514,214 @@ export function ArchitectProductRequestsPage() {
     );
     if (ok) {
       if (editingId === requestId) {
-        setEditingId(null);
-        setForm({ site_id: "", title: "", preferred_category: "", preferred_brand: "", description: "" });
+        resetArchRequestForm();
       }
       requests.refetch?.();
     }
   }
 
+  const isArchWizard = !editingId;
+
   return (
     <div className="page-stack">
-      <FormCard title={editingId ? "Edit custom product request" : "Request a new product"} description="Architects can describe a required product when it is missing from the live catalog.">
+      <FormCard
+        title={editingId ? "Edit custom product request" : "Request a new product"}
+        description="Same category → brand → details rhythm as catalog and material lines: narrow what you need, then describe it."
+      >
         <form onSubmit={saveRequest} className="auth-form">
-          <FormGrid>
-            <label>
-              Site
-              <select value={form.site_id} onChange={(event) => setForm((state) => ({ ...state, site_id: event.target.value }))} required>
-                <option value="">Select site</option>
-                {sites.data.map((site: any) => (
-                  <option key={site.id} value={site.id}>
-                    {site.site_name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Request title
-              <input value={form.title} onChange={(event) => setForm((state) => ({ ...state, title: event.target.value }))} required />
-            </label>
-            <label>
-              Preferred category
-              <input value={form.preferred_category} onChange={(event) => setForm((state) => ({ ...state, preferred_category: event.target.value }))} />
-            </label>
-            <label>
-              Preferred brand
-              <input value={form.preferred_brand} onChange={(event) => setForm((state) => ({ ...state, preferred_brand: event.target.value }))} />
-            </label>
-          </FormGrid>
-          <label>
-            Description
-            <textarea value={form.description} onChange={(event) => setForm((state) => ({ ...state, description: event.target.value }))} required />
-          </label>
-          <div className="form-actions">
-            <button className="primary-button" disabled={mutation.isSubmitting}>
-              {mutation.isSubmitting ? "Saving..." : editingId ? "Update request" : "Send request"}
-            </button>
-            {editingId ? (
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => {
-                  setEditingId(null);
-                  setForm({ site_id: "", title: "", preferred_category: "", preferred_brand: "", description: "" });
-                  mutation.reset();
-                }}
-              >
-                Cancel edit
-              </button>
-            ) : null}
-          </div>
+          {isArchWizard ? <FlowWizardSteps steps={ARCH_REQUEST_STEPS} currentStep={archCreateStep} ariaLabel="Steps for product request" /> : null}
+          {editingId ? <FormSectionHeader title="Request" lead={<>Edit any field, then save.</>} /> : null}
+
+          {isArchWizard && archCreateStep === 1 ? (
+            <div className="wizard-step-body">
+              <FormGrid>
+                <label>
+                  Site
+                  <select value={form.site_id} onChange={(event) => setForm((state) => ({ ...state, site_id: event.target.value }))} required autoFocus>
+                    <option value="">Select site</option>
+                    {sites.data.map((site: any) => (
+                      <option key={site.id} value={site.id}>
+                        {site.site_name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Request title
+                  <input value={form.title} onChange={(event) => setForm((state) => ({ ...state, title: event.target.value }))} required placeholder="Short name for this need" />
+                </label>
+              </FormGrid>
+              <div className="wizard-nav">
+                <button type="button" className="primary-button" disabled={!form.site_id || !form.title.trim()} onClick={() => setArchCreateStep(2)}>
+                  Continue to category
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {isArchWizard && archCreateStep === 2 ? (
+            <div className="wizard-step-body">
+              <label>
+                Preferred category
+                <input
+                  value={form.preferred_category}
+                  onChange={(event) => setForm((state) => ({ ...state, preferred_category: event.target.value }))}
+                  placeholder="e.g. Cables, switches"
+                  autoFocus
+                />
+                <FormFieldHint>Optional. Helps admin match to the catalog.</FormFieldHint>
+              </label>
+              <div className="wizard-nav">
+                <button type="button" className="secondary-button" onClick={() => setArchCreateStep(1)}>
+                  Back
+                </button>
+                <button type="button" className="primary-button" onClick={() => setArchCreateStep(3)}>
+                  Continue to brand
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {isArchWizard && archCreateStep === 3 ? (
+            <div className="wizard-step-body">
+              <label>
+                Preferred brand
+                <input value={form.preferred_brand} onChange={(event) => setForm((state) => ({ ...state, preferred_brand: event.target.value }))} placeholder="Manufacturer or range" autoFocus />
+                <FormFieldHint>Optional.</FormFieldHint>
+              </label>
+              <div className="wizard-nav">
+                <button type="button" className="secondary-button" onClick={() => setArchCreateStep(2)}>
+                  Back
+                </button>
+                <button type="button" className="primary-button" onClick={() => setArchCreateStep(4)}>
+                  Continue to description
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {isArchWizard && archCreateStep === 4 ? (
+            <div className="wizard-step-body">
+              <label>
+                Description
+                <textarea
+                  value={form.description}
+                  onChange={(event) => setForm((state) => ({ ...state, description: event.target.value }))}
+                  required
+                  autoFocus
+                  placeholder="Specs, quantities, finish, or links"
+                />
+              </label>
+              <div className="wizard-nav">
+                <button type="button" className="secondary-button" onClick={() => setArchCreateStep(3)}>
+                  Back
+                </button>
+                <button className="primary-button" disabled={mutation.isSubmitting || !form.description.trim()} type="submit">
+                  {mutation.isSubmitting ? "Saving..." : "Send request"}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {editingId ? (
+            <>
+              <FormGrid>
+                <label>
+                  Site
+                  <select value={form.site_id} onChange={(event) => setForm((state) => ({ ...state, site_id: event.target.value }))} required>
+                    <option value="">Select site</option>
+                    {sites.data.map((site: any) => (
+                      <option key={site.id} value={site.id}>
+                        {site.site_name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Request title
+                  <input value={form.title} onChange={(event) => setForm((state) => ({ ...state, title: event.target.value }))} required />
+                </label>
+                <label>
+                  Preferred category
+                  <input value={form.preferred_category} onChange={(event) => setForm((state) => ({ ...state, preferred_category: event.target.value }))} />
+                </label>
+                <label>
+                  Preferred brand
+                  <input value={form.preferred_brand} onChange={(event) => setForm((state) => ({ ...state, preferred_brand: event.target.value }))} />
+                </label>
+              </FormGrid>
+              <label>
+                Description
+                <textarea value={form.description} onChange={(event) => setForm((state) => ({ ...state, description: event.target.value }))} required />
+              </label>
+              <div className="form-actions">
+                <button className="primary-button" disabled={mutation.isSubmitting} type="submit">
+                  {mutation.isSubmitting ? "Saving..." : "Update request"}
+                </button>
+                <button type="button" className="secondary-button" onClick={resetArchRequestForm}>
+                  Cancel edit
+                </button>
+              </div>
+            </>
+          ) : null}
           <FormNotice error={mutation.error} success={mutation.success} />
         </form>
       </FormCard>
 
-      <PageSection title="Your requests" description="Track what was requested, matched, ordered, and fulfilled by admin.">
+      <PageSection title="Your requests" description="Search your queue. Track match, order, and fulfillment status.">
         <QueryState
           loading={requests.loading}
           error={requests.error}
           hasData={requests.data.length > 0}
           empty={{ title: "No product requests yet", description: "Custom requests you send from here will appear in this queue." }}
         >
-          <CardGrid>
-            {requests.data.map((request: any) => (
-              <DataCard key={request.id} title={request.title} subtitle={request.site_name} meta={request.status}>
-                <p>{request.description}</p>
-                <p>Preferred category: {request.preferred_category ?? "-"}</p>
-                <p>Preferred brand: {request.preferred_brand ?? "-"}</p>
-                <p>Matched product: {request.matched_product_name ?? "-"}</p>
-                <p>Admin notes: {request.admin_notes ?? "-"}</p>
-                <div className="inline-actions">
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => {
-                      setEditingId(request.id);
-                      setForm({
-                        site_id: request.site_id ?? "",
-                        title: request.title ?? "",
-                        preferred_category: request.preferred_category ?? "",
-                        preferred_brand: request.preferred_brand ?? "",
-                        description: request.description ?? ""
-                      });
-                      mutation.reset();
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => void deleteRequest(request.id)}
-                    disabled={mutation.isSubmitting}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </DataCard>
-            ))}
-          </CardGrid>
+          <ListSearchField value={requestSearch} onChange={setRequestSearch} placeholder="Search requests" ariaLabel="Search product requests" />
+          <QueryState
+            loading={false}
+            error={null}
+            hasData={visibleArchRequests.length > 0}
+            empty={{ title: "No matching requests", description: "Try another search or clear the filter." }}
+          >
+            <CardGrid>
+              {visibleArchRequests.map((request: any) => (
+                <DataCard key={request.id} title={request.title} subtitle={request.site_name} meta={request.status}>
+                  <p>{request.description}</p>
+                  <p>Preferred category: {request.preferred_category ?? "-"}</p>
+                  <p>Preferred brand: {request.preferred_brand ?? "-"}</p>
+                  <p>Matched product: {request.matched_product_name ?? "-"}</p>
+                  <p>Admin notes: {request.admin_notes ?? "-"}</p>
+                  <div className="inline-actions">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => {
+                        setEditingId(request.id);
+                        setArchCreateStep(1);
+                        setForm({
+                          site_id: request.site_id ?? "",
+                          title: request.title ?? "",
+                          preferred_category: request.preferred_category ?? "",
+                          preferred_brand: request.preferred_brand ?? "",
+                          description: request.description ?? ""
+                        });
+                        mutation.reset();
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => void deleteRequest(request.id)}
+                      disabled={mutation.isSubmitting}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </DataCard>
+              ))}
+            </CardGrid>
+          </QueryState>
         </QueryState>
       </PageSection>
     </div>
@@ -511,11 +751,22 @@ export function AdminProductRequestsPage() {
     []
   );
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [adminReqSearch, setAdminReqSearch] = useState("");
   const [form, setForm] = useState({
     status: "reviewing",
     matched_product_id: "",
     admin_notes: ""
   });
+
+  const visibleAdminRequests = useMemo(() => {
+    const q = adminReqSearch.trim().toLowerCase();
+    if (!q) return requests.data;
+    return requests.data.filter((request: any) =>
+      [request.title, request.site_name, request.requested_by_name, request.status, request.description].some((value) =>
+        String(value ?? "").toLowerCase().includes(q)
+      )
+    );
+  }, [requests.data, adminReqSearch]);
 
   async function saveResolution(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -560,22 +811,33 @@ export function AdminProductRequestsPage() {
 
   return (
     <div className="page-stack">
-      <FormCard title="Resolve architect product requests" description="Match requests to existing products, place procurement, and send back admin notes.">
+      <FormCard
+        title="Resolve architect product requests"
+        description="Pick a row in the queue below, then set status, optional catalog match, and notes—same toolbar and card pattern as other admin lists."
+      >
         <form onSubmit={saveResolution} className="auth-form">
+          {!editingId ? (
+            <FormSectionHeader title="Resolution form" lead={<>Choose <strong>Resolve</strong> on a request in the queue to load it here.</>} />
+          ) : null}
           <FormGrid>
             <label>
               Status
-              <select value={form.status} onChange={(event) => setForm((state) => ({ ...state, status: event.target.value }))}>
+              <select value={form.status} onChange={(event) => setForm((state) => ({ ...state, status: event.target.value }))} disabled={!editingId}>
                 <option value="reviewing">Reviewing</option>
                 <option value="matched">Matched</option>
                 <option value="ordered">Ordered</option>
                 <option value="fulfilled">Fulfilled</option>
                 <option value="rejected">Rejected</option>
               </select>
+              {!editingId ? <FormFieldHint>Enabled after you select a request.</FormFieldHint> : null}
             </label>
             <label>
               Matched product
-              <select value={form.matched_product_id} onChange={(event) => setForm((state) => ({ ...state, matched_product_id: event.target.value }))}>
+              <select
+                value={form.matched_product_id}
+                onChange={(event) => setForm((state) => ({ ...state, matched_product_id: event.target.value }))}
+                disabled={!editingId}
+              >
                 <option value="">Select product</option>
                 {products.data.map((product: any) => (
                   <option key={product.id} value={product.id}>
@@ -587,7 +849,7 @@ export function AdminProductRequestsPage() {
           </FormGrid>
           <label>
             Admin notes
-            <textarea value={form.admin_notes} onChange={(event) => setForm((state) => ({ ...state, admin_notes: event.target.value }))} />
+            <textarea value={form.admin_notes} onChange={(event) => setForm((state) => ({ ...state, admin_notes: event.target.value }))} disabled={!editingId} />
           </label>
           <div className="form-actions">
             <button className="primary-button" disabled={mutation.isSubmitting || !editingId}>
@@ -611,49 +873,57 @@ export function AdminProductRequestsPage() {
         </form>
       </FormCard>
 
-      <PageSection title="Request queue" description="All custom product requests raised by architects are visible here.">
+      <PageSection title="Request queue" description="Search by title, site, architect, or status.">
         <QueryState
           loading={requests.loading}
           error={requests.error}
           hasData={requests.data.length > 0}
           empty={{ title: "No requests yet", description: "Architect custom product requests will appear here." }}
         >
-          <CardGrid>
-            {requests.data.map((request: any) => (
-              <DataCard key={request.id} title={request.title} subtitle={`${request.site_name} · ${request.requested_by_name}`} meta={request.status}>
-                <p>{request.description}</p>
-                <p>Preferred category: {request.preferred_category ?? "-"}</p>
-                <p>Preferred brand: {request.preferred_brand ?? "-"}</p>
-                <p>Matched: {request.matched_product_name ?? "-"}</p>
-                <p>Admin notes: {request.admin_notes ?? "-"}</p>
-                <div className="inline-actions">
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => {
-                      setEditingId(request.id);
-                      setForm({
-                        status: request.status ?? "reviewing",
-                        matched_product_id: request.matched_product_id ?? "",
-                        admin_notes: request.admin_notes ?? ""
-                      });
-                      mutation.reset();
-                    }}
-                  >
-                    Resolve
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => void deleteRequest(request.id)}
-                    disabled={mutation.isSubmitting}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </DataCard>
-            ))}
-          </CardGrid>
+          <ListSearchField value={adminReqSearch} onChange={setAdminReqSearch} placeholder="Search the queue" ariaLabel="Search product requests" />
+          <QueryState
+            loading={false}
+            error={null}
+            hasData={visibleAdminRequests.length > 0}
+            empty={{ title: "No matching requests", description: "Try another search or clear the filter." }}
+          >
+            <CardGrid>
+              {visibleAdminRequests.map((request: any) => (
+                <DataCard key={request.id} title={request.title} subtitle={`${request.site_name} · ${request.requested_by_name}`} meta={request.status}>
+                  <p>{request.description}</p>
+                  <p>Preferred category: {request.preferred_category ?? "-"}</p>
+                  <p>Preferred brand: {request.preferred_brand ?? "-"}</p>
+                  <p>Matched: {request.matched_product_name ?? "-"}</p>
+                  <p>Admin notes: {request.admin_notes ?? "-"}</p>
+                  <div className="inline-actions">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => {
+                        setEditingId(request.id);
+                        setForm({
+                          status: request.status ?? "reviewing",
+                          matched_product_id: request.matched_product_id ?? "",
+                          admin_notes: request.admin_notes ?? ""
+                        });
+                        mutation.reset();
+                      }}
+                    >
+                      Resolve
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => void deleteRequest(request.id)}
+                      disabled={mutation.isSubmitting}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </DataCard>
+              ))}
+            </CardGrid>
+          </QueryState>
         </QueryState>
       </PageSection>
     </div>
@@ -1069,6 +1339,8 @@ export function AdminCatalogPage() {
 export function AdminAssignmentsPage() {
   const mutation = useMutationAction();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [assignCreateStep, setAssignCreateStep] = useState(1);
+  const [assignSearch, setAssignSearch] = useState("");
   const [form, setForm] = useState({
     site_id: "",
     user_id: "",
@@ -1102,8 +1374,36 @@ export function AdminAssignmentsPage() {
     [users.data, form.role]
   );
 
+  const visibleAssignments = useMemo(() => {
+    const q = assignSearch.trim().toLowerCase();
+    if (!q) return assignments.data;
+    return assignments.data.filter((assignment: any) => {
+      const site = siteLookup.get(assignment.site_id);
+      const user = userLookup.get(assignment.user_id);
+      return [site?.site_name, site?.site_code, user?.full_name, assignment.role, assignment.status].some((value) =>
+        String(value ?? "").toLowerCase().includes(q)
+      );
+    });
+  }, [assignments.data, assignSearch, siteLookup, userLookup]);
+
+  useEffect(() => {
+    if (editingId) return;
+    if (assignCreateStep >= 2 && !form.site_id) setAssignCreateStep(1);
+    else if (assignCreateStep >= 3 && !form.user_id) setAssignCreateStep(2);
+  }, [editingId, assignCreateStep, form.site_id, form.user_id]);
+
+  const emptyAssignForm = { site_id: "", user_id: "", role: "electrician" as const, status: "active" as const };
+
+  function resetAssignmentForm() {
+    setEditingId(null);
+    setAssignCreateStep(1);
+    setForm({ ...emptyAssignForm });
+    mutation.reset();
+  }
+
   async function saveAssignment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!editingId && assignCreateStep < 3) return;
     const client = await getSupabaseBrowserClient();
     if (!client) return;
     const payload = {
@@ -1119,8 +1419,7 @@ export function AdminAssignmentsPage() {
       return client.from("site_assignments").insert(payload);
     }, editingId ? "Assignment updated." : "Assignment created.");
     if (ok) {
-      setEditingId(null);
-      setForm({ site_id: "", user_id: "", role: "electrician", status: "active" });
+      resetAssignmentForm();
       assignments.refetch?.();
     }
   }
@@ -1134,124 +1433,214 @@ export function AdminAssignmentsPage() {
     );
     if (ok) {
       if (editingId === assignmentId) {
-        setEditingId(null);
-        setForm({ site_id: "", user_id: "", role: "electrician", status: "active" });
+        resetAssignmentForm();
       }
       assignments.refetch?.();
     }
   }
 
+  const isAssignWizard = !editingId;
+
   return (
     <div className="page-stack">
-      <FormCard title={editingId ? "Edit site assignment" : "Assign electrician or architect"} description="Admins can assign verified professionals to sites directly from the frontend.">
+      <FormCard
+        title={editingId ? "Edit site assignment" : "Assign electrician or architect"}
+        description="Site first, then role and verified professional, then status—consistent with other multi-step admin forms."
+      >
         <form onSubmit={saveAssignment} className="auth-form">
-          <FormGrid>
-            <label>
-              Site
-              <select value={form.site_id} onChange={(event) => setForm((state) => ({ ...state, site_id: event.target.value }))} required>
-                <option value="">Select site</option>
-                {sites.data.map((site: any) => (
-                  <option key={site.id} value={site.id}>
-                    {site.site_name} {site.site_code ? `(${site.site_code})` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Role
-              <select value={form.role} onChange={(event) => setForm((state) => ({ ...state, role: event.target.value, user_id: "" }))}>
-                <option value="electrician">Electrician</option>
-                <option value="architect">Architect</option>
-              </select>
-            </label>
-            <label>
-              Professional
-              <select value={form.user_id} onChange={(event) => setForm((state) => ({ ...state, user_id: event.target.value }))} required>
-                <option value="">Select professional</option>
-                {availableUsers.map((user: any) => (
-                  <option key={user.id} value={user.id}>
-                    {user.full_name} {user.is_admin_verified ? "" : "(Pending verification)"}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Status
-              <select value={form.status} onChange={(event) => setForm((state) => ({ ...state, status: event.target.value }))}>
-                <option value="active">Active</option>
-                <option value="removed">Removed</option>
-                <option value="completed">Completed</option>
-              </select>
-            </label>
-          </FormGrid>
-          <div className="form-actions">
-            <button className="primary-button" disabled={mutation.isSubmitting}>
-              {mutation.isSubmitting ? "Saving..." : editingId ? "Update assignment" : "Create assignment"}
-            </button>
-            {editingId ? (
-              <button type="button" className="secondary-button" onClick={() => {
-                setEditingId(null);
-                setForm({ site_id: "", user_id: "", role: "electrician", status: "active" });
-                mutation.reset();
-              }}>
-                Cancel edit
-              </button>
-            ) : null}
-          </div>
+          {isAssignWizard ? <FlowWizardSteps steps={ADMIN_ASSIGN_STEPS} currentStep={assignCreateStep} ariaLabel="Steps to create assignment" /> : null}
+          {editingId ? <FormSectionHeader title="Assignment" lead={<>Update fields, then save.</>} /> : null}
+
+          {isAssignWizard && assignCreateStep === 1 ? (
+            <div className="wizard-step-body">
+              <label>
+                Site
+                <select value={form.site_id} onChange={(event) => setForm((state) => ({ ...state, site_id: event.target.value }))} required autoFocus>
+                  <option value="">Select site</option>
+                  {sites.data.map((site: any) => (
+                    <option key={site.id} value={site.id}>
+                      {site.site_name} {site.site_code ? `(${site.site_code})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="wizard-nav">
+                <button type="button" className="primary-button" disabled={!form.site_id} onClick={() => setAssignCreateStep(2)}>
+                  Continue
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {isAssignWizard && assignCreateStep === 2 ? (
+            <div className="wizard-step-body">
+              <FormGrid>
+                <label>
+                  Role
+                  <select value={form.role} onChange={(event) => setForm((state) => ({ ...state, role: event.target.value, user_id: "" }))} autoFocus>
+                    <option value="electrician">Electrician</option>
+                    <option value="architect">Architect</option>
+                  </select>
+                </label>
+                <label>
+                  Professional
+                  <select value={form.user_id} onChange={(event) => setForm((state) => ({ ...state, user_id: event.target.value }))} required>
+                    <option value="">Select professional</option>
+                    {availableUsers.map((user: any) => (
+                      <option key={user.id} value={user.id}>
+                        {user.full_name}
+                      </option>
+                    ))}
+                  </select>
+                  <FormFieldHint>Only admin-verified users for the selected role.</FormFieldHint>
+                </label>
+              </FormGrid>
+              <div className="wizard-nav">
+                <button type="button" className="secondary-button" onClick={() => setAssignCreateStep(1)}>
+                  Back
+                </button>
+                <button type="button" className="primary-button" disabled={!form.user_id} onClick={() => setAssignCreateStep(3)}>
+                  Continue
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {isAssignWizard && assignCreateStep === 3 ? (
+            <div className="wizard-step-body">
+              <label>
+                Status
+                <select value={form.status} onChange={(event) => setForm((state) => ({ ...state, status: event.target.value }))} autoFocus>
+                  <option value="active">Active</option>
+                  <option value="removed">Removed</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </label>
+              <div className="wizard-nav">
+                <button type="button" className="secondary-button" onClick={() => setAssignCreateStep(2)}>
+                  Back
+                </button>
+                <button className="primary-button" disabled={mutation.isSubmitting} type="submit">
+                  {mutation.isSubmitting ? "Saving..." : "Create assignment"}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {editingId ? (
+            <>
+              <FormGrid>
+                <label>
+                  Site
+                  <select value={form.site_id} onChange={(event) => setForm((state) => ({ ...state, site_id: event.target.value }))} required>
+                    <option value="">Select site</option>
+                    {sites.data.map((site: any) => (
+                      <option key={site.id} value={site.id}>
+                        {site.site_name} {site.site_code ? `(${site.site_code})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Role
+                  <select value={form.role} onChange={(event) => setForm((state) => ({ ...state, role: event.target.value, user_id: "" }))}>
+                    <option value="electrician">Electrician</option>
+                    <option value="architect">Architect</option>
+                  </select>
+                </label>
+                <label>
+                  Professional
+                  <select value={form.user_id} onChange={(event) => setForm((state) => ({ ...state, user_id: event.target.value }))} required>
+                    <option value="">Select professional</option>
+                    {availableUsers.map((user: any) => (
+                      <option key={user.id} value={user.id}>
+                        {user.full_name} {user.is_admin_verified ? "" : "(Pending verification)"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Status
+                  <select value={form.status} onChange={(event) => setForm((state) => ({ ...state, status: event.target.value }))}>
+                    <option value="active">Active</option>
+                    <option value="removed">Removed</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </label>
+              </FormGrid>
+              <div className="form-actions">
+                <button className="primary-button" disabled={mutation.isSubmitting} type="submit">
+                  {mutation.isSubmitting ? "Saving..." : "Update assignment"}
+                </button>
+                <button type="button" className="secondary-button" onClick={resetAssignmentForm}>
+                  Cancel edit
+                </button>
+              </div>
+            </>
+          ) : null}
           <FormNotice error={mutation.error} success={mutation.success} />
         </form>
       </FormCard>
 
-      <PageSection title="Live assignments" description="Admin can monitor current electrician and architect coverage across all sites.">
+      <PageSection title="Live assignments" description="Search by site, person, role, or status.">
         <QueryState
           loading={assignments.loading}
           error={assignments.error}
           hasData={assignments.data.length > 0}
           empty={{ title: "No assignments yet", description: "Create assignments here to connect sites with professionals." }}
         >
-          <CardGrid>
-            {assignments.data.map((assignment: any) => {
-              const site = siteLookup.get(assignment.site_id);
-              const user = userLookup.get(assignment.user_id);
-              return (
-                <DataCard
-                  key={assignment.id}
-                  title={site?.site_name ?? assignment.site_id}
-                  subtitle={user?.full_name ?? assignment.user_id}
-                  meta={`${assignment.role} · ${assignment.status}`}
-                >
-                  <p>Assigned at: {assignment.assigned_at ? new Date(assignment.assigned_at).toLocaleDateString("en-IN") : "-"}</p>
-                  <p>Verification: {user?.verification_status ?? "-"}</p>
-                  <div className="inline-actions">
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => {
-                        setEditingId(assignment.id);
-                        setForm({
-                          site_id: assignment.site_id ?? "",
-                          user_id: assignment.user_id ?? "",
-                          role: assignment.role ?? "electrician",
-                          status: assignment.status ?? "active"
-                        });
-                        mutation.reset();
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => void deleteAssignment(assignment.id)}
-                      disabled={mutation.isSubmitting}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </DataCard>
-              );
-            })}
-          </CardGrid>
+          <ListSearchField value={assignSearch} onChange={setAssignSearch} placeholder="Search assignments" ariaLabel="Search assignments" />
+          <QueryState
+            loading={false}
+            error={null}
+            hasData={visibleAssignments.length > 0}
+            empty={{ title: "No matching assignments", description: "Try another search or clear the filter." }}
+          >
+            <CardGrid>
+              {visibleAssignments.map((assignment: any) => {
+                const site = siteLookup.get(assignment.site_id);
+                const user = userLookup.get(assignment.user_id);
+                return (
+                  <DataCard
+                    key={assignment.id}
+                    title={site?.site_name ?? assignment.site_id}
+                    subtitle={user?.full_name ?? assignment.user_id}
+                    meta={`${assignment.role} · ${assignment.status}`}
+                  >
+                    <p>Assigned at: {assignment.assigned_at ? new Date(assignment.assigned_at).toLocaleDateString("en-IN") : "-"}</p>
+                    <p>Verification: {user?.verification_status ?? "-"}</p>
+                    <div className="inline-actions">
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => {
+                          setEditingId(assignment.id);
+                          setAssignCreateStep(1);
+                          setForm({
+                            site_id: assignment.site_id ?? "",
+                            user_id: assignment.user_id ?? "",
+                            role: assignment.role ?? "electrician",
+                            status: assignment.status ?? "active"
+                          });
+                          mutation.reset();
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => void deleteAssignment(assignment.id)}
+                        disabled={mutation.isSubmitting}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </DataCard>
+                );
+              })}
+            </CardGrid>
+          </QueryState>
         </QueryState>
       </PageSection>
     </div>

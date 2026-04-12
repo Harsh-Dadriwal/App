@@ -32,7 +32,9 @@ function getExtension(fileName: string, mimeType: string) {
 
 export async function POST(request: Request) {
   try {
-    const formData = await request.formData();
+    const formData = (await request.formData()) as unknown as {
+      get: (name: string) => FormDataEntryValue | null;
+    };
     const file = formData.get("file");
     const productId = String(formData.get("productId") ?? "");
     const productSku = String(formData.get("productSku") ?? "");
