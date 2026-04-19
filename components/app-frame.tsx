@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutationAction, useRows } from "@/components/data-view";
 import { useAuth } from "@/components/providers/auth-provider";
+import { useTheme } from "@/components/theme-provider";
 import { roleLabels, roleNav } from "@/lib/navigation";
 import type { AppRole } from "@/lib/app-types";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
@@ -50,6 +51,9 @@ export function AppFrame({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
+
   const {
     configured,
     isLoading,
@@ -61,6 +65,7 @@ export function AppFrame({
     switchTenant,
     signOut
   } = useAuth();
+
   const notifications = useRows(
     async (client) => {
       if (!profile?.id) {
@@ -76,6 +81,7 @@ export function AppFrame({
     },
     [profile?.id]
   );
+  
   const approvals = useRows(
     async (client) => {
       if (role !== "customer" || !profile?.id) {
@@ -89,6 +95,7 @@ export function AppFrame({
     },
     [role, profile?.id]
   );
+  
   const adminRequests = useRows(
     async (client) => {
       if (role !== "admin") {
@@ -102,6 +109,7 @@ export function AppFrame({
     },
     [role]
   );
+  
   const mutation = useMutationAction();
 
   const navBadges = useMemo(() => {
@@ -144,14 +152,13 @@ export function AppFrame({
     if (!tenantId || tenantId === activeTenant?.id) {
       return;
     }
-
     const ok = await switchTenant(tenantId);
-
     if (ok) {
       notifications.refetch?.();
       approvals.refetch?.();
       adminRequests.refetch?.();
       router.refresh();
+      setIsSidebarOpen(false); // close sidebar on tenant switch
     }
   }
 
@@ -159,20 +166,22 @@ export function AppFrame({
     if (!configured || isLoading) {
       return;
     }
-
     if (!session) {
       router.replace("/auth");
       return;
     }
-
     if (!profile) {
       return;
     }
-
     if (profile.role !== role) {
       router.replace(`/${profile.role}`);
     }
   }, [configured, isLoading, session, profile, role, router]);
+
+  // Handle route changes to close mobile sidebar gracefully
+  useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [pathname]);
 
   if (!configured) {
     return <SetupView />;
@@ -184,7 +193,14 @@ export function AppFrame({
 
   return (
     <main className="workspace-shell">
-      <aside className="workspace-sidebar">
+      {/* Mobile Drawer Overlay */}
+      <div 
+        className={`sidebar-overlay ${isSidebarOpen ? "is-open" : ""}`} 
+        onClick={() => setIsSidebarOpen(false)}
+        aria-hidden="true"
+      />
+
+      <aside className={`workspace-sidebar ${isSidebarOpen ? "is-open" : ""}`}>
         <div className="sidebar-brand">
           <span className="brand-mark">
             {(activeTenant?.app_name ?? "ME")
@@ -236,6 +252,10 @@ export function AppFrame({
         <div className="sidebar-profile">
           <strong>{profile.full_name ?? "User"}</strong>
           <span>{profile.email ?? profile.phone ?? roleLabels[role]}</span>
+          <button type="button" className="theme-toggle theme-toggle--sidebar" onClick={toggleTheme}>
+            <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>
+            <strong>{theme === "dark" ? "L" : "D"}</strong>
+          </button>
           <button type="button" className="secondary-button" onClick={() => void signOut()}>
             Sign out
           </button>
@@ -244,19 +264,32 @@ export function AppFrame({
 
       <section className="workspace-main">
         <header className="workspace-header">
-          <div>
-            <span className="eyebrow">
-              {activeTenant?.app_name ?? "Mahalaxmi Electricals"} • {roleLabels[role]}
-            </span>
-            <h1>{title ?? "Workspace"}</h1>
-            {activeTenant?.membership_role ? (
-              <p className="helper-copy">
-                Tenant access: {activeTenant.membership_role}
-                {activeTenant.slug ? ` • ${activeTenant.slug}` : ""}
-              </p>
-            ) : null}
+          <div className="header-left">
+            <button 
+              type="button" 
+              className="menu-toggle-btn"
+              onClick={() => setIsSidebarOpen(true)}
+              aria-label="Open navigation menu"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
+            <div className="header-title-block">
+              <div className="eyebrow">
+                {activeTenant?.app_name ?? "Mahalaxmi Electricals"} • {roleLabels[role]}
+              </div>
+              <h1>{title ?? "Workspace"}</h1>
+            </div>
           </div>
+          
           <div className="header-aside">
+            <button type="button" className="theme-toggle" onClick={toggleTheme} aria-label="Toggle light and dark mode">
+              <span>{theme === "dark" ? "Light" : "Dark"}</span>
+              <strong>{theme === "dark" ? "L" : "D"}</strong>
+            </button>
             <div className="header-user-card">
               <strong>{profile.full_name ?? "User"}</strong>
               <span>
@@ -265,34 +298,47 @@ export function AppFrame({
               </span>
             </div>
             <div className="header-notifications">
-              <div className="header-notifications-head">
-                <strong>Inbox</strong>
-                <button type="button" className="secondary-button" onClick={() => void markAllRead()}>
-                  Mark all read
-                </button>
-              </div>
+              <button 
+                type="button" 
+                aria-label="View notifications"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+              </button>
               <div className="notification-list">
-                {notifications.data.length ? notifications.data.map((item: any) => (
-                  <article key={item.id} className={item.is_read ? "notification-item" : "notification-item notification-item--unread"}>
-                    <div>
-                      <strong>{item.title}</strong>
-                      <p>{item.body}</p>
-                      <small>{new Date(item.created_at).toLocaleString("en-IN")}</small>
-                    </div>
-                    {!item.is_read ? (
-                      <button type="button" className="secondary-button" onClick={() => void markNotificationRead(item.id)}>
-                        Read
-                      </button>
-                    ) : null}
-                  </article>
-                )) : <p className="notification-empty">No new notifications.</p>}
+                <div className="header-notifications-head" style={{ padding: '1rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)', margin: 0 }}>
+                  <strong style={{ fontSize: '0.875rem' }}>Inbox</strong>
+                  <button type="button" className="secondary-button" onClick={() => void markAllRead()} style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}>
+                    Mark all read
+                  </button>
+                </div>
+                <div>
+                  {notifications.data.length ? notifications.data.map((item: any) => (
+                    <article key={item.id} className={item.is_read ? "notification-item" : "notification-item notification-item--unread"}>
+                      <div>
+                        <strong>{item.title}</strong>
+                        <p>{item.body}</p>
+                        <small>{new Date(item.created_at).toLocaleString("en-IN")}</small>
+                      </div>
+                      {!item.is_read ? (
+                        <button type="button" className="secondary-button" onClick={() => void markNotificationRead(item.id)}>
+                          Read
+                        </button>
+                      ) : null}
+                    </article>
+                  )) : <p className="notification-empty" style={{ padding: '1rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>No new notifications.</p>}
+                </div>
               </div>
             </div>
           </div>
         </header>
 
-        {errorMessage ? <p className="notice error">{errorMessage}</p> : null}
-        {children}
+        <div className="page-content fade-in">
+          {errorMessage ? <p className="notice error">{errorMessage}</p> : null}
+          {children}
+        </div>
       </section>
     </main>
   );

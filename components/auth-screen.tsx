@@ -230,33 +230,29 @@ export function AuthScreen() {
   return (
     <main className="auth-shell">
       <section className="auth-hero">
-        <div className="brand-row">
-          <span className="brand-mark">ME</span>
-          <div>
-            <p className="brand-name">Mahalaxmi Electricals</p>
-            <small>B2B/B2C procurement and site management platform</small>
+        <div style={{ paddingBottom: '2rem' }}>
+          <div className="brand-row" style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+            <span className="brand-mark" style={{ 
+              background: 'linear-gradient(135deg, white, rgba(255,255,255,0.7))', 
+              color: '#1e3a8a', 
+              width: 48, 
+              height: 48, 
+              borderRadius: 12, 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              fontWeight: 700 
+            }}>ME</span>
+            <div>
+              <p className="brand-name" style={{ color: 'white', fontSize: '1.25rem', marginBottom: 0 }}>Mahalaxmi Electricals</p>
+              <small style={{ color: 'rgba(255,255,255,0.8)' }}>B2B & B2C Platform</small>
+            </div>
           </div>
-        </div>
-        <span className="eyebrow">Unified Access</span>
-        <h1>Phone and email login for every role, with a cleaner production-style flow.</h1>
-        <p>
-          Customers, electricians, and architects can sign up directly. Admin accounts stay manual
-          and capped so business control stays tight.
-        </p>
-
-        <div className="auth-benefits">
-          <div className="benefit-chip">
-            <strong>Phone + Email</strong>
-            <span>Flexible login that works like a normal modern app.</span>
-          </div>
-          <div className="benefit-chip">
-            <strong>Role-aware onboarding</strong>
-            <span>Each user lands in the right workspace after sign-in.</span>
-          </div>
-          <div className="benefit-chip">
-            <strong>Controlled admin access</strong>
-            <span>Admins are promoted manually and limited to four accounts.</span>
-          </div>
+          <span className="eyebrow" style={{ color: '#93c5fd' }}>Unified Access</span>
+          <h1>Phone and email access for every professional role.</h1>
+          <p>
+            Architects, contractors, and customers work together harmoniously within our advanced secure procurement layers.
+          </p>
         </div>
 
         <div className="role-grid">
@@ -267,241 +263,232 @@ export function AuthScreen() {
             >
               <strong>{role.label}</strong>
               <p>{role.description}</p>
-              <small>{role.signupAllowed ? "Self signup enabled" : "Manual creation only"}</small>
+              {role.signupAllowed ? null : <small>Manual creation only</small>}
             </article>
           ))}
         </div>
       </section>
 
       <section className="auth-panel">
-        <div className="auth-panel-header">
-          <span className="eyebrow">{authMode === "login" ? "Welcome Back" : "Create Account"}</span>
-          <h2>{authMode === "login" ? "Access your workspace" : "Set up your role-based account"}</h2>
-          <p>
-            {authMethod === "email"
-              ? "Use email and password for a familiar web and mobile login pattern."
-              : "Use SMS OTP for faster mobile-first access."}
-          </p>
-        </div>
-
-        <div className="toggle-row">
-          <div className="segmented-control">
-            <button
-              type="button"
-              className={authMode === "login" ? "is-active" : ""}
-              onClick={() => setAuthMode("login")}
-            >
-              Login
-            </button>
-            <button
-              type="button"
-              className={authMode === "signup" ? "is-active" : ""}
-              onClick={() => setAuthMode("signup")}
-            >
-              Sign Up
-            </button>
-          </div>
-          <div className="segmented-control">
-            <button
-              type="button"
-              className={authMethod === "email" ? "is-active" : ""}
-              onClick={() => {
-                setAuthMethod("email");
-                setOtpSent(false);
-              }}
-            >
-              Email
-            </button>
-            <button
-              type="button"
-              className={authMethod === "phone" ? "is-active" : ""}
-              onClick={() => setAuthMethod("phone")}
-            >
-              Phone
-            </button>
-          </div>
-        </div>
-
-        <div className="auth-steps">
-          <div className="step-pill">
-            <span>1</span>
-            <p>Select method and role</p>
-          </div>
-          <div className="step-pill">
-            <span>2</span>
-            <p>Verify access</p>
-          </div>
-          <div className="step-pill">
-            <span>3</span>
-            <p>Open your dashboard</p>
-          </div>
-        </div>
-
-        {authMethod === "email" ? (
-          <form className="auth-form" onSubmit={handleEmailSubmit}>
-            {authMode === "signup" ? (
-              <div className="form-grid">
-                <label>
-                  Full name
-                  <input
-                    name="fullName"
-                    value={emailForm.fullName}
-                    onChange={onEmailChange}
-                    placeholder="Harsh Dadriwal"
-                    required
-                  />
-                </label>
-                <label>
-                  Phone number
-                  <input
-                    name="phone"
-                    value={emailForm.phone}
-                    onChange={onEmailChange}
-                    placeholder="+919876543210"
-                  />
-                </label>
-                <label>
-                  Role
-                  <select name="role" value={emailForm.role} onChange={onEmailChange}>
-                    {authRoleOptions.map((role) => (
-                      <option
-                        key={role.value}
-                        value={role.value}
-                        disabled={!role.signupAllowed}
-                      >
-                        {role.label}
-                        {!role.signupAllowed ? " (manual only)" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            ) : null}
-
-            <label>
-              Email address
-              <input
-                type="email"
-                name="email"
-                value={emailForm.email}
-                onChange={onEmailChange}
-                placeholder="name@example.com"
-                required
-              />
-            </label>
-            <label>
-              Password
-              <input
-                type="password"
-                name="password"
-                value={emailForm.password}
-                onChange={onEmailChange}
-                placeholder="••••••••"
-                required
-                minLength={6}
-              />
-            </label>
-            <button type="submit" className="primary-button" disabled={isSubmitting}>
-              {isSubmitting
-                ? "Please wait..."
-                : authMode === "login"
-                  ? "Login with Email"
-                  : "Create Account"}
-            </button>
-            <div className="auth-footer-note">
-              <strong>Admin access</strong>
-              <p>Admins are promoted manually by the owner after signup, not created from public signup.</p>
-            </div>
-          </form>
-        ) : otpSent ? (
-          <form className="auth-form" onSubmit={handlePhoneVerify}>
-            <label>
-              Phone number
-              <input
-                name="phone"
-                value={phoneForm.phone}
-                onChange={onPhoneChange}
-                placeholder="+919876543210"
-                required
-              />
-            </label>
-            <label>
-              OTP code
-              <input
-                name="otp"
-                value={phoneForm.otp}
-                onChange={onPhoneChange}
-                placeholder="123456"
-                required
-              />
-            </label>
-            <button type="submit" className="primary-button" disabled={isSubmitting}>
-              {isSubmitting ? "Verifying..." : "Verify OTP"}
-            </button>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => {
-                setOtpSent(false);
-                setPhoneForm((current) => ({ ...current, otp: "" }));
-              }}
-            >
-              Change phone number
-            </button>
-          </form>
-        ) : (
-          <form className="auth-form" onSubmit={handlePhoneOtpSend}>
-            {authMode === "signup" ? (
-              <div className="form-grid">
-                <label>
-                  Full name
-                  <input
-                    name="fullName"
-                    value={phoneForm.fullName}
-                    onChange={onPhoneChange}
-                    placeholder="Harsh Dadriwal"
-                    required
-                  />
-                </label>
-                <label>
-                  Role
-                  <select name="role" value={phoneForm.role} onChange={onPhoneChange}>
-                    {authRoleOptions.map((role) => (
-                      <option
-                        key={role.value}
-                        value={role.value}
-                        disabled={!role.signupAllowed}
-                      >
-                        {role.label}
-                        {!role.signupAllowed ? " (manual only)" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            ) : null}
-
-            <label>
-              Phone number
-              <input
-                name="phone"
-                value={phoneForm.phone}
-                onChange={onPhoneChange}
-                placeholder="+919876543210"
-                required
-              />
-            </label>
-            <button type="submit" className="primary-button" disabled={isSubmitting}>
-              {isSubmitting ? "Sending..." : "Send OTP"}
-            </button>
-            <p className="helper-copy">
-              Use international format with country code. In Supabase, phone auth requires SMS provider configuration.
+        <div className="auth-panel-inner">
+          <div className="auth-panel-header" style={{ marginBottom: '2.5rem' }}>
+            <span className="eyebrow">{authMode === "login" ? "Welcome Back" : "Create Account"}</span>
+            <h2>{authMode === "login" ? "Access your workspace" : "Set up your role-based account"}</h2>
+            <p>
+              {authMethod === "email"
+                ? "Use your email securely. No fuss."
+                : "Use SMS OTP for mobile-first rapid access."}
             </p>
-          </form>
-        )}
+          </div>
 
-        {notice ? <p className="notice success">{notice}</p> : null}
-        {errorMessage ? <p className="notice error">{errorMessage}</p> : null}
+          <div className="toggle-row">
+            <div className="segmented-control">
+              <button
+                type="button"
+                className={authMode === "login" ? "is-active" : ""}
+                onClick={() => setAuthMode("login")}
+              >
+                Login
+              </button>
+              <button
+                type="button"
+                className={authMode === "signup" ? "is-active" : ""}
+                onClick={() => setAuthMode("signup")}
+              >
+                Sign Up
+              </button>
+            </div>
+            <div className="segmented-control">
+              <button
+                type="button"
+                className={authMethod === "email" ? "is-active" : ""}
+                onClick={() => {
+                  setAuthMethod("email");
+                  setOtpSent(false);
+                }}
+              >
+                Email
+              </button>
+              <button
+                type="button"
+                className={authMethod === "phone" ? "is-active" : ""}
+                onClick={() => setAuthMethod("phone")}
+              >
+                Phone
+              </button>
+            </div>
+          </div>
+
+          {authMethod === "email" ? (
+            <form className="auth-form fade-in" onSubmit={handleEmailSubmit}>
+              {authMode === "signup" ? (
+                <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <label style={{ gridColumn: '1 / -1' }}>
+                    Full name
+                    <input
+                      className="input"
+                      name="fullName"
+                      value={emailForm.fullName}
+                      onChange={onEmailChange}
+                      placeholder="Harsh Dadriwal"
+                      required
+                    />
+                  </label>
+                  <label>
+                    Phone number
+                    <input
+                      className="input"
+                      name="phone"
+                      value={emailForm.phone}
+                      onChange={onEmailChange}
+                      placeholder="+919876543210"
+                    />
+                  </label>
+                  <label>
+                    Role
+                    <select className="input" name="role" value={emailForm.role} onChange={onEmailChange}>
+                      {authRoleOptions.map((role) => (
+                        <option
+                          key={role.value}
+                          value={role.value}
+                          disabled={!role.signupAllowed}
+                        >
+                          {role.label}
+                          {!role.signupAllowed ? " (manual only)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              ) : null}
+
+              <label>
+                Email address
+                <input
+                  className="input"
+                  type="email"
+                  name="email"
+                  value={emailForm.email}
+                  onChange={onEmailChange}
+                  placeholder="name@example.com"
+                  required
+                />
+              </label>
+              <label>
+                Password
+                <input
+                  className="input"
+                  type="password"
+                  name="password"
+                  value={emailForm.password}
+                  onChange={onEmailChange}
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                />
+              </label>
+              <button type="submit" className="primary-button" disabled={isSubmitting} style={{ marginTop: '1rem' }}>
+                {isSubmitting
+                  ? "Please wait..."
+                  : authMode === "login"
+                    ? "Login Securely"
+                    : "Create Account"}
+              </button>
+            </form>
+          ) : otpSent ? (
+            <form className="auth-form fade-in" onSubmit={handlePhoneVerify}>
+              <label>
+                Phone number
+                <input
+                  className="input"
+                  name="phone"
+                  value={phoneForm.phone}
+                  onChange={onPhoneChange}
+                  disabled
+                />
+              </label>
+              <label>
+                Secure OTP code
+                <input
+                  className="input"
+                  name="otp"
+                  value={phoneForm.otp}
+                  onChange={onPhoneChange}
+                  placeholder="123456"
+                  required
+                  autoFocus
+                />
+              </label>
+              <button type="submit" className="primary-button" disabled={isSubmitting} style={{ marginTop: '1rem' }}>
+                {isSubmitting ? "Verifying Token..." : "Verify OTP"}
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => {
+                  setOtpSent(false);
+                  setPhoneForm((current) => ({ ...current, otp: "" }));
+                }}
+              >
+                Change phone number
+              </button>
+            </form>
+          ) : (
+            <form className="auth-form fade-in" onSubmit={handlePhoneOtpSend}>
+              {authMode === "signup" ? (
+                <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <label style={{ gridColumn: '1 / -1' }}>
+                    Full name
+                    <input
+                      className="input"
+                      name="fullName"
+                      value={phoneForm.fullName}
+                      onChange={onPhoneChange}
+                      placeholder="Harsh Dadriwal"
+                      required
+                    />
+                  </label>
+                  <label style={{ gridColumn: '1 / -1' }}>
+                    Role
+                    <select className="input" name="role" value={phoneForm.role} onChange={onPhoneChange}>
+                      {authRoleOptions.map((role) => (
+                        <option
+                          key={role.value}
+                          value={role.value}
+                          disabled={!role.signupAllowed}
+                        >
+                          {role.label}
+                          {!role.signupAllowed ? " (manual only)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              ) : null}
+
+              <label>
+                Phone number
+                <input
+                  className="input"
+                  name="phone"
+                  value={phoneForm.phone}
+                  onChange={onPhoneChange}
+                  placeholder="+919876543210"
+                  required
+                />
+              </label>
+              <button type="submit" className="primary-button" disabled={isSubmitting} style={{ marginTop: '1rem' }}>
+                {isSubmitting ? "Sending..." : "Send OTP Request"}
+              </button>
+              <p className="helper-copy" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                Standard message and data rates may apply.
+              </p>
+            </form>
+          )}
+
+          {notice ? <div className="notice success fade-in">{notice}</div> : null}
+          {errorMessage ? <div className="notice error fade-in">{errorMessage}</div> : null}
+        </div>
       </section>
     </main>
   );

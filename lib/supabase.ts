@@ -33,6 +33,8 @@ type BrowserSupabaseClient = {
   };
   from: (table: string) => any;
   rpc: (fn: string, args?: Record<string, unknown>) => Promise<any>;
+  channel: (name: string) => any;
+  removeChannel: (channel: any) => Promise<any>;
 };
 
 if (typeof window === "undefined") {

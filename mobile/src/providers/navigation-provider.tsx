@@ -6,7 +6,8 @@ export type MobileScreen =
   | "order-builder"
   | "materials"
   | "notes"
-  | "admin-catalog";
+  | "admin-catalog"
+  | "fintech";
 
 type NavigationContextValue = {
   screen: MobileScreen;

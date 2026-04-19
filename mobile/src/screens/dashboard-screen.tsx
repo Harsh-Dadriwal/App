@@ -16,13 +16,13 @@ const roleActions = {
     { label: "Project notes", route: "notes" }
   ],
   architect: [
+    { label: "Create material order", route: "order-builder" },
     { label: "Material reviews", route: "materials" },
-    { label: "Request new products", route: "catalog" },
     { label: "Project notes", route: "notes" }
   ],
   admin: [
+    { label: "Create quick order", route: "order-builder" },
     { label: "Admin catalog", route: "admin-catalog" },
-    { label: "Live products", route: "catalog" },
     { label: "Notes and monitoring", route: "notes" }
   ]
 } as const satisfies Record<string, Array<{ label: string; route: MobileScreen }>>;

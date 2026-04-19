@@ -23,25 +23,25 @@ const tabConfig: Record<string, Array<{ key: MobileScreen; label: string; icon: 
     { key: "dashboard", label: "Home", icon: "home" },
     { key: "catalog", label: "Catalog", icon: "grid" },
     { key: "order-builder", label: "Order", icon: "shopping-bag" },
-    { key: "notes", label: "Notes", icon: "message-square" }
+    { key: "fintech", label: "Fintech", icon: "dollar-sign" }
   ],
   electrician: [
     { key: "dashboard", label: "Home", icon: "home" },
     { key: "order-builder", label: "Order", icon: "shopping-bag" },
     { key: "materials", label: "Tracker", icon: "layers" },
-    { key: "notes", label: "Notes", icon: "message-square" }
+    { key: "fintech", label: "Fintech", icon: "dollar-sign" }
   ],
   architect: [
     { key: "dashboard", label: "Home", icon: "home" },
-    { key: "catalog", label: "Catalog", icon: "grid" },
+    { key: "order-builder", label: "Order", icon: "shopping-bag" },
     { key: "materials", label: "Tracker", icon: "layers" },
     { key: "notes", label: "Notes", icon: "message-square" }
   ],
   admin: [
     { key: "dashboard", label: "Home", icon: "home" },
+    { key: "order-builder", label: "Order", icon: "shopping-bag" },
     { key: "admin-catalog", label: "Admin", icon: "settings" },
-    { key: "catalog", label: "Products", icon: "package" },
-    { key: "notes", label: "Notes", icon: "message-square" }
+    { key: "fintech", label: "Fintech", icon: "dollar-sign" }
   ]
 };
 
@@ -156,7 +156,7 @@ export function ScreenShell({
                 <Feather
                   name={tab.icon}
                   size={18}
-                  color={active ? "#fffaf4" : palette.muted}
+                  color={active ? "#ffffff" : palette.muted}
                 />
                 <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{tab.label}</Text>
               </Pressable>
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
     width: 240,
     height: 240,
     borderRadius: 120,
-    backgroundColor: "rgba(183, 97, 51, 0.12)"
+    backgroundColor: "rgba(79, 70, 229, 0.1)"
   },
   backgroundTintBottom: {
     position: "absolute",
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     borderRadius: 110,
-    backgroundColor: "rgba(39, 95, 99, 0.08)"
+    backgroundColor: "rgba(15, 23, 42, 0.05)"
   },
   scroll: {
     paddingHorizontal: 16,
@@ -407,12 +407,12 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderColor: palette.line,
-    borderRadius: 28,
+    borderRadius: 32,
     backgroundColor: palette.surfaceRaised,
     shadowColor: palette.shadow,
     shadowOpacity: 1,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 16 },
     elevation: 4
   },
   heroCompact: {
@@ -531,24 +531,24 @@ const styles = StyleSheet.create({
     color: "#fffaf4"
   },
   card: {
-    padding: 16,
+    padding: 18,
     borderWidth: 1,
     borderColor: palette.line,
-    borderRadius: 24,
+    borderRadius: 28,
     backgroundColor: palette.surface,
     shadowColor: palette.shadow,
-    shadowOpacity: 0.7,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
+    shadowOpacity: 0.9,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
     gap: 10
   },
   cardSoft: {
     backgroundColor: palette.surfaceSoft
   },
   cardBrand: {
-    backgroundColor: "#fff4ea",
-    borderColor: "rgba(183, 97, 51, 0.22)"
+    backgroundColor: palette.brandSoft,
+    borderColor: "rgba(180, 83, 9, 0.15)"
   },
   sectionHead: {
     flexDirection: "row",
@@ -610,7 +610,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 13,
-    backgroundColor: "#fffdfa",
+    backgroundColor: palette.surface,
     color: palette.ink
   },
   textarea: {
@@ -679,7 +679,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 10,
     borderRadius: 24,
-    backgroundColor: "rgba(25, 22, 19, 0.94)",
+    backgroundColor: "rgba(15, 23, 42, 0.95)",
     shadowColor: palette.shadow,
     shadowOpacity: 1,
     shadowRadius: 18,
@@ -695,15 +695,15 @@ const styles = StyleSheet.create({
     gap: 4
   },
   tabButtonActive: {
-    backgroundColor: "rgba(255, 250, 244, 0.16)"
+    backgroundColor: "rgba(255, 255, 255, 0.16)"
   },
   tabLabel: {
-    color: "#cbbfaf",
+    color: "#94a3b8",
     fontSize: 11,
     fontWeight: "700"
   },
   tabLabelActive: {
-    color: "#fffaf4"
+    color: "#ffffff"
   }
 });
 

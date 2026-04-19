@@ -3,7 +3,8 @@ import { supabase } from "@/lib/supabase";
 
 export function useRows<T>(
   fetcher: (client: NonNullable<typeof supabase>) => Promise<{ data: T[]; error: string | null }>,
-  deps: any[]
+  deps: any[],
+  options?: { realtimeTable?: string }
 ) {
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
@@ -12,6 +13,8 @@ export function useRows<T>(
 
   useEffect(() => {
     let active = true;
+    let channel: any = null;
+    
     void (async () => {
       if (!supabase) {
         setError("Supabase is not configured.");
@@ -19,6 +22,18 @@ export function useRows<T>(
         setLoading(false);
         return;
       }
+
+      if (options?.realtimeTable) {
+        channel = supabase
+          .channel(`public:${options.realtimeTable}:${Math.random().toString(36).slice(2)}`)
+          .on("postgres_changes", { event: "*", schema: "public", table: options.realtimeTable }, () => {
+            if (active) {
+              setReloadKey((k) => k + 1);
+            }
+          })
+          .subscribe();
+      }
+
       setLoading(true);
       const result = await fetcher(supabase);
       if (!active) return;
@@ -26,8 +41,15 @@ export function useRows<T>(
       setError(result.error);
       setLoading(false);
     })();
+    
     return () => {
       active = false;
+      if (channel && supabase) {
+        // Run asynchronously to avoid locking the Native JS thread during fast refresh or immediate unmounts
+        setTimeout(() => {
+          supabase?.removeChannel(channel).catch(() => {});
+        }, 100);
+      }
     };
   }, [...deps, reloadKey]);
 

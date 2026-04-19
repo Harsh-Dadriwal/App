@@ -82,7 +82,8 @@ type FetchResult<T> = {
 
 export function useRows<T>(
   fetcher: (client: NonNullable<Awaited<ReturnType<typeof getSupabaseBrowserClient>>>) => Promise<FetchResult<T>>,
-  deps: DependencyList
+  deps: DependencyList,
+  options?: { realtimeTable?: string }
 ) {
   const [data, setData] = useState<T[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +92,7 @@ export function useRows<T>(
 
   useEffect(() => {
     let active = true;
+    let channel: any = null;
 
     void (async () => {
       setLoading(true);
@@ -103,6 +105,17 @@ export function useRows<T>(
           setLoading(false);
         }
         return;
+      }
+
+      if (options?.realtimeTable) {
+        channel = client
+          .channel(`public:${options.realtimeTable}:${Math.random().toString(36).slice(2)}`)
+          .on("postgres_changes", { event: "*", schema: "public", table: options.realtimeTable }, () => {
+            if (active) {
+              setReloadKey((k) => k + 1);
+            }
+          })
+          .subscribe();
       }
 
       const result = await fetcher(client);
@@ -118,6 +131,9 @@ export function useRows<T>(
 
     return () => {
       active = false;
+      if (channel) {
+        void getSupabaseBrowserClient().then(c => c && c.removeChannel(channel));
+      }
     };
   }, [...deps, reloadKey]);
 

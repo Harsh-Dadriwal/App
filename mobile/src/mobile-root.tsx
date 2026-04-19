@@ -9,6 +9,7 @@ import { OrderBuilderScreen } from "@/screens/order-builder-screen";
 import { MaterialsScreen } from "@/screens/materials-screen";
 import { NotesScreen } from "@/screens/notes-screen";
 import { AdminCatalogScreen } from "@/screens/admin-catalog-screen";
+import { FintechScreen } from "@/screens/fintech-screen";
 
 function AppBody() {
   const { configured, loading, session, profile } = useAuth();
@@ -33,6 +34,7 @@ function AppBody() {
   if (screen === "materials") return <MaterialsScreen />;
   if (screen === "notes") return <NotesScreen />;
   if (screen === "admin-catalog") return <AdminCatalogScreen />;
+  if (screen === "fintech") return <FintechScreen />;
   return <DashboardScreen />;
 }
 

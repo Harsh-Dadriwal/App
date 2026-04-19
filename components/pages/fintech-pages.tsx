@@ -46,7 +46,8 @@ export function CustomerWalletPage() {
         .maybeSingle();
       return { data: data ? [data as any] : [], error: error?.message ?? null };
     },
-    [customerId, tenantId]
+    [customerId, tenantId],
+    { realtimeTable: "wallet_accounts" }
   );
 
   const ledger = useRows(
@@ -60,7 +61,8 @@ export function CustomerWalletPage() {
         .limit(25);
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
-    [wallet.data[0]?.id]
+    [wallet.data[0]?.id],
+    { realtimeTable: "wallet_ledger_entries" }
   );
 
   const totalCredits = ledger.data
@@ -165,7 +167,8 @@ export function CustomerSavingsPage() {
         .order("created_at", { ascending: false });
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
-    [tenantId, customerId]
+    [tenantId, customerId],
+    { realtimeTable: "savings_plan_subscriptions" }
   );
 
   const installments = useRows(
@@ -179,7 +182,8 @@ export function CustomerSavingsPage() {
         .order("due_date", { ascending: true });
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
-    [subscriptions.data.map((subscription: any) => subscription.id).join(",")]
+    [subscriptions.data.map((subscription: any) => subscription.id).join(",")],
+    { realtimeTable: "savings_installments" }
   );
 
   async function subscribeToPlan(template: any) {
@@ -583,7 +587,7 @@ export function AdminFintechPage() {
     async (client) => {
       const { data, error } = await client
         .from("wallet_accounts")
-        .select("id, user_id, available_balance, status, currency_code, users!inner(full_name, email)")
+        .select("id, user_id, available_balance, status, currency_code, user:users!wallet_accounts_user_id_fkey(full_name, email)")
         .eq("tenant_id", tenantId)
         .order("created_at", { ascending: false });
       return { data: (data ?? []) as any[], error: error?.message ?? null };
@@ -595,7 +599,7 @@ export function AdminFintechPage() {
     async (client) => {
       const { data, error } = await client
         .from("tenant_memberships")
-        .select("user_id, users!inner(id, full_name, email, role)")
+        .select("user_id, user:users!tenant_memberships_user_id_fkey(id, full_name, email, role)")
         .eq("tenant_id", tenantId)
         .eq("is_active", true);
       return { data: (data ?? []) as any[], error: error?.message ?? null };
@@ -631,7 +635,7 @@ export function AdminFintechPage() {
     async (client) => {
       const { data, error } = await client
         .from("savings_plan_subscriptions")
-        .select("id, subscription_number, status, installment_amount, installment_count, users!inner(full_name), savings_plan_templates!inner(name)")
+        .select("id, subscription_number, status, installment_amount, installment_count, user:users!savings_plan_subscriptions_user_id_fkey(full_name), plan_template:savings_plan_templates!savings_plan_subscriptions_plan_template_id_fkey(name)")
         .eq("tenant_id", tenantId)
         .order("created_at", { ascending: false })
         .limit(25);
@@ -950,7 +954,7 @@ export function AdminFintechPage() {
                 <option value="">Select user</option>
                 {wallets.data.map((wallet: any) => (
                   <option key={wallet.id} value={wallet.user_id}>
-                    {wallet.users?.full_name ?? wallet.user_id}
+                    {wallet.user?.full_name ?? wallet.user_id}
                   </option>
                 ))}
               </select>
@@ -1058,8 +1062,8 @@ export function AdminFintechPage() {
               .map((membership: any) => (
                 <DataCard
                   key={`wallet-create-${membership.user_id}`}
-                  title={membership.users?.full_name ?? membership.user_id}
-                  subtitle={membership.users?.email ?? membership.users?.role ?? "tenant member"}
+                  title={membership.user?.full_name ?? membership.user_id}
+                  subtitle={membership.user?.email ?? membership.user?.role ?? "tenant member"}
                   meta="wallet missing"
                 >
                   <div className="inline-actions">
@@ -1088,9 +1092,9 @@ export function AdminFintechPage() {
           <DataTable
             columns={["Customer", "Subscription", "Plan", "Amount", "Count", "Status"]}
             rows={subscriptions.data.map((row: any) => [
-              row.users?.full_name ?? "-",
+              row.user?.full_name ?? "-",
               row.subscription_number,
-              row.savings_plan_templates?.name ?? "-",
+              row.plan_template?.name ?? "-",
               `₹${Number(row.installment_amount ?? 0).toLocaleString("en-IN")}`,
               row.installment_count,
               row.status

@@ -505,6 +505,15 @@ export function ElectricianMaterialsPage() {
       [item.item_name_snapshot, item.site_name, item.status].some((value) => String(value ?? "").toLowerCase().includes(q))
     );
   }, [materials.data, materialSearch]);
+  const selectedProduct = useMemo(
+    () => products.data.find((product: any) => product.id === form.product_id),
+    [products.data, form.product_id]
+  );
+  const selectedSiteName = ongoingProjects.data.find((site: any) => site.site_id === form.site_id)?.site_name;
+  const selectedOrderNumber = siteOrders.data.find((order: any) => order.id === form.site_order_id)?.order_number;
+  const selectedCategoryName = form.category_id ? categoryLookup.get(form.category_id) : "";
+  const selectedBrandName = form.brand_id ? brandLookup.get(form.brand_id) : "";
+  const orderLineTotal = Number(form.quantity_required || 0) * Number(form.unit_price || 0);
 
   useEffect(() => {
     if (editingId) return;
@@ -587,6 +596,24 @@ export function ElectricianMaterialsPage() {
         }
       >
         <form onSubmit={saveOrderItem} className="auth-form">
+          {!editingId ? (
+            <div className="order-builder-hero">
+              <div>
+                <span className="eyebrow">Guided Order Builder</span>
+                <h3>Find the exact material fast, then send it for approval.</h3>
+                <p>
+                  Choose site, category, brand, and product in sequence so the list stays short and mistakes are reduced.
+                </p>
+              </div>
+              <div className="order-builder-snapshot">
+                <span>{selectedSiteName ?? "No site selected"}</span>
+                <strong>{selectedProduct?.item_name ?? (form.item_name_snapshot || "Choose product")}</strong>
+                <small>
+                  {selectedOrderNumber ?? "No order"} {orderLineTotal ? `• ₹${orderLineTotal.toLocaleString("en-IN")}` : ""}
+                </small>
+              </div>
+            </div>
+          ) : null}
           {isWizard ? <FlowWizardSteps steps={ELECTRICIAN_ORDER_ITEM_STEPS} currentStep={createStep} ariaLabel="Steps to add a material line" /> : null}
           {editingId ? (
             <FormSectionHeader title="Line item fields" lead={<>Adjust any value, then save.</>} />
@@ -752,6 +779,33 @@ export function ElectricianMaterialsPage() {
               <FormFieldHint>
                 Narrow the list with search, then pick the exact catalog row. Snapshots fill automatically for approvals.
               </FormFieldHint>
+              <div className="product-choice-grid">
+                {filteredProducts.slice(0, 8).map((product: any) => {
+                  const selected = form.product_id === product.id;
+                  return (
+                    <button
+                      type="button"
+                      key={product.id}
+                      className={selected ? "product-choice-card is-selected" : "product-choice-card"}
+                      onClick={() =>
+                        setForm((s) => ({
+                          ...s,
+                          product_id: product.id,
+                          item_name_snapshot: product.item_name ?? s.item_name_snapshot,
+                          unit_snapshot: product.unit ?? s.unit_snapshot,
+                          unit_price: product.base_price ? String(product.base_price) : s.unit_price,
+                          category_name_snapshot: product.category_id ? categoryLookup.get(product.category_id) ?? s.category_name_snapshot : s.category_name_snapshot,
+                          brand_name_snapshot: product.brand_id ? brandLookup.get(product.brand_id) ?? s.brand_name_snapshot : s.brand_name_snapshot
+                        }))
+                      }
+                    >
+                      <span>{brandLookup.get(product.brand_id) ?? "Catalog"}</span>
+                      <strong>{product.item_name}</strong>
+                      <small>{product.sku ?? "No SKU"} • ₹{Number(product.base_price ?? 0).toLocaleString("en-IN")} / {product.unit ?? "unit"}</small>
+                    </button>
+                  );
+                })}
+              </div>
               <div className="wizard-nav">
                 <button type="button" className="secondary-button" onClick={() => setCreateStep(3)}>
                   Back
@@ -765,6 +819,24 @@ export function ElectricianMaterialsPage() {
 
           {isWizard && createStep === 5 ? (
             <div className="wizard-step-body">
+              <div className="order-review-strip">
+                <div>
+                  <span>Site</span>
+                  <strong>{selectedSiteName ?? "-"}</strong>
+                </div>
+                <div>
+                  <span>Category</span>
+                  <strong>{selectedCategoryName ?? "-"}</strong>
+                </div>
+                <div>
+                  <span>Brand</span>
+                  <strong>{selectedBrandName ?? "-"}</strong>
+                </div>
+                <div>
+                  <span>Line total</span>
+                  <strong>₹{orderLineTotal.toLocaleString("en-IN")}</strong>
+                </div>
+              </div>
               <FormGrid>
                 <label>
                   Item name on order
