@@ -85,6 +85,71 @@ function RazorpayDepositButton({ amount, onSuccess }: { amount: string; onSucces
   );
 }
 
+export function CustomerCreditPage() {
+  const { profile, activeTenant } = useAuth();
+  const customerId = profile?.id ?? "";
+  const tenantId = activeTenant?.id ?? "";
+  const mutation = useMutationAction();
+
+  const creditInfo = useRows(
+    async (client) => {
+      const { data, error } = await client
+        .from("users")
+        .select("credit_limit, credit_balance, credit_score")
+        .eq("id", customerId)
+        .single();
+      return { data: data ? [data as any] : [], error: error?.message ?? null };
+    },
+    [customerId]
+  );
+
+  const loans = useRows(
+    async (client) => {
+      const { data, error } = await client
+        .from("credit_loans")
+        .select("*")
+        .eq("user_id", customerId)
+        .eq("tenant_id", tenantId)
+        .order("created_at", { ascending: false });
+      return { data: (data ?? []) as any[], error: error?.message ?? null };
+    },
+    [customerId, tenantId]
+  );
+
+  return (
+    <div className="page-stack">
+      <StatsGrid
+        items={[
+          { label: "Credit limit", value: `₹${Number(creditInfo.data[0]?.credit_limit ?? 0).toLocaleString("en-IN")}` },
+          { label: "Available credit", value: `₹${Number(creditInfo.data[0]?.credit_balance ?? 0).toLocaleString("en-IN")}` },
+          { label: "Credit score", value: creditInfo.data[0]?.credit_score ?? "N/A" },
+          { label: "Active loans", value: loans.data.filter(l => l.status === "active").length }
+        ]}
+      />
+
+      <PageSection title="Buy Now Pay Later" description="Manage your project financing and credit lines.">
+        <QueryState
+          loading={loans.loading}
+          error={loans.error}
+          hasData={loans.data.length > 0}
+          empty={{ title: "No active credit lines", description: "Your credit limit can be used for material purchases once verified." }}
+        >
+          <DataTable
+            columns={["Order Ref", "Amount", "Tenure", "Next EMI", "Status"]}
+            rows={loans.data.map((loan: any) => [
+              loan.reference_number,
+              `₹${Number(loan.principal_amount).toLocaleString("en-IN")}`,
+              `${loan.tenure_months} months`,
+              loan.next_due_date ? new Date(loan.next_due_date).toLocaleDateString() : "-",
+              loan.status
+            ])}
+          />
+        </QueryState>
+      </PageSection>
+    </div>
+  );
+}
+
 export function CustomerWalletPage() {
   const { profile, activeTenant } = useAuth();
   const customerId = profile?.id ?? "";

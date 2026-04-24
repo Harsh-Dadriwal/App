@@ -1513,6 +1513,16 @@ export function AdminUsersPage() {
     []
   );
 
+  async function setCreditLimit(userId: string, limit: string) {
+    const client = await getSupabaseBrowserClient();
+    if (!client) return;
+    const ok = await mutation.run(
+      async () => client.from("users").update({ credit_limit: Number(limit), credit_balance: Number(limit) }).eq("id", userId),
+      "Credit limit updated."
+    );
+    if (ok) users.refetch?.();
+  }
+
   async function verifyUser(userId: string, approve: boolean) {
     const client = await getSupabaseBrowserClient();
     if (!client) return;
@@ -1541,12 +1551,29 @@ export function AdminUsersPage() {
             <DataCard key={user.id} title={user.full_name ?? "-"} subtitle={user.email ?? user.phone} meta={user.role}>
               <p>Verification: {user.verification_status}</p>
               <p>Admin verified: {user.is_admin_verified ? "Yes" : "No"}</p>
-              {["electrician", "architect"].includes(user.role) ? (
-                <div className="inline-actions">
-                  <button type="button" className="primary-button" disabled={mutation.isSubmitting} onClick={() => void verifyUser(user.id, true)}>Verify</button>
-                  <button type="button" className="secondary-button" disabled={mutation.isSubmitting} onClick={() => void verifyUser(user.id, false)}>Reject</button>
-                </div>
-              ) : null}
+              {user.credit_limit !== undefined && (
+                <p>Credit: ₹{Number(user.credit_limit).toLocaleString("en-IN")}</p>
+              )}
+              <div className="inline-actions">
+                {["electrician", "architect", "customer"].includes(user.role) && (
+                  <button 
+                    type="button" 
+                    className="secondary-button" 
+                    onClick={() => {
+                      const limit = prompt("Enter credit limit for this user:", String(user.credit_limit || 0));
+                      if (limit !== null) setCreditLimit(user.id, limit);
+                    }}
+                  >
+                    Set Credit
+                  </button>
+                )}
+                {["electrician", "architect"].includes(user.role) && !user.is_admin_verified && (
+                  <>
+                    <button type="button" className="primary-button" disabled={mutation.isSubmitting} onClick={() => void verifyUser(user.id, true)}>Verify</button>
+                    <button type="button" className="secondary-button" disabled={mutation.isSubmitting} onClick={() => void verifyUser(user.id, false)}>Reject</button>
+                  </>
+                )}
+              </div>
             </DataCard>
           ))}
         </CardGrid>

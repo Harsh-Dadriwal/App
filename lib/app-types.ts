@@ -13,6 +13,9 @@ export type UserProfile = {
   company_name: string | null;
   verification_status: string;
   is_admin_verified: boolean;
+  credit_limit?: number;
+  credit_balance?: number;
+  credit_score?: number;
 };
 
 export type TenantMembership = {
