@@ -1489,6 +1489,30 @@ export function SupplierDashboardPage() {
               <DataCard key={order.id} title={order.order_number} subtitle={order.site?.site_name} meta={order.status}>
                 <p>Total: ₹{Number(order.total_amount).toLocaleString("en-IN")}</p>
                 <div className="inline-actions">
+                  {order.status === "confirmed" && (
+                    <button 
+                      className="primary-button" 
+                      onClick={async () => {
+                        const client = await getSupabaseBrowserClient();
+                        await client?.from("site_orders").update({ status: "processing" }).eq("id", order.id);
+                        orders.refetch?.();
+                      }}
+                    >
+                      Accept Order
+                    </button>
+                  )}
+                  {order.status === "processing" && (
+                    <button 
+                      className="primary-button" 
+                      onClick={async () => {
+                        const client = await getSupabaseBrowserClient();
+                        await client?.from("site_orders").update({ status: "shipped", shipped_at: new Date().toISOString() }).eq("id", order.id);
+                        orders.refetch?.();
+                      }}
+                    >
+                      Mark as Shipped
+                    </button>
+                  )}
                   <Link href={`/orders/${order.id}`} className="secondary-button">View details</Link>
                 </div>
               </DataCard>
