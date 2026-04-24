@@ -1,4 +1,4 @@
-export type AppRole = "admin" | "customer" | "electrician" | "architect";
+export type AppRole = "admin" | "customer" | "electrician" | "architect" | "supplier";
 
 export type UserProfile = {
   id: string;
@@ -53,5 +53,6 @@ export const roleLabels: Record<AppRole, string> = {
   admin: "Admin",
   customer: "Customer",
   electrician: "Electrician",
-  architect: "Architect"
+  architect: "Architect",
+  supplier: "Supplier"
 };

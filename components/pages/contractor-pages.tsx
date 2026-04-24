@@ -1439,6 +1439,67 @@ export function AdminDashboardPage() {
   );
 }
 
+export function SupplierDashboardPage() {
+  const { profile, activeTenant } = useAuth();
+  const supplierId = profile?.id ?? "";
+  const tenantId = activeTenant?.id ?? "";
+
+  const products = useRows(
+    async (client) => {
+      const { data, error } = await client
+        .from("products")
+        .select("*")
+        .eq("tenant_id", tenantId); // Ideally suppliers only see their brands, but filtering by tenant for now
+      return { data: (data ?? []) as any[], error: error?.message ?? null };
+    },
+    [tenantId]
+  );
+
+  const orders = useRows(
+    async (client) => {
+      const { data, error } = await client
+        .from("site_orders")
+        .select("*, site:sites(site_name)")
+        .eq("tenant_id", tenantId)
+        .in("status", ["confirmed", "processing"]);
+      return { data: (data ?? []) as any[], error: error?.message ?? null };
+    },
+    [tenantId]
+  );
+
+  return (
+    <div className="page-stack">
+      <StatsGrid
+        items={[
+          { label: "My products", value: products.data.length },
+          { label: "Active orders", value: orders.data.length },
+          { label: "Pending fulfillment", value: orders.data.filter(o => o.status === "confirmed").length }
+        ]}
+      />
+      
+      <PageSection title="Active Supply Orders" description="Orders ready for fulfillment and dispatch.">
+        <QueryState
+          loading={orders.loading}
+          error={orders.error}
+          hasData={orders.data.length > 0}
+          empty={{ title: "No active orders", description: "You will see orders here when they are confirmed by customers." }}
+        >
+          <CardGrid>
+            {orders.data.map((order: any) => (
+              <DataCard key={order.id} title={order.order_number} subtitle={order.site?.site_name} meta={order.status}>
+                <p>Total: ₹{Number(order.total_amount).toLocaleString("en-IN")}</p>
+                <div className="inline-actions">
+                  <Link href={`/orders/${order.id}`} className="secondary-button">View details</Link>
+                </div>
+              </DataCard>
+            ))}
+          </CardGrid>
+        </QueryState>
+      </PageSection>
+    </div>
+  );
+}
+
 export function AdminUsersPage() {
   const mutation = useMutationAction();
   const users = useRows(

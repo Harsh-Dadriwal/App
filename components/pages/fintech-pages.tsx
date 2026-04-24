@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import {
   CardGrid,
@@ -31,10 +31,66 @@ function addDays(baseDate: Date, days: number) {
   return next;
 }
 
+function RazorpayDepositButton({ amount, onSuccess }: { amount: string; onSuccess: (paymentId: string) => void }) {
+  const [loading, setLoading] = useState(false);
+
+  async function handlePayment() {
+    if (!amount || Number(amount) <= 0) return;
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/razorpay", {
+        method: "POST",
+        body: JSON.stringify({ action: "createOrder", amount }),
+      });
+      const order = await res.json();
+
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount: order.amount,
+        currency: order.currency,
+        name: "Fintech Wallet",
+        description: "Wallet Top-up",
+        order_id: order.id,
+        handler: async (response: any) => {
+          const verifyRes = await fetch("/api/razorpay", {
+            method: "POST",
+            body: JSON.stringify({
+              action: "verify",
+              orderId: response.razorpay_order_id,
+              paymentId: response.razorpay_payment_id,
+              signature: response.razorpay_signature,
+            }),
+          });
+          const { isValid } = await verifyRes.json();
+          if (isValid) onSuccess(response.razorpay_payment_id);
+        },
+        prefill: { name: "", email: "", contact: "" },
+        theme: { color: "#3399cc" },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <button type="button" className="primary-button" onClick={handlePayment} disabled={loading}>
+      {loading ? "Processing..." : `Deposit ₹${Number(amount).toLocaleString("en-IN")}`}
+    </button>
+  );
+}
+
 export function CustomerWalletPage() {
   const { profile, activeTenant } = useAuth();
   const customerId = profile?.id ?? "";
   const tenantId = activeTenant?.id ?? "";
+  const mutation = useMutationAction();
+  const [depositAmount, setDepositAmount] = useState("");
 
   const wallet = useRows(
     async (client) => {
@@ -72,8 +128,40 @@ export function CustomerWalletPage() {
     .filter((row: any) => row.direction === "debit")
     .reduce((sum: number, row: any) => sum + Number(row.amount ?? 0), 0);
 
+  async function completeDeposit(paymentId: string) {
+    const client = await getSupabaseBrowserClient();
+    if (!client || !wallet.data[0]?.id) return;
+
+    await mutation.run(async () => (client as any).rpc("post_wallet_entry", {
+      target_tenant_id: tenantId,
+      target_wallet_account_id: wallet.data[0].id,
+      target_direction: "credit",
+      target_entry_type: "manual_adjustment", // Or "payment_deposit" if type exists
+      target_amount: Number(depositAmount),
+      target_narrative: `Razorpay Deposit: ${paymentId}`,
+      target_external_reference: paymentId
+    }), "Deposit successful!");
+    
+    setDepositAmount("");
+    wallet.refetch?.();
+    ledger.refetch?.();
+  }
+
   return (
     <div className="page-stack">
+      <FormCard title="Top up wallet" description="Instant deposit via Razorpay.">
+        <FormGrid>
+          <label>
+            Amount (₹)
+            <input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="500" />
+          </label>
+        </FormGrid>
+        <div className="form-actions">
+          <RazorpayDepositButton amount={depositAmount} onSuccess={completeDeposit} />
+        </div>
+        <FormNotice error={mutation.error} success={mutation.success} />
+      </FormCard>
+
       <StatsGrid
         items={[
           { label: "Available balance", value: `₹${Number(wallet.data[0]?.available_balance ?? 0).toLocaleString("en-IN")}` },
