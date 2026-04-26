@@ -17,6 +17,14 @@ import {
 } from "@/components/data-view";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => {
+      open: () => void;
+    };
+  }
+}
+
 function makeCode(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 }
@@ -31,30 +39,103 @@ function addDays(baseDate: Date, days: number) {
   return next;
 }
 
-function RazorpayDepositButton({ amount, onSuccess }: { amount: string; onSuccess: (paymentId: string) => void }) {
+let razorpayScriptPromise: Promise<void> | null = null;
+
+function loadRazorpayCheckoutScript() {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (window.Razorpay) return Promise.resolve();
+  if (razorpayScriptPromise) return razorpayScriptPromise;
+
+  razorpayScriptPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>('script[data-razorpay-checkout="true"]');
+
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Unable to load Razorpay checkout.")), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.dataset.razorpayCheckout = "true";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Unable to load Razorpay checkout."));
+    document.body.appendChild(script);
+  });
+
+  return razorpayScriptPromise;
+}
+
+type RazorpayCheckoutButtonProps = {
+  amount: string | number;
+  buttonLabel: string;
+  merchantName?: string;
+  description: string;
+  disabled?: boolean;
+  receipt?: string;
+  notes?: Record<string, string>;
+  prefill?: {
+    name?: string;
+    email?: string;
+    contact?: string;
+  };
+  onSuccess: (paymentId: string, orderId: string) => Promise<void> | void;
+};
+
+function RazorpayCheckoutButton({
+  amount,
+  buttonLabel,
+  merchantName,
+  description,
+  disabled,
+  receipt,
+  notes,
+  prefill,
+  onSuccess,
+}: RazorpayCheckoutButtonProps) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function handlePayment() {
-    if (!amount || Number(amount) <= 0) return;
+    const numericAmount = Number(amount);
+    if (!numericAmount || numericAmount <= 0 || disabled) return;
     setLoading(true);
+    setError("");
 
     try {
+      await loadRazorpayCheckoutScript();
+
       const res = await fetch("/api/razorpay", {
         method: "POST",
-        body: JSON.stringify({ action: "createOrder", amount }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action: "createOrder", amount, receipt, notes }),
       });
       const order = await res.json();
 
+      if (!res.ok) {
+        throw new Error(order?.error ?? "Unable to start payment.");
+      }
+
+      if (!window.Razorpay) {
+        throw new Error("Razorpay checkout did not load.");
+      }
+
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        key: order.keyId,
         amount: order.amount,
         currency: order.currency,
-        name: "Fintech Wallet",
-        description: "Wallet Top-up",
+        name: merchantName ?? "Mahalaxmi Electricals",
+        description,
         order_id: order.id,
         handler: async (response: any) => {
           const verifyRes = await fetch("/api/razorpay", {
             method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
             body: JSON.stringify({
               action: "verify",
               orderId: response.razorpay_order_id,
@@ -62,26 +143,45 @@ function RazorpayDepositButton({ amount, onSuccess }: { amount: string; onSucces
               signature: response.razorpay_signature,
             }),
           });
-          const { isValid } = await verifyRes.json();
-          if (isValid) onSuccess(response.razorpay_payment_id);
+          const verifyResult = await verifyRes.json();
+
+          if (!verifyRes.ok || !verifyResult.isValid) {
+            throw new Error("Payment verification failed.");
+          }
+
+          await onSuccess(response.razorpay_payment_id, response.razorpay_order_id);
         },
-        prefill: { name: "", email: "", contact: "" },
+        modal: {
+          ondismiss: () => {
+            setLoading(false);
+          },
+        },
+        prefill: {
+          name: prefill?.name ?? "",
+          email: prefill?.email ?? "",
+          contact: prefill?.contact ?? "",
+        },
+        notes: notes ?? {},
         theme: { color: "#3399cc" },
       };
 
-      const rzp = new (window as any).Razorpay(options);
+      const rzp = new window.Razorpay(options);
       rzp.open();
     } catch (err) {
       console.error(err);
+      setError(err instanceof Error ? err.message : "Payment could not be completed.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <button type="button" className="primary-button" onClick={handlePayment} disabled={loading}>
-      {loading ? "Processing..." : `Deposit ₹${Number(amount).toLocaleString("en-IN")}`}
-    </button>
+    <>
+      <button type="button" className="primary-button" onClick={handlePayment} disabled={loading || disabled}>
+        {loading ? "Processing..." : buttonLabel}
+      </button>
+      {error ? <p className="form-error">{error}</p> : null}
+    </>
   );
 }
 
@@ -222,9 +322,32 @@ export function CustomerWalletPage() {
           </label>
         </FormGrid>
         <div className="form-actions">
-          <RazorpayDepositButton amount={depositAmount} onSuccess={completeDeposit} />
+          <RazorpayCheckoutButton
+            amount={depositAmount}
+            buttonLabel={`Deposit ₹${Number(depositAmount || 0).toLocaleString("en-IN")}`}
+            merchantName={activeTenant?.app_name ?? "Mahalaxmi Electricals"}
+            description="Wallet top-up"
+            disabled={!wallet.data[0]?.id || Number(depositAmount) <= 0}
+            receipt={`wallet_${customerId.slice(0, 8)}_${Date.now()}`}
+            notes={{
+              feature: "wallet_topup",
+              tenant_id: tenantId,
+              customer_id: customerId,
+            }}
+            prefill={{
+              name: profile?.full_name ?? "",
+              email: profile?.email ?? "",
+              contact: profile?.phone ?? "",
+            }}
+            onSuccess={async (paymentId) => {
+              await completeDeposit(paymentId);
+            }}
+          />
         </div>
         <FormNotice error={mutation.error} success={mutation.success} />
+        {!wallet.data[0]?.id ? (
+          <p className="form-hint">Admin must create a wallet account before accepting live deposits for this customer.</p>
+        ) : null}
       </FormCard>
 
       <StatsGrid
@@ -404,17 +527,17 @@ export function CustomerSavingsPage() {
     setSelectedTemplateId("");
   }
 
-  async function payInstallment(installmentId: string) {
+  async function payInstallment(installmentId: string, amount: number, paymentId: string) {
     const client = await getSupabaseBrowserClient();
-    if (!client || !installmentId) return;
+    if (!client || !installmentId || amount <= 0) return;
     setPayingInstallmentId(installmentId);
 
     const ok = await mutation.run(
       async () =>
         (client as any).rpc("pay_savings_installment", {
           target_installment_id: installmentId,
-          payment_amount: null,
-          note_text: "Customer installment payment recorded from the app."
+          payment_amount: amount,
+          note_text: `Razorpay installment payment: ${paymentId}`
         }),
       "Installment posted successfully."
     );
@@ -537,14 +660,48 @@ export function CustomerSavingsPage() {
                     <p>Expected amount: ₹{Number(row.expected_amount ?? 0).toLocaleString("en-IN")}</p>
                     <p>Paid so far: ₹{Number(row.paid_amount ?? 0).toLocaleString("en-IN")}</p>
                     <div className="inline-actions">
-                      <button
-                        type="button"
-                        className="primary-button"
-                        onClick={() => void payInstallment(row.id)}
-                        disabled={mutation.isSubmitting && payingInstallmentId === row.id}
-                      >
-                        {mutation.isSubmitting && payingInstallmentId === row.id ? "Posting..." : "Mark installment paid"}
-                      </button>
+                      <RazorpayCheckoutButton
+                        amount={Math.max(
+                          Number(row.expected_amount ?? 0) - Number(row.paid_amount ?? 0),
+                          0,
+                        )}
+                        merchantName={activeTenant?.app_name ?? "Mahalaxmi Electricals"}
+                        buttonLabel={
+                          mutation.isSubmitting && payingInstallmentId === row.id
+                            ? "Posting..."
+                            : `Pay ₹${Math.max(
+                                Number(row.expected_amount ?? 0) - Number(row.paid_amount ?? 0),
+                                0,
+                              ).toLocaleString("en-IN")}`
+                        }
+                        description={`Savings installment ${row.installment_number}`}
+                        disabled={
+                          mutation.isSubmitting ||
+                          Math.max(Number(row.expected_amount ?? 0) - Number(row.paid_amount ?? 0), 0) <= 0
+                        }
+                        receipt={`sav_${row.id.slice(0, 8)}_${Date.now()}`}
+                        notes={{
+                          feature: "savings_installment",
+                          installment_id: row.id,
+                          subscription_id: row.subscription_id,
+                          tenant_id: tenantId,
+                        }}
+                        prefill={{
+                          name: profile?.full_name ?? "",
+                          email: profile?.email ?? "",
+                          contact: profile?.phone ?? "",
+                        }}
+                        onSuccess={async (paymentId) => {
+                          await payInstallment(
+                            row.id,
+                            Math.max(
+                              Number(row.expected_amount ?? 0) - Number(row.paid_amount ?? 0),
+                              0,
+                            ),
+                            paymentId,
+                          );
+                        }}
+                      />
                     </div>
                   </DataCard>
                 );

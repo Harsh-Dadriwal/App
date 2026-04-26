@@ -20,6 +20,7 @@ import {
   ArchitectProjectsPage,
   ArchitectMaterialsPage,
   AdminDashboardPage,
+  SupplierDashboardPage,
   AdminUsersPage,
   AdminOrdersPage,
   AdminProductsPage,
@@ -108,6 +109,11 @@ export default function RolePage({
           case "substitutions": return { title: "Substitutions", component: <AdminSubstitutionsPage /> };
           case "content": return { title: "Tips Content", component: <AdminContentPage /> };
           case "notes": return { title: "Project Notes", component: <ProjectNotesPage role="admin" /> };
+          default: return { title: "Not Found", component: null };
+        }
+      case "supplier":
+        switch (pathPart) {
+          case "": return { title: "Dashboard", component: <SupplierDashboardPage /> };
           default: return { title: "Not Found", component: null };
         }
       default:

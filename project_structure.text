@@ -1,0 +1,97 @@
+- .DS_Store
+- .env.example
+- .env.local
+- .gitattributes
+- .gitignore
+- README.md
+- app
+  - .DS_Store
+  - [role]
+    - [[...slug]]
+      - page.tsx
+  - api
+    - upload
+      - route.ts
+  - auth
+    - page.tsx
+  - globals.css
+  - layout.tsx
+  - page.tsx
+  - providers.tsx
+- components
+  - .DS_Store
+  - app-frame.tsx
+  - auth-screen.tsx
+  - data-view.tsx
+  - pages
+    - collaboration-pages.tsx
+    - contractor-pages.tsx
+    - customer-pages.tsx
+    - fintech-pages.tsx
+  - providers
+    - auth-provider.tsx
+  - theme-provider.tsx
+- db
+  - auth_profile_patch.sql
+  - fintech_foundation.sql
+  - fintech_operations_patch.sql
+  - full_project_rebuild.sql
+  - mahalaxmi_electrical_schema.sql
+  - multi_tenant_foundation.sql
+  - product_image_extensions.sql
+- docs
+  - fintech-backend-design.md
+  - multi-tenant-architecture.md
+- lib
+  - app-types.ts
+  - navigation.ts
+  - s3.ts
+  - supabase.ts
+- mobile
+  - .DS_Store
+  - .env
+  - .env.example
+  - .expo
+    - README.md
+    - devices.json
+  - .gitignore
+  - App.tsx
+  - README.md
+  - app.json
+  - babel.config.js
+  - metro.config.js
+  - package-lock.json
+  - package.json
+  - src
+    - components
+      - app-state.tsx
+      - ui.tsx
+    - lib
+      - supabase.ts
+      - theme.ts
+      - types.ts
+    - mobile-root.tsx
+    - providers
+      - auth-provider.tsx
+      - navigation-provider.tsx
+    - screens
+      - admin-catalog-screen.tsx
+      - auth-screen.tsx
+      - catalog-screen.tsx
+      - dashboard-screen.tsx
+      - fintech-screen.tsx
+      - materials-screen.tsx
+      - notes-screen.tsx
+      - order-builder-screen.tsx
+    - shims
+      - punycode.js
+      - ws.js
+  - tsconfig.json
+- next-env.d.ts
+- next.config.ts
+- package-lock.json
+- package.json
+- public
+  - auth_hero_bg.png
+- tsconfig.json
+- tsconfig.tsbuildinfo

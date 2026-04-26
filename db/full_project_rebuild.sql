@@ -444,6 +444,7 @@ AS $$
 DECLARE
   requested_role TEXT;
   safe_role public.user_role;
+  matched_user_id UUID;
 BEGIN
   requested_role := LOWER(COALESCE(NEW.raw_user_meta_data ->> 'role', 'customer'));
   safe_role := CASE
@@ -452,21 +453,50 @@ BEGIN
     ELSE 'customer'::public.user_role
   END;
 
-  INSERT INTO public.users (
-    auth_user_id, role, full_name, phone, email, status, verification_status, is_admin_verified, last_login_at
-  )
-  VALUES (
-    NEW.id,
-    safe_role,
-    COALESCE(NULLIF(NEW.raw_user_meta_data ->> 'full_name', ''), split_part(COALESCE(NEW.email, NEW.phone, ''), '@', 1)),
-    NULLIF(NEW.phone, ''),
-    NULLIF(NEW.email, ''),
-    'active',
-    CASE WHEN safe_role = 'customer' THEN 'verified'::public.verification_status ELSE 'pending'::public.verification_status END,
-    CASE WHEN safe_role = 'customer' THEN TRUE ELSE FALSE END,
-    NEW.last_sign_in_at
-  )
-  ON CONFLICT (auth_user_id) DO NOTHING;
+  SELECT id
+  INTO matched_user_id
+  FROM public.users
+  WHERE auth_user_id IS NULL
+    AND (
+      (NEW.email IS NOT NULL AND email IS NOT NULL AND LOWER(email) = LOWER(NEW.email))
+      OR
+      (NEW.phone IS NOT NULL AND phone IS NOT NULL AND phone = NEW.phone)
+    )
+  ORDER BY created_at
+  LIMIT 1;
+
+  IF matched_user_id IS NOT NULL THEN
+    UPDATE public.users
+    SET
+      auth_user_id = NEW.id,
+      email = COALESCE(NULLIF(NEW.email, ''), email),
+      phone = COALESCE(NULLIF(NEW.phone, ''), phone),
+      full_name = COALESCE(NULLIF(NEW.raw_user_meta_data ->> 'full_name', ''), full_name, 'User'),
+      role = COALESCE(role, safe_role),
+      last_login_at = NEW.last_sign_in_at,
+      updated_at = NOW()
+    WHERE id = matched_user_id;
+  ELSE
+    INSERT INTO public.users (
+      auth_user_id, role, full_name, phone, email, status, verification_status, is_admin_verified, last_login_at
+    )
+    VALUES (
+      NEW.id,
+      safe_role,
+      COALESCE(
+        NULLIF(NEW.raw_user_meta_data ->> 'full_name', ''),
+        split_part(COALESCE(NULLIF(NEW.email, ''), NULLIF(NEW.phone, ''), 'user'), '@', 1),
+        'User'
+      ),
+      NULLIF(NEW.phone, ''),
+      NULLIF(NEW.email, ''),
+      'active',
+      CASE WHEN safe_role = 'customer' THEN 'verified'::public.verification_status ELSE 'pending'::public.verification_status END,
+      CASE WHEN safe_role = 'customer' THEN TRUE ELSE FALSE END,
+      NEW.last_sign_in_at
+    )
+    ON CONFLICT (auth_user_id) DO NOTHING;
+  END IF;
   RETURN NEW;
 END;
 $$;

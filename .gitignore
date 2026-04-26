@@ -36,3 +36,4 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 next-swc.darwin-arm64.node
+.aider*
