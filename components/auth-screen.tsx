@@ -330,7 +330,7 @@ export function AuthScreen() {
                       name="fullName"
                       value={emailForm.fullName}
                       onChange={onEmailChange}
-                      placeholder="Harsh Dadriwal"
+                      placeholder="Ashok Kumar"
                       required
                     />
                   </label>
@@ -341,7 +341,7 @@ export function AuthScreen() {
                       name="phone"
                       value={emailForm.phone}
                       onChange={onEmailChange}
-                      placeholder="+919876543210"
+                      placeholder="+91 XXXXXXXXXX"
                     />
                   </label>
                   <label>
@@ -444,7 +444,7 @@ export function AuthScreen() {
                       name="fullName"
                       value={phoneForm.fullName}
                       onChange={onPhoneChange}
-                      placeholder="Harsh Dadriwal"
+                      placeholder="Ashok Kumar"
                       required
                     />
                   </label>
