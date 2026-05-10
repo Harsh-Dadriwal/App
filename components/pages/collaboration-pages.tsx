@@ -17,8 +17,8 @@ import {
   useMutationAction,
   useRows
 } from "@/components/data-view";
-import type { AppRole } from "@/lib/app-types";
-import { getSupabaseBrowserClient } from "@/lib/supabase";
+import type { AppRole } from "@mahalaxmi/core/types/domain";
+import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
 
 const NOTE_STEPS = [
   { label: "Where & who", description: "Site and recipient" },

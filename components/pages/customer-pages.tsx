@@ -20,7 +20,7 @@ import {
   useMutationAction,
   useRows
 } from "@/components/data-view";
-import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
 import {
   approveOrderItemByCustomer,
   respondToSubstitute

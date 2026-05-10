@@ -3,9 +3,9 @@
 import { useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
-import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
 import { authRoleOptions } from "@/lib/navigation";
-import type { AppRole } from "@/lib/app-types";
+import type { AppRole } from "@mahalaxmi/core/types/domain";
 
 type AuthMethod = "email" | "phone";
 type AuthMode = "login" | "signup";

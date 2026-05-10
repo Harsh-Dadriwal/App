@@ -14,7 +14,7 @@ import {
   useRows,
 } from "@/components/data-view";
 import { useAuth } from "@/components/providers/auth-provider";
-import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
 import {
   type LightingLeadConfig,
   type LightingProduct,
@@ -28,7 +28,7 @@ import {
   roomSceneDataUri,
   sceneFromProduct,
   ugrVisual,
-} from "@/lib/lighting-visualizer";
+} from "@mahalaxmi/core/lighting/visualizer";
 
 type LeadFormState = {
   contact_name: string;

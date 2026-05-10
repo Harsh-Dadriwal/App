@@ -7,8 +7,8 @@ import { useMutationAction, useRows } from "@/components/data-view";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useTheme } from "@/components/theme-provider";
 import { roleLabels, roleNav } from "@/lib/navigation";
-import type { AppRole } from "@/lib/app-types";
-import { getSupabaseBrowserClient } from "@/lib/supabase";
+import type { AppRole } from "@mahalaxmi/core/types/domain";
+import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
 import {
   listNotifications,
   markAllNotificationsRead,

@@ -8,7 +8,6 @@ module.exports = function (api) {
         {
           alias: {
             "@": "./src",
-            "@shared-types": "../packages/shared-types/src",
             "@mahalaxmi/core": "../packages/core/src"
           }
         }

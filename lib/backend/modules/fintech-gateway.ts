@@ -1,6 +1,7 @@
-import { backendRequest, type BackendResult } from "@/lib/backend/http";
+import { createFintechGateway } from "@mahalaxmi/core/gateway/fintech-gateway";
 import { isBackendApiConfigured } from "@/lib/backend/config";
-import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
+import { backendRequest, type BackendResult } from "@/lib/backend/http";
 
 async function runRpcFallback(
   fn: string,
@@ -19,62 +20,13 @@ async function runRpcFallback(
   };
 }
 
-export async function postWalletEntry(args: Record<string, unknown>) {
-  if (isBackendApiConfigured()) {
-    const result = await backendRequest(`/api/v1/wallet/entries`, {
-      method: "POST",
-      body: args
-    });
+const fintechGateway = createFintechGateway({
+  isBackendApiConfigured,
+  backendRequest,
+  runRpcFallback
+});
 
-    if (result.data || !result.error) {
-      return result;
-    }
-  }
-
-  return runRpcFallback("post_wallet_entry", args);
-}
-
-export async function paySavingsInstallment(args: Record<string, unknown>) {
-  if (isBackendApiConfigured()) {
-    const result = await backendRequest(`/api/v1/savings/installments/pay`, {
-      method: "POST",
-      body: args
-    });
-
-    if (result.data || !result.error) {
-      return result;
-    }
-  }
-
-  return runRpcFallback("pay_savings_installment", args);
-}
-
-export async function ensureWalletAccount(args: Record<string, unknown>) {
-  if (isBackendApiConfigured()) {
-    const result = await backendRequest(`/api/v1/wallet/accounts/ensure`, {
-      method: "POST",
-      body: args
-    });
-
-    if (result.data || !result.error) {
-      return result;
-    }
-  }
-
-  return runRpcFallback("ensure_wallet_account", args);
-}
-
-export async function resolveReferralReward(args: Record<string, unknown>) {
-  if (isBackendApiConfigured()) {
-    const result = await backendRequest(`/api/v1/referrals/rewards/resolve`, {
-      method: "POST",
-      body: args
-    });
-
-    if (result.data || !result.error) {
-      return result;
-    }
-  }
-
-  return runRpcFallback("resolve_referral_reward", args);
-}
+export const postWalletEntry = fintechGateway.postWalletEntry;
+export const paySavingsInstallment = fintechGateway.paySavingsInstallment;
+export const ensureWalletAccount = fintechGateway.ensureWalletAccount;
+export const resolveReferralReward = fintechGateway.resolveReferralReward;

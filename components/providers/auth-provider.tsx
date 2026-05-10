@@ -8,14 +8,19 @@ import {
   useState,
   type ReactNode
 } from "react";
-import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase";
-import type { ActiveTenant, AuthSession, TenantMembership, UserProfile } from "@/lib/app-types";
+import { getSupabaseBrowserClient, isSupabaseConfigured } from "@mahalaxmi/core/supabase/client";
+import type { ActiveTenant, TenantMembership, UserProfile } from "@mahalaxmi/core/types/domain";
 import {
   fetchAppProfile,
   fetchTenantMemberships,
   resolveActiveTenant,
   switchDefaultTenant
 } from "@/lib/backend/modules/auth-gateway";
+type AuthSession = {
+  user: {
+    id: string;
+  };
+} | null;
 
 type AuthContextValue = {
   configured: boolean;

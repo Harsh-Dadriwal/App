@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, type DependencyList, type ReactNode } from "react";
-import { getSupabaseBrowserClient, getSupabaseReadBrowserClient } from "@/lib/supabase";
-import { useSharedMutationAction } from "@shared-types/use-mutation-action";
+import { getSupabaseBrowserClient, getSupabaseReadBrowserClient } from "@mahalaxmi/core/supabase/client";
+import { useSharedMutationAction } from "@mahalaxmi/core/hooks/use-mutation-action";
 
 export function FormFieldHint({ children }: { children: ReactNode }) {
   return <p className="form-field-hint">{children}</p>;

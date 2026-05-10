@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { palette } from "@/lib/theme";
-import { roleLabels } from "@/lib/types";
+import { roleLabels } from "@mahalaxmi/core/types/domain";
 import { useAuth } from "@/providers/auth-provider";
 import {
   useMobileNavigation,

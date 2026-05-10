@@ -1,7 +1,7 @@
 import { ScrollView, Text, View } from "react-native";
 import { useAuth } from "@/providers/auth-provider";
 import { AppButton, Card, ScreenShell, SectionTitle } from "@/components/ui";
-import { roleLabels } from "@/lib/types";
+import { roleLabels } from "@mahalaxmi/core/types/domain";
 import { useMobileNavigation, type MobileScreen } from "@/providers/navigation-provider";
 
 const roleActions = {

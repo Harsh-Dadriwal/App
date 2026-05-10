@@ -2,7 +2,7 @@ import { Body, Controller, Get, Post, Query, Req, UseGuards } from "@nestjs/comm
 import { IdentityService } from "./identity.service";
 import { SupabaseAuthGuard } from "../../common/auth/supabase-auth.guard";
 import type { AuthenticatedRequest } from "../../common/auth/authenticated-request";
-import type { SwitchTenantRequestDto } from "@shared-types/backend-contracts";
+import type { SwitchTenantRequestDto } from "@mahalaxmi/core/types/contracts";
 
 @Controller("/api/v1/me")
 @UseGuards(SupabaseAuthGuard)

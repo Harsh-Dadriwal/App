@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase, supabaseRead } from "@/lib/supabase";
-import { useSharedMutationAction } from "@shared-types/use-mutation-action";
+import { useSharedMutationAction } from "@mahalaxmi/core/hooks/use-mutation-action";
 
 export function useRows<T>(
   fetcher: (client: NonNullable<typeof supabase>) => Promise<{ data: T[]; error: string | null }>,

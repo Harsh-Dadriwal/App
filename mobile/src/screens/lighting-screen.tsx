@@ -16,7 +16,7 @@ import {
   roomSceneDataUri,
   sceneFromProduct,
   ugrVisual,
-} from "@/lib/lighting-visualizer";
+} from "@mahalaxmi/core/lighting/visualizer";
 
 const kelvinSteps = [2700, 3000, 3500, 4000, 5000, 6000, 6500];
 const criSteps = [60, 70, 80, 90, 95, 98];

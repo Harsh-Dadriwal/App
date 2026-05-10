@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton, Card, Field, Notice, ScreenShell } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import { palette } from "@/lib/theme";
-import { roleLabels, type AppRole } from "@/lib/types";
+import { roleLabels, type AppRole } from "@mahalaxmi/core/types/domain";
 import { useMobileNavigation } from "@/providers/navigation-provider";
 
 type AuthMode = "login" | "signup";

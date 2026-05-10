@@ -2,7 +2,7 @@ import { Body, Controller, Post, Req, UseGuards } from "@nestjs/common";
 import type {
   RazorpayCreateOrderRequestDto,
   RazorpayVerifyPaymentRequestDto
-} from "@shared-types/backend-contracts";
+} from "@mahalaxmi/core/types/contracts";
 import { SupabaseAuthGuard } from "../../common/auth/supabase-auth.guard";
 import type { AuthenticatedRequest } from "../../common/auth/authenticated-request";
 import { PaymentsService } from "./payments.service";

@@ -1,4 +1,4 @@
-import type { AppRole } from "@/lib/app-types";
+import type { AppRole } from "@mahalaxmi/core/types/domain";
 
 export const roleLabels: Record<AppRole, string> = {
   admin: "Admin",

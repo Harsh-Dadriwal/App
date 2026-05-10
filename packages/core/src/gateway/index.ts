@@ -1,7 +1,7 @@
 export * from "./config";
 export * from "./http";
-export * from "./auth-gateway";
-export * from "./workflow-gateway";
-export * from "./fintech-gateway";
-export * from "./inventory-gateway";
-export * from "./notifications-gateway";
+export { createAuthGateway } from "./auth-gateway";
+export { createWorkflowGateway } from "./workflow-gateway";
+export { createFintechGateway } from "./fintech-gateway";
+export { createInventoryGateway } from "./inventory-gateway";
+export { createNotificationsGateway } from "./notifications-gateway";

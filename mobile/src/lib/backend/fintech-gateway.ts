@@ -1,6 +1,7 @@
-import { supabase } from "@/lib/supabase";
+import { createFintechGateway } from "@mahalaxmi/core/gateway/fintech-gateway";
 import { backendRequest, type BackendResult } from "./http";
 import { isBackendApiConfigured } from "./config";
+import { supabase } from "@/lib/supabase";
 
 async function runRpcFallback(
   fn: string,
@@ -17,13 +18,10 @@ async function runRpcFallback(
   };
 }
 
-export async function paySavingsInstallment(args: Record<string, unknown>) {
-  if (isBackendApiConfigured()) {
-    const result = await backendRequest(`/api/v1/savings/installments/pay`, {
-      method: "POST",
-      body: args
-    });
-    if (result.data || !result.error) return result;
-  }
-  return runRpcFallback("pay_savings_installment", args);
-}
+const fintechGateway = createFintechGateway({
+  isBackendApiConfigured,
+  backendRequest,
+  runRpcFallback
+});
+
+export const paySavingsInstallment = fintechGateway.paySavingsInstallment;

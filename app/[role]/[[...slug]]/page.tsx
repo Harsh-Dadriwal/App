@@ -3,7 +3,7 @@
 import { use, useMemo } from "react";
 import { notFound } from "next/navigation";
 import { AppFrame } from "@/components/app-frame";
-import type { AppRole } from "@/lib/app-types";
+import type { AppRole } from "@mahalaxmi/core/types/domain";
 import { roleLabels } from "@/lib/navigation";
 import {
   ProjectNotesPage,

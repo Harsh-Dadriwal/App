@@ -7,7 +7,7 @@ import {
   type ReactNode
 } from "react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
-import type { ActiveTenant, TenantMembership, UserProfile } from "@/lib/types";
+import type { ActiveTenant, TenantMembership, UserProfile } from "@mahalaxmi/core/types/domain";
 import {
   fetchAppProfile,
   fetchTenantMemberships,
