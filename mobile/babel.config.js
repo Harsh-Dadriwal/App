@@ -7,7 +7,9 @@ module.exports = function (api) {
         "module-resolver",
         {
           alias: {
-            "@": "./src"
+            "@": "./src",
+            "@shared-types": "../packages/shared-types/src",
+            "@mahalaxmi/core": "../packages/core/src"
           }
         }
       ]

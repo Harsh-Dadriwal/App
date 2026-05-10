@@ -10,6 +10,12 @@ import {
 } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase";
 import type { ActiveTenant, AuthSession, TenantMembership, UserProfile } from "@/lib/app-types";
+import {
+  fetchAppProfile,
+  fetchTenantMemberships,
+  resolveActiveTenant,
+  switchDefaultTenant
+} from "@/lib/backend/modules/auth-gateway";
 
 type AuthContextValue = {
   configured: boolean;
@@ -27,64 +33,11 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-async function fetchProfile(userId: string) {
-  const supabase = await getSupabaseBrowserClient();
-  const profileSelect =
-    "id, auth_user_id, default_tenant_id, full_name, email, phone, role, city, state, company_name, verification_status, is_admin_verified";
-
-  if (!supabase) {
-    return { data: null, error: null };
-  }
-
-  const authLinkedResult = await supabase
-    .from("users")
-    .select(profileSelect)
-    .eq("auth_user_id", userId)
-    .maybeSingle();
-
-  if (authLinkedResult.data && !authLinkedResult.error) {
-    return authLinkedResult;
-  }
-
-  const rpcResult = await (supabase as any).rpc("get_my_profile");
-  const rpcData = Array.isArray(rpcResult?.data) ? rpcResult.data[0] ?? null : rpcResult?.data ?? null;
-
-  if (rpcData && !rpcResult?.error) {
-    return { data: rpcData, error: null };
-  }
-
-  const directIdResult = await supabase
-    .from("users")
-    .select(profileSelect)
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (directIdResult.data && !directIdResult.error) {
-    return directIdResult;
-  }
-
-  if (authLinkedResult.error || rpcResult?.error || directIdResult.error) {
-    return authLinkedResult.error
-      ? authLinkedResult
-      : rpcResult?.error
-        ? { data: null, error: rpcResult.error }
-        : directIdResult;
-  }
-
-  return {
-    data: null,
-    error: {
-      message:
-        "No app profile row is visible for this account. Run the auth profile SQL patch and try again."
-    }
-  };
-}
-
 async function fetchProfileWithRetry(userId: string, attempts = 8) {
-  let lastError: unknown = null;
+  let lastError: string | null = null;
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const result = await fetchProfile(userId);
+    const result = await fetchAppProfile(userId);
 
     if (result.data && !result.error) {
       return result;
@@ -107,22 +60,13 @@ function AuthProvider({ children }: { children: ReactNode }) {
   const [errorMessage, setErrorMessage] = useState("");
 
   async function fetchTenantContext(profileValue: UserProfile | null) {
-    const supabase = await getSupabaseBrowserClient();
-
-    if (!supabase || !profileValue?.id) {
+    if (!profileValue?.id) {
       setTenantMemberships([]);
       setActiveTenant(null);
       return;
     }
 
-    const membershipResult = await supabase
-      .from("tenant_memberships")
-      .select(
-        "id, tenant_id, role, is_default, is_active, tenant:tenants(id, slug, display_name, status)"
-      )
-      .eq("user_id", profileValue.id)
-      .eq("is_active", true)
-      .order("joined_at", { ascending: true });
+    const membershipResult = await fetchTenantMemberships(profileValue.id);
 
     if (membershipResult.error) {
       setTenantMemberships([]);
@@ -130,65 +74,10 @@ function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const memberships = ((membershipResult.data ?? []) as Array<Record<string, any>>).map((membership) => ({
-      ...membership,
-      tenant: Array.isArray(membership.tenant) ? membership.tenant[0] ?? null : membership.tenant ?? null
-    })) as TenantMembership[];
-    const tenantIds = memberships.map((membership) => membership.tenant_id);
-    const brandingMap = new Map<string, TenantMembership["branding"]>();
-
-    if (tenantIds.length) {
-      const brandingResult = await supabase
-        .from("tenant_branding")
-        .select("tenant_id, app_name, logo_url, primary_color, secondary_color, accent_color")
-        .in("tenant_id", tenantIds);
-
-      for (const row of brandingResult.data ?? []) {
-        brandingMap.set(row.tenant_id, {
-          app_name: row.app_name,
-          logo_url: row.logo_url,
-          primary_color: row.primary_color,
-          secondary_color: row.secondary_color,
-          accent_color: row.accent_color
-        });
-      }
-    }
-
-    const enrichedMemberships = memberships.map((membership) => ({
-      ...membership,
-      branding: brandingMap.get(membership.tenant_id) ?? null
-    }));
+    const enrichedMemberships = membershipResult.data ?? [];
 
     setTenantMemberships(enrichedMemberships);
-
-    const preferredTenantId =
-      profileValue.default_tenant_id ||
-      enrichedMemberships.find((membership) => membership.is_default)?.tenant_id ||
-      enrichedMemberships[0]?.tenant_id ||
-      null;
-
-    const activeMembership =
-      enrichedMemberships.find((membership) => membership.tenant_id === preferredTenantId) ??
-      enrichedMemberships[0] ??
-      null;
-
-    if (!activeMembership?.tenant) {
-      setActiveTenant(null);
-      return;
-    }
-
-    setActiveTenant({
-      id: activeMembership.tenant.id,
-      slug: activeMembership.tenant.slug,
-      display_name: activeMembership.tenant.display_name,
-      status: activeMembership.tenant.status,
-      membership_role: activeMembership.role,
-      app_name: activeMembership.branding?.app_name ?? activeMembership.tenant.display_name,
-      logo_url: activeMembership.branding?.logo_url ?? null,
-      primary_color: activeMembership.branding?.primary_color ?? null,
-      secondary_color: activeMembership.branding?.secondary_color ?? null,
-      accent_color: activeMembership.branding?.accent_color ?? null
-    });
+    setActiveTenant(resolveActiveTenant(profileValue, enrichedMemberships));
   }
 
   async function refreshProfile(userIdOverride?: string) {
@@ -317,13 +206,10 @@ function AuthProvider({ children }: { children: ReactNode }) {
       return false;
     }
 
-    const { error } = await supabase
-      .from("users")
-      .update({ default_tenant_id: tenantId })
-      .eq("id", profile.id);
+    const { error } = await switchDefaultTenant(profile.id, tenantId);
 
     if (error) {
-      setErrorMessage(error.message);
+      setErrorMessage(error);
       return false;
     }
 

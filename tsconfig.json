@@ -20,9 +20,11 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@shared-types/*": ["./packages/shared-types/src/*"],
+      "@mahalaxmi/core/*": ["./packages/core/src/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "mobile"]
+  "exclude": ["node_modules", "mobile", "apps/api"]
 }

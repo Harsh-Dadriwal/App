@@ -174,10 +174,10 @@ export function AuthScreen() {
           data:
             authMode === "signup"
               ? {
-                  full_name: phoneForm.fullName,
-                  role: phoneForm.role,
-                  phone: phoneForm.phone
-                }
+                full_name: phoneForm.fullName,
+                role: phoneForm.role,
+                phone: phoneForm.phone
+              }
               : undefined
         }
       });
@@ -232,16 +232,16 @@ export function AuthScreen() {
       <section className="auth-hero">
         <div style={{ paddingBottom: '2rem' }}>
           <div className="brand-row" style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
-            <span className="brand-mark" style={{ 
-              background: 'linear-gradient(135deg, white, rgba(255,255,255,0.7))', 
-              color: '#1e3a8a', 
-              width: 48, 
-              height: 48, 
-              borderRadius: 12, 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              fontWeight: 700 
+            <span className="brand-mark" style={{
+              background: 'linear-gradient(135deg, white, rgba(255,255,255,0.7))',
+              color: '#1e3a8a',
+              width: 48,
+              height: 48,
+              borderRadius: 12,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700
             }}>ME</span>
             <div>
               <p className="brand-name" style={{ color: 'white', fontSize: '1.25rem', marginBottom: 0 }}>Mahalaxmi Electricals</p>
@@ -330,7 +330,7 @@ export function AuthScreen() {
                       name="fullName"
                       value={emailForm.fullName}
                       onChange={onEmailChange}
-                      placeholder="Ashok Kumar"
+                      placeholder="John Doe"
                       required
                     />
                   </label>
@@ -444,7 +444,7 @@ export function AuthScreen() {
                       name="fullName"
                       value={phoneForm.fullName}
                       onChange={onPhoneChange}
-                      placeholder="Ashok Kumar"
+                      placeholder="John Doe"
                       required
                     />
                   </label>

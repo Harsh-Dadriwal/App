@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
+import { OrderWorkflowTimeline } from "@/components/order-workflow";
 import {
   CardGrid,
   DataCard,
@@ -20,6 +21,10 @@ import {
   useRows
 } from "@/components/data-view";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import {
+  approveOrderItemByCustomer,
+  respondToSubstitute
+} from "@/lib/backend/modules/workflow-gateway";
 
 const CUSTOMER_SITE_STEPS = [
   { label: "Basics", description: "Code, name, budget" },
@@ -890,6 +895,7 @@ export function CustomerFinancePage() {
 export function CustomerApprovalsPage() {
   const { profile } = useAuth();
   const customerId = profile?.id ?? "";
+  const [selectedWorkflowItemId, setSelectedWorkflowItemId] = useState<string | null>(null);
   const approvals = useRows(
     async (client) => {
       const { data, error } = await client
@@ -915,18 +921,16 @@ export function CustomerApprovalsPage() {
   );
 
   async function respond(orderItemId: string, approve: boolean) {
-    const client = await getSupabaseBrowserClient();
-    if (!client) return;
     const suggestion = suggestions.data.find((item: any) => item.original_order_item_id === orderItemId);
     const ok = await mutation.run(
       async () => {
         if (suggestion) {
-          return client.rpc("respond_to_substitute", {
+          return respondToSubstitute({
             suggestion_id: suggestion.id,
             accept_choice: approve
           });
         }
-        return client.rpc("approve_order_item_by_customer", {
+        return approveOrderItemByCustomer({
           target_order_item_id: orderItemId,
           approve,
           note_text: approve ? "Approved from customer app" : "Rejected from customer app"
@@ -943,8 +947,15 @@ export function CustomerApprovalsPage() {
     if (ok) {
       approvals.refetch?.();
       suggestions.refetch?.();
+      setSelectedWorkflowItemId(orderItemId);
     }
   }
+
+  useEffect(() => {
+    if (!selectedWorkflowItemId && approvals.data[0]?.order_item_id) {
+      setSelectedWorkflowItemId(approvals.data[0].order_item_id);
+    }
+  }, [approvals.data, selectedWorkflowItemId]);
 
   return (
     <PageSection
@@ -975,11 +986,18 @@ export function CustomerApprovalsPage() {
               <div className="inline-actions">
                 <button type="button" className="primary-button" disabled={mutation.isSubmitting} onClick={() => void respond(item.order_item_id, true)}>Approve</button>
                 <button type="button" className="secondary-button" disabled={mutation.isSubmitting} onClick={() => void respond(item.order_item_id, false)}>Reject</button>
+                <button type="button" className="secondary-button" onClick={() => setSelectedWorkflowItemId(item.order_item_id)}>Timeline</button>
               </div>
             </DataCard>
           ))}
         </CardGrid>
       </QueryState>
+      <OrderWorkflowTimeline
+        entityType="order_item"
+        entityId={selectedWorkflowItemId}
+        title="Customer approval timeline"
+        description="See how this line moved through architect review, substitute steps, and final customer action."
+      />
     </PageSection>
   );
 }

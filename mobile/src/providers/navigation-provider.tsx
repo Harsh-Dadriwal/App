@@ -2,8 +2,10 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from "re
 
 export type MobileScreen =
   | "dashboard"
+  | "lighting"
   | "catalog"
   | "order-builder"
+  | "approvals"
   | "materials"
   | "notes"
   | "admin-catalog"

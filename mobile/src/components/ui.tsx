@@ -21,9 +21,9 @@ import {
 const tabConfig: Record<string, Array<{ key: MobileScreen; label: string; icon: keyof typeof Feather.glyphMap }>> = {
   customer: [
     { key: "dashboard", label: "Home", icon: "home" },
+    { key: "lighting", label: "Lighting", icon: "sun" },
     { key: "catalog", label: "Catalog", icon: "grid" },
-    { key: "order-builder", label: "Order", icon: "shopping-bag" },
-    { key: "fintech", label: "Fintech", icon: "dollar-sign" }
+    { key: "order-builder", label: "Order", icon: "shopping-bag" }
   ],
   electrician: [
     { key: "dashboard", label: "Home", icon: "home" },
@@ -33,12 +33,14 @@ const tabConfig: Record<string, Array<{ key: MobileScreen; label: string; icon: 
   ],
   architect: [
     { key: "dashboard", label: "Home", icon: "home" },
+    { key: "lighting", label: "Lighting", icon: "sun" },
     { key: "order-builder", label: "Order", icon: "shopping-bag" },
     { key: "materials", label: "Tracker", icon: "layers" },
     { key: "notes", label: "Notes", icon: "message-square" }
   ],
   admin: [
     { key: "dashboard", label: "Home", icon: "home" },
+    { key: "lighting", label: "Lighting", icon: "sun" },
     { key: "order-builder", label: "Order", icon: "shopping-bag" },
     { key: "admin-catalog", label: "Admin", icon: "settings" },
     { key: "fintech", label: "Fintech", icon: "dollar-sign" }

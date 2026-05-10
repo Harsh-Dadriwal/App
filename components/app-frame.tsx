@@ -9,6 +9,11 @@ import { useTheme } from "@/components/theme-provider";
 import { roleLabels, roleNav } from "@/lib/navigation";
 import type { AppRole } from "@/lib/app-types";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import {
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead
+} from "@/lib/backend/modules/notifications-gateway";
 
 function SetupView() {
   return (
@@ -67,19 +72,14 @@ export function AppFrame({
   } = useAuth();
 
   const notifications = useRows(
-    async (client) => {
+    async () => {
       if (!profile?.id) {
         return { data: [] as any[], error: null };
       }
-      const { data, error } = await client
-        .from("notifications")
-        .select("id, title, body, is_read, data, created_at")
-        .eq("user_id", profile.id)
-        .order("created_at", { ascending: false })
-        .limit(8);
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
+      const result = await listNotifications(profile.id, activeTenant?.id ?? null);
+      return { data: result.data ?? [], error: result.error };
     },
-    [profile?.id]
+    [profile?.id, activeTenant?.id]
   );
   
   const approvals = useRows(
@@ -126,23 +126,19 @@ export function AppFrame({
     } as Record<string, number>;
   }, [notifications.data, approvals.data.length, adminRequests.data.length]);
 
-  async function markNotificationRead(notificationId: string) {
-    const client = await getSupabaseBrowserClient();
-    if (!client) return;
+  async function handleMarkNotificationRead(notificationId: string) {
     const ok = await mutation.run(
-      async () => client.from("notifications").update({ is_read: true, read_at: new Date().toISOString() }).eq("id", notificationId),
+      async () => markNotificationRead(notificationId),
       "Notification marked as read."
     );
     if (ok) notifications.refetch?.();
   }
 
   async function markAllRead() {
-    const client = await getSupabaseBrowserClient();
-    if (!client || !profile?.id) return;
     const unreadIds = notifications.data.filter((item: any) => !item.is_read).map((item: any) => item.id);
     if (unreadIds.length === 0) return;
     const ok = await mutation.run(
-      async () => client.from("notifications").update({ is_read: true, read_at: new Date().toISOString() }).in("id", unreadIds),
+      async () => markAllNotificationsRead(unreadIds),
       "All notifications marked as read."
     );
     if (ok) notifications.refetch?.();
@@ -323,7 +319,7 @@ export function AppFrame({
                         <small>{new Date(item.created_at).toLocaleString("en-IN")}</small>
                       </div>
                       {!item.is_read ? (
-                        <button type="button" className="secondary-button" onClick={() => void markNotificationRead(item.id)}>
+                          <button type="button" className="secondary-button" onClick={() => void handleMarkNotificationRead(item.id)}>
                           Read
                         </button>
                       ) : null}

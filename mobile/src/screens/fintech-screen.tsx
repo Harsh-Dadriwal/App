@@ -4,6 +4,7 @@ import { useMutationAction, useRows } from "@/components/app-state";
 import { AppButton, Card, Chip, Notice, QueryState, ScreenShell, SectionTitle } from "@/components/ui";
 import { useAuth } from "@/providers/auth-provider";
 import { supabase } from "@/lib/supabase";
+import { paySavingsInstallment } from "@/lib/backend/fintech-gateway";
 
 import { palette } from "@/lib/theme";
 
@@ -46,11 +47,11 @@ export function FintechScreen() {
   }, [subscriptions.data.map((sub: any) => sub.id).join(",")], { realtimeTable: "savings_installments" });
 
   async function payInstallment(installmentId: string) {
-    if (!supabase || !installmentId) return;
+    if (!installmentId) return;
     setPayingInstallmentId(installmentId);
 
     const ok = await mutation.run(async () =>
-      (supabase as any).rpc("pay_savings_installment", {
+      paySavingsInstallment({
         target_installment_id: installmentId,
         payment_amount: null,
         note_text: "Customer installment payment recorded from Mobile App."

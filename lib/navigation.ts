@@ -41,6 +41,7 @@ export const roleNav: Record<
 > = {
   customer: [
     { href: "/customer", label: "Dashboard" },
+    { href: "/customer/lighting", label: "Lighting Visualizer", shortLabel: "Lighting" },
     { href: "/customer/electricians", label: "Electricians" },
     { href: "/customer/architects", label: "Architects" },
     { href: "/customer/sites", label: "Sites" },
@@ -64,6 +65,7 @@ export const roleNav: Record<
   ],
   architect: [
     { href: "/architect", label: "Dashboard" },
+    { href: "/architect/lighting", label: "Lighting Visualizer", shortLabel: "Lighting" },
     { href: "/architect/projects/new", label: "New Projects" },
     { href: "/architect/projects/ongoing", label: "Ongoing Projects", shortLabel: "Ongoing" },
     { href: "/architect/materials", label: "Material Tracker", shortLabel: "Materials" },
@@ -75,9 +77,11 @@ export const roleNav: Record<
   ],
   admin: [
     { href: "/admin", label: "Dashboard" },
+    { href: "/admin/lighting", label: "Lighting Leads", shortLabel: "Lighting" },
     { href: "/admin/users", label: "Users & Verification", shortLabel: "Users" },
     { href: "/admin/assignments", label: "Site Assignments", shortLabel: "Assignments" },
     { href: "/admin/orders", label: "Orders" },
+    { href: "/admin/workflows", label: "Workflow Center", shortLabel: "Workflow" },
     { href: "/admin/products", label: "Products & Inventory", shortLabel: "Products" },
     { href: "/admin/catalog", label: "Categories & Brands", shortLabel: "Catalog" },
     { href: "/admin/fintech", label: "Wallets, Savings & Referrals", shortLabel: "Fintech" },

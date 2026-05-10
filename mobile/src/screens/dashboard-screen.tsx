@@ -6,7 +6,8 @@ import { useMobileNavigation, type MobileScreen } from "@/providers/navigation-p
 
 const roleActions = {
   customer: [
-    { label: "Browse sites and approvals", route: "dashboard" },
+    { label: "Lighting visualizer", route: "lighting" },
+    { label: "Customer approvals", route: "approvals" },
     { label: "Easy product ordering", route: "order-builder" },
     { label: "Project notes", route: "notes" }
   ],
@@ -16,14 +17,21 @@ const roleActions = {
     { label: "Project notes", route: "notes" }
   ],
   architect: [
+    { label: "Lighting visualizer", route: "lighting" },
     { label: "Create material order", route: "order-builder" },
     { label: "Material reviews", route: "materials" },
     { label: "Project notes", route: "notes" }
   ],
   admin: [
+    { label: "Lighting leads", route: "lighting" },
     { label: "Create quick order", route: "order-builder" },
     { label: "Admin catalog", route: "admin-catalog" },
     { label: "Notes and monitoring", route: "notes" }
+  ],
+  supplier: [
+    { label: "Lighting scene preview", route: "lighting" },
+    { label: "Return to dashboard", route: "dashboard" },
+    { label: "Project notes", route: "notes" }
   ]
 } as const satisfies Record<string, Array<{ label: string; route: MobileScreen }>>;
 
@@ -36,6 +44,8 @@ export function DashboardScreen() {
       <ScreenShell title="Loading workspace" subtitle="Fetching your profile and role-based mobile workspace." />
     );
   }
+
+  const actions = roleActions[profile.role] ?? [];
 
   return (
     <ScreenShell
@@ -57,7 +67,7 @@ export function DashboardScreen() {
       />
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View style={{ flexDirection: "row", gap: 12 }}>
-          {roleActions[profile.role].map((action) => (
+          {actions.map((action) => (
             <View key={action.route} style={{ width: 260 }}>
               <Card tone="soft">
                 <Text style={{ fontSize: 18, fontWeight: "700", marginBottom: 10 }}>{action.label}</Text>

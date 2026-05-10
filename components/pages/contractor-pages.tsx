@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
+import { AdminWorkflowMonitor, OrderWorkflowTimeline } from "@/components/order-workflow";
 import {
   CardGrid,
   DataCard,
@@ -21,6 +22,20 @@ import {
   useRows
 } from "@/components/data-view";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import {
+  markOrderItemSupplied,
+  reviewOrderItemByArchitect,
+  suggestSubstituteItem,
+  transitionSiteOrder,
+  verifyProfessionalUser
+} from "@/lib/backend/modules/workflow-gateway";
+import {
+  listInventoryProducts,
+  listProductBrands,
+  listProductCategories,
+  saveInventoryProduct,
+  updateProductImage
+} from "@/lib/backend/modules/inventory-gateway";
 
 function matchesQuery(value: string, query: string) {
   return value.toLowerCase().includes(query.trim().toLowerCase());
@@ -528,7 +543,7 @@ export function ElectricianMaterialsPage() {
     if (!editingId && createStep < 5) return;
     const client = await getSupabaseBrowserClient();
     if (!client || !electricianId) return;
-    const payload = {
+    const basePayload = {
       site_id: form.site_id,
       site_order_id: form.site_order_id,
       product_id: form.product_id,
@@ -544,12 +559,16 @@ export function ElectricianMaterialsPage() {
       unit_price: Number(form.unit_price || 0),
       line_subtotal: Number(form.quantity_required || 0) * Number(form.unit_price || 0),
       line_total: Number(form.quantity_required || 0) * Number(form.unit_price || 0),
-      electrician_notes: form.electrician_notes || null,
-      status: form.approval_mode === "architect_then_customer" ? "pending_architect_approval" : "pending_customer_approval"
+      electrician_notes: form.electrician_notes || null
     };
     const ok = await mutation.run(async () => {
-      if (editingId) return client.from("order_items").update(payload).eq("id", editingId);
-      return client.from("order_items").insert(payload);
+      if (editingId) {
+        return client.from("order_items").update(basePayload).eq("id", editingId);
+      }
+      return client.from("order_items").insert({
+        ...basePayload,
+        status: form.approval_mode === "architect_then_customer" ? "pending_architect_approval" : "pending_customer_approval"
+      });
     }, editingId ? "Order item updated." : "Order item created.");
     if (ok) {
       setEditingId(null);
@@ -1238,6 +1257,7 @@ export function ArchitectMaterialsPage() {
   const { profile } = useAuth();
   const architectId = profile?.id ?? "";
   const [archMaterialSearch, setArchMaterialSearch] = useState("");
+  const [selectedWorkflowItemId, setSelectedWorkflowItemId] = useState<string | null>(null);
   const materials = useRows(
     async (client) => {
       const { data, error } = await client
@@ -1252,9 +1272,7 @@ export function ArchitectMaterialsPage() {
   const mutation = useMutationAction();
 
   async function reviewItem(orderItemId: string, approve: boolean) {
-    const client = await getSupabaseBrowserClient();
-    if (!client) return;
-    const ok = await mutation.run(async () => client.rpc("review_order_item_by_architect", {
+    const ok = await mutation.run(async () => reviewOrderItemByArchitect({
       target_order_item_id: orderItemId,
       approve,
       note_text: approve ? "Approved by architect" : "Rejected by architect"
@@ -1269,6 +1287,12 @@ export function ArchitectMaterialsPage() {
       [item.item_name_snapshot, item.site_name, item.status].some((value) => String(value ?? "").toLowerCase().includes(q))
     );
   }, [materials.data, archMaterialSearch]);
+
+  useEffect(() => {
+    if (!selectedWorkflowItemId && visibleArchMaterials[0]?.order_item_id) {
+      setSelectedWorkflowItemId(visibleArchMaterials[0].order_item_id);
+    }
+  }, [visibleArchMaterials, selectedWorkflowItemId]);
 
   return (
     <div className="page-stack">
@@ -1312,14 +1336,29 @@ export function ArchitectMaterialsPage() {
                       <button type="button" className="secondary-button" disabled={mutation.isSubmitting} onClick={() => void reviewItem(item.order_item_id, false)}>
                         Reject
                       </button>
+                      <button type="button" className="secondary-button" onClick={() => setSelectedWorkflowItemId(item.order_item_id)}>
+                        Timeline
+                      </button>
                     </div>
-                  ) : null}
+                  ) : (
+                    <div className="inline-actions">
+                      <button type="button" className="secondary-button" onClick={() => setSelectedWorkflowItemId(item.order_item_id)}>
+                        Timeline
+                      </button>
+                    </div>
+                  )}
                 </DataCard>
               ))}
             </CardGrid>
           </QueryState>
         </QueryState>
       </PageSection>
+      <OrderWorkflowTimeline
+        entityType="order_item"
+        entityId={selectedWorkflowItemId}
+        title="Architect workflow timeline"
+        description="Track approvals, substitute detours, and supply updates for the currently selected material line."
+      />
     </div>
   );
 }
@@ -1435,6 +1474,7 @@ export function AdminDashboardPage() {
           </DataCard>
         </CardGrid>
       </PageSection>
+      <AdminWorkflowMonitor />
     </div>
   );
 }
@@ -1443,6 +1483,7 @@ export function SupplierDashboardPage() {
   const { profile, activeTenant } = useAuth();
   const supplierId = profile?.id ?? "";
   const tenantId = activeTenant?.id ?? "";
+  const mutation = useMutationAction();
 
   const products = useRows(
     async (client) => {
@@ -1484,6 +1525,7 @@ export function SupplierDashboardPage() {
           hasData={orders.data.length > 0}
           empty={{ title: "No active orders", description: "You will see orders here when they are confirmed by customers." }}
         >
+          <FormNotice error={mutation.error} success={mutation.success} />
           <CardGrid>
             {orders.data.map((order: any) => (
               <DataCard key={order.id} title={order.order_number} subtitle={order.site?.site_name} meta={order.status}>
@@ -1493,24 +1535,40 @@ export function SupplierDashboardPage() {
                     <button 
                       className="primary-button" 
                       onClick={async () => {
-                        const client = await getSupabaseBrowserClient();
-                        await client?.from("site_orders").update({ status: "processing" }).eq("id", order.id);
-                        orders.refetch?.();
+                        const ok = await mutation.run(
+                          async () => transitionSiteOrder({
+                            target_site_order_id: order.id,
+                            target_transition_key: "admin_start_processing",
+                            note_text: "Supplier accepted order for processing",
+                            event_payload: {},
+                            target_source_module: "supplier_dashboard"
+                          }),
+                          "Order moved to processing."
+                        );
+                        if (ok) orders.refetch?.();
                       }}
                     >
                       Accept Order
                     </button>
                   )}
-                  {order.status === "processing" && (
+                  {["processing", "partially_supplied", "confirmed"].includes(order.status) && (
                     <button 
                       className="primary-button" 
                       onClick={async () => {
-                        const client = await getSupabaseBrowserClient();
-                        await client?.from("site_orders").update({ status: "shipped", shipped_at: new Date().toISOString() }).eq("id", order.id);
-                        orders.refetch?.();
+                        const ok = await mutation.run(
+                          async () => transitionSiteOrder({
+                            target_site_order_id: order.id,
+                            target_transition_key: "admin_mark_supplied",
+                            note_text: "Supplier marked order supplied",
+                            event_payload: {},
+                            target_source_module: "supplier_dashboard"
+                          }),
+                          "Order marked supplied."
+                        );
+                        if (ok) orders.refetch?.();
                       }}
                     >
-                      Mark as Shipped
+                      Mark supplied
                     </button>
                   )}
                   <Link href={`/orders/${order.id}`} className="secondary-button">View details</Link>
@@ -1548,9 +1606,7 @@ export function AdminUsersPage() {
   }
 
   async function verifyUser(userId: string, approve: boolean) {
-    const client = await getSupabaseBrowserClient();
-    if (!client) return;
-    const ok = await mutation.run(async () => client.rpc("verify_professional_user", {
+    const ok = await mutation.run(async () => verifyProfessionalUser({
       target_user_id: userId,
       approve,
       admin_note: approve ? "Verified from admin panel" : "Rejected from admin panel"
@@ -1608,13 +1664,14 @@ export function AdminUsersPage() {
 
 export function AdminOrdersPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedOrderItemId, setSelectedOrderItemId] = useState<string | null>(null);
   const [form, setForm] = useState({
     site_id: "",
     order_number: "",
     customer_id: "",
     electrician_id: "",
     architect_id: "",
-    status: "draft",
     total_amount: ""
   });
   const mutation = useMutationAction();
@@ -1654,25 +1711,22 @@ export function AdminOrdersPage() {
       customer_id: form.customer_id,
       electrician_id: form.electrician_id || null,
       architect_id: form.architect_id || null,
-      status: form.status,
       subtotal_amount: Number(form.total_amount || 0),
       total_amount: Number(form.total_amount || 0)
     };
     const ok = await mutation.run(async () => {
       if (editingId) return client.from("site_orders").update(payload).eq("id", editingId);
-      return client.from("site_orders").insert(payload);
+      return client.from("site_orders").insert({ ...payload, status: "draft" });
     }, editingId ? "Order updated." : "Order created.");
     if (ok) {
       setEditingId(null);
-      setForm({ site_id: "", order_number: "", customer_id: "", electrician_id: "", architect_id: "", status: "draft", total_amount: "" });
+      setForm({ site_id: "", order_number: "", customer_id: "", electrician_id: "", architect_id: "", total_amount: "" });
       orders.refetch?.();
     }
   }
 
   async function markSupplied(orderItemId: string) {
-    const client = await getSupabaseBrowserClient();
-    if (!client) return;
-    const ok = await mutation.run(async () => client.rpc("mark_order_item_supplied", {
+    const ok = await mutation.run(async () => markOrderItemSupplied({
       target_order_item_id: orderItemId,
       supplied_qty: 999999,
       note_text: "Marked supplied from admin panel"
@@ -1680,6 +1734,24 @@ export function AdminOrdersPage() {
     if (ok) {
       orders.refetch?.();
       orderItems.refetch?.();
+      setSelectedOrderItemId(orderItemId);
+    }
+  }
+
+  async function transitionOrder(orderId: string, transitionKey: string, successMessage: string, noteText: string) {
+    const ok = await mutation.run(
+      async () => transitionSiteOrder({
+        target_site_order_id: orderId,
+        target_transition_key: transitionKey,
+        note_text: noteText,
+        event_payload: {},
+        target_source_module: "admin_orders"
+      }),
+      successMessage
+    );
+    if (ok) {
+      orders.refetch?.();
+      setSelectedOrderId(orderId);
     }
   }
 
@@ -1724,18 +1796,9 @@ export function AdminOrdersPage() {
             </select>
           </label>
           <label>
-            Status
-            <select value={form.status} onChange={(e) => setForm((s) => ({ ...s, status: e.target.value }))}>
-              <option value="draft">draft</option>
-              <option value="awaiting_approval">awaiting_approval</option>
-              <option value="confirmed">confirmed</option>
-              <option value="processing">processing</option>
-              <option value="supplied">supplied</option>
-            </select>
-          </label>
-          <label>
             Total amount
             <input type="number" value={form.total_amount} onChange={(e) => setForm((s) => ({ ...s, total_amount: e.target.value }))} />
+            <FormFieldHint>Order status now moves through workflow transitions, not direct form edits.</FormFieldHint>
           </label>
         </FormGrid>
         <div className="form-actions">
@@ -1765,11 +1828,33 @@ export function AdminOrdersPage() {
                     customer_id: order.customer_id ?? "",
                     electrician_id: order.electrician_id ?? "",
                     architect_id: order.architect_id ?? "",
-                    status: order.status ?? "draft",
                     total_amount: String(order.total_amount ?? "")
                   });
                   mutation.reset();
                 }}>Edit</button>
+                <button type="button" className="secondary-button" onClick={() => setSelectedOrderId(order.id)}>
+                  Timeline
+                </button>
+                {order.status === "confirmed" ? (
+                  <button
+                    type="button"
+                    className="primary-button"
+                    disabled={mutation.isSubmitting}
+                    onClick={() => void transitionOrder(order.id, "admin_start_processing", "Order moved to processing.", "Moved into processing from admin orders.")}
+                  >
+                    Start processing
+                  </button>
+                ) : null}
+                {["confirmed", "processing", "partially_supplied"].includes(order.status) ? (
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={mutation.isSubmitting}
+                    onClick={() => void transitionOrder(order.id, "admin_mark_supplied", "Order marked supplied.", "Closed from admin orders panel.")}
+                  >
+                    Mark supplied
+                  </button>
+                ) : null}
               </div>
             </DataCard>
           ))}
@@ -1792,13 +1877,34 @@ export function AdminOrdersPage() {
                   <button type="button" className="primary-button" disabled={mutation.isSubmitting} onClick={() => void markSupplied(item.id)}>
                     Mark supplied
                   </button>
+                  <button type="button" className="secondary-button" onClick={() => setSelectedOrderItemId(item.id)}>
+                    Timeline
+                  </button>
                 </div>
-              ) : null}
+              ) : (
+                <div className="inline-actions">
+                  <button type="button" className="secondary-button" onClick={() => setSelectedOrderItemId(item.id)}>
+                    Timeline
+                  </button>
+                </div>
+              )}
             </DataCard>
           ))}
         </CardGrid>
       </QueryState>
     </PageSection>
+    <OrderWorkflowTimeline
+      entityType="site_order"
+      entityId={selectedOrderId}
+      title="Selected order timeline"
+      description="Header-level order transitions now flow through the same system event layer."
+    />
+    <OrderWorkflowTimeline
+      entityType="order_item"
+      entityId={selectedOrderItemId}
+      title="Selected line-item timeline"
+      description="Use this to inspect approvals, substitute actions, and supply updates for one material line."
+    />
     </div>
   );
 }
@@ -1825,21 +1931,18 @@ export function AdminProductsPage() {
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const mutation = useMutationAction();
-  const categories = useRows(async (client) => {
-    const { data, error } = await client.from("product_categories").select("id, name").order("name");
-    return { data: (data ?? []) as any[], error: error?.message ?? null };
+  const categories = useRows(async () => {
+    const result = await listProductCategories();
+    return { data: result.data ?? [], error: result.error };
   }, []);
-  const brands = useRows(async (client) => {
-    const { data, error } = await client.from("product_brands").select("id, name, category_id").order("name");
-    return { data: (data ?? []) as any[], error: error?.message ?? null };
+  const brands = useRows(async () => {
+    const result = await listProductBrands();
+    return { data: result.data ?? [], error: result.error };
   }, []);
   const products = useRows(
-    async (client) => {
-      const { data, error } = await client
-        .from("products")
-        .select("id, category_id, brand_id, item_name, sku, unit, base_price, stock_status, image_url")
-        .order("item_name", { ascending: true });
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
+    async () => {
+      const result = await listInventoryProducts();
+      return { data: result.data ?? [], error: result.error };
     },
     []
   );
@@ -1874,8 +1977,6 @@ export function AdminProductsPage() {
 
   async function saveProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const client = await getSupabaseBrowserClient();
-    if (!client) return;
     const payload = {
       category_id: form.category_id,
       brand_id: form.brand_id,
@@ -1887,21 +1988,13 @@ export function AdminProductsPage() {
       image_url: form.image_url || null
     };
     const ok = await mutation.run(async () => {
-      const result = editingId
-        ? await client
-            .from("products")
-            .update(payload)
-            .eq("id", editingId)
-            .select("id, sku")
-            .single()
-        : await client
-            .from("products")
-            .insert(payload)
-            .select("id, sku")
-            .single();
+      const result = await saveInventoryProduct({
+        editingId,
+        payload
+      });
 
-      if (result.error || !imageFile) {
-        return result;
+      if (result.error || !imageFile || !result.data) {
+        return { error: result.error };
       }
 
       const uploadFormData = new FormData();
@@ -1927,10 +2020,7 @@ export function AdminProductsPage() {
         };
       }
 
-      return client
-        .from("products")
-        .update({ image_url: uploadData.url })
-        .eq("id", result.data.id);
+      return updateProductImage(result.data.id, uploadData.url);
     }, editingId ? "Product updated." : "Product created.");
     if (ok) {
       setEditingId(null);
@@ -2348,9 +2438,7 @@ export function AdminSubstitutionsPage() {
 
   async function saveSuggestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const client = await getSupabaseBrowserClient();
-    if (!client) return;
-    const ok = await mutation.run(async () => client.rpc("suggest_substitute_item", {
+    const ok = await mutation.run(async () => suggestSubstituteItem({
       original_item_id: form.original_order_item_id,
       suggested_product: form.suggested_product_id,
       reason_text: form.reason || null

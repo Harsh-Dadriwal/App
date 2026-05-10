@@ -6,10 +6,12 @@ import { AuthScreen } from "@/screens/auth-screen";
 import { DashboardScreen } from "@/screens/dashboard-screen";
 import { CatalogScreen } from "@/screens/catalog-screen";
 import { OrderBuilderScreen } from "@/screens/order-builder-screen";
+import { ApprovalsScreen } from "@/screens/approvals-screen";
 import { MaterialsScreen } from "@/screens/materials-screen";
 import { NotesScreen } from "@/screens/notes-screen";
 import { AdminCatalogScreen } from "@/screens/admin-catalog-screen";
 import { FintechScreen } from "@/screens/fintech-screen";
+import { LightingScreen } from "@/screens/lighting-screen";
 
 function AppBody() {
   const { configured, loading, session, profile } = useAuth();
@@ -30,7 +32,9 @@ function AppBody() {
   }
 
   if (screen === "catalog") return <CatalogScreen />;
+  if (screen === "lighting") return <LightingScreen />;
   if (screen === "order-builder") return <OrderBuilderScreen />;
+  if (screen === "approvals") return <ApprovalsScreen />;
   if (screen === "materials") return <MaterialsScreen />;
   if (screen === "notes") return <NotesScreen />;
   if (screen === "admin-catalog") return <AdminCatalogScreen />;

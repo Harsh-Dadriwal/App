@@ -15,6 +15,35 @@ cp .env.example .env.local
 npm run dev
 ```
 
+## API scaffold
+
+The repo now also includes a NestJS-ready backend scaffold under:
+
+- `apps/api`
+
+This is the first enterprise migration layer between frontend and Supabase.
+
+Planned runtime pattern:
+
+- web/mobile call NestJS APIs for business actions
+- NestJS talks to Supabase Postgres/Auth/Storage/Realtime
+- Supabase remains the system of record
+
+When you are ready to bring the backend online:
+
+```bash
+cd apps/api
+npm install
+cp .env.example .env
+npm run start:dev
+```
+
+Or from the repo root:
+
+```bash
+npm run dev:api
+```
+
 ## Supabase setup
 
 1. Create a Supabase project

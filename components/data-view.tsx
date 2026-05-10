@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, type DependencyList, type ReactNode } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { getSupabaseBrowserClient, getSupabaseReadBrowserClient } from "@/lib/supabase";
+import { useSharedMutationAction } from "@shared-types/use-mutation-action";
 
 export function FormFieldHint({ children }: { children: ReactNode }) {
   return <p className="form-field-hint">{children}</p>;
@@ -83,7 +84,7 @@ type FetchResult<T> = {
 export function useRows<T>(
   fetcher: (client: NonNullable<Awaited<ReturnType<typeof getSupabaseBrowserClient>>>) => Promise<FetchResult<T>>,
   deps: DependencyList,
-  options?: { realtimeTable?: string }
+  options?: { realtimeTable?: string; clientType?: "primary" | "read" }
 ) {
   const [data, setData] = useState<T[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -96,12 +97,16 @@ export function useRows<T>(
 
     void (async () => {
       setLoading(true);
-      const client = await getSupabaseBrowserClient();
+      const resolvedClientType =
+        options?.clientType ?? (options?.realtimeTable ? "primary" : "read");
+      const client = resolvedClientType === "read"
+        ? await getSupabaseReadBrowserClient()
+        : await getSupabaseBrowserClient();
 
       if (!client) {
         if (active) {
           setData([]);
-          setError("Supabase is not configured.");
+          setError(`${resolvedClientType === "read" ? "Supabase read client" : "Supabase"} is not configured.`);
           setLoading(false);
         }
         return;
@@ -141,43 +146,14 @@ export function useRows<T>(
 }
 
 export function useMutationAction() {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
-  async function run(action: () => Promise<{ error?: { message?: string | null } | null } | void>, successMessage?: string) {
-    setIsSubmitting(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const result = await action();
-      const maybeError = result && "error" in result ? result.error : null;
-
-      if (maybeError?.message) {
-        setError(maybeError.message);
-        return false;
-      }
-
-      if (successMessage) {
-        setSuccess(successMessage);
-      }
-
-      return true;
-    } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Action failed.");
-      return false;
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  function reset() {
-    setError(null);
-    setSuccess(null);
-  }
-
-  return { isSubmitting, error, success, run, reset };
+  const mutation = useSharedMutationAction();
+  return {
+    isSubmitting: mutation.loading,
+    error: mutation.error,
+    success: mutation.success,
+    run: mutation.run,
+    reset: mutation.reset
+  };
 }
 
 export function PageSection({

@@ -16,6 +16,12 @@ import {
   useRows
 } from "@/components/data-view";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import {
+  ensureWalletAccount,
+  paySavingsInstallment,
+  postWalletEntry,
+  resolveReferralReward
+} from "@/lib/backend/modules/fintech-gateway";
 
 declare global {
   interface Window {
@@ -294,10 +300,9 @@ export function CustomerWalletPage() {
     .reduce((sum: number, row: any) => sum + Number(row.amount ?? 0), 0);
 
   async function completeDeposit(paymentId: string) {
-    const client = await getSupabaseBrowserClient();
-    if (!client || !wallet.data[0]?.id) return;
+    if (!wallet.data[0]?.id) return;
 
-    await mutation.run(async () => (client as any).rpc("post_wallet_entry", {
+    await mutation.run(async () => postWalletEntry({
       target_tenant_id: tenantId,
       target_wallet_account_id: wallet.data[0].id,
       target_direction: "credit",
@@ -528,13 +533,12 @@ export function CustomerSavingsPage() {
   }
 
   async function payInstallment(installmentId: string, amount: number, paymentId: string) {
-    const client = await getSupabaseBrowserClient();
-    if (!client || !installmentId || amount <= 0) return;
+    if (!installmentId || amount <= 0) return;
     setPayingInstallmentId(installmentId);
 
     const ok = await mutation.run(
       async () =>
-        (client as any).rpc("pay_savings_installment", {
+        paySavingsInstallment({
           target_installment_id: installmentId,
           payment_amount: amount,
           note_text: `Razorpay installment payment: ${paymentId}`
@@ -1066,8 +1070,7 @@ export function AdminFintechPage() {
 
   async function postWalletAdjustment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const client = await getSupabaseBrowserClient();
-    if (!client || !tenantId || !adminId) return;
+    if (!tenantId || !adminId) return;
 
     const selectedWallet = wallets.data.find((wallet: any) => wallet.user_id === walletForm.user_id);
     if (!selectedWallet?.id) {
@@ -1079,7 +1082,7 @@ export function AdminFintechPage() {
 
     const ok = await walletMutation.run(
       async () =>
-        (client as any).rpc("post_wallet_entry", {
+        postWalletEntry({
           target_tenant_id: tenantId,
           target_wallet_account_id: selectedWallet.id,
           target_direction: walletForm.direction,
@@ -1106,10 +1109,9 @@ export function AdminFintechPage() {
   }
 
   async function createWalletAccount(userId: string) {
-    const client = await getSupabaseBrowserClient();
-    if (!client || !tenantId) return;
+    if (!tenantId) return;
     const ok = await walletMutation.run(
-      async () => (client as any).rpc("ensure_wallet_account", { target_tenant_id: tenantId, target_user_id: userId }),
+      async () => ensureWalletAccount({ target_tenant_id: tenantId, target_user_id: userId }),
       "Wallet account created."
     );
     if (ok) {
@@ -1118,12 +1120,11 @@ export function AdminFintechPage() {
   }
 
   async function resolveReward(rewardId: string, approveReward: boolean) {
-    const client = await getSupabaseBrowserClient();
-    if (!client || !rewardId) return;
+    if (!rewardId) return;
 
     const ok = await rewardMutation.run(
       async () =>
-        (client as any).rpc("resolve_referral_reward", {
+        resolveReferralReward({
           target_reward_id: rewardId,
           approve_reward: approveReward,
           note_text: approveReward

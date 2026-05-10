@@ -42,6 +42,8 @@ import {
   CustomerReferralsPage,
   AdminFintechPage
 } from "@/components/pages/fintech-pages";
+import { LightingVisualizerPage } from "@/components/pages/lighting-pages";
+import { AdminWorkflowHubPage } from "@/components/order-workflow";
 
 export default function RolePage({
   params
@@ -62,6 +64,7 @@ export default function RolePage({
       case "customer":
         switch (pathPart) {
           case "": return { title: "Dashboard", component: <CustomerDashboardPage /> };
+          case "lighting": return { title: "Lighting Visualizer", component: <LightingVisualizerPage role="customer" /> };
           case "electricians": return { title: "Electricians Directory", component: <DirectoryPage role="electrician" /> };
           case "architects": return { title: "Architects Directory", component: <DirectoryPage role="architect" /> };
           case "sites": return { title: "Sites", component: <CustomerSitesPage /> };
@@ -89,6 +92,7 @@ export default function RolePage({
       case "architect":
         switch (pathPart) {
           case "": return { title: "Dashboard", component: <ArchitectDashboardPage /> };
+          case "lighting": return { title: "Lighting Visualizer", component: <LightingVisualizerPage role="architect" /> };
           case "projects/new": return { title: "New Projects", component: <ArchitectProjectsPage mode="new" /> };
           case "projects/ongoing": return { title: "Ongoing Projects", component: <ArchitectProjectsPage mode="ongoing" /> };
           case "materials": return { title: "Material Tracker", component: <ArchitectMaterialsPage /> };
@@ -99,9 +103,11 @@ export default function RolePage({
       case "admin":
         switch (pathPart) {
           case "": return { title: "Dashboard", component: <AdminDashboardPage /> };
+          case "lighting": return { title: "Lighting Leads", component: <LightingVisualizerPage role="admin" /> };
           case "users": return { title: "Users & Verification", component: <AdminUsersPage /> };
           case "assignments": return { title: "Site Assignments", component: <AdminAssignmentsPage /> };
           case "orders": return { title: "Orders", component: <AdminOrdersPage /> };
+          case "workflows": return { title: "Workflow Center", component: <AdminWorkflowHubPage /> };
           case "products": return { title: "Products & Inventory", component: <AdminProductsPage /> };
           case "catalog": return { title: "Categories & Brands", component: <AdminCatalogPage /> };
           case "fintech": return { title: "Wallets, Savings & Referrals", component: <AdminFintechPage /> };

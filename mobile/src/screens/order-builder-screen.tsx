@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { useMutationAction, useRows } from "@/components/app-state";
+import { WorkflowTimelineCard } from "@/components/workflow";
 import { AppButton, Card, Chip, Field, Notice, QueryState, ScreenShell, SectionTitle } from "@/components/ui";
 import { useAuth } from "@/providers/auth-provider";
 import { supabase } from "@/lib/supabase";
@@ -18,6 +19,7 @@ export function OrderBuilderScreen() {
   const [unitPrice, setUnitPrice] = useState("");
   const [approvalMode, setApprovalMode] = useState("architect_then_customer");
   const [notes, setNotes] = useState("");
+  const [lastCreatedItemId, setLastCreatedItemId] = useState<string | null>(null);
 
   const sites = useRows(async (client) => {
     if (!profile?.id) return { data: [] as any[], error: null };
@@ -112,11 +114,26 @@ export function OrderBuilderScreen() {
     };
 
     const ok = await mutation.run(
-      async () => client.from("order_items").insert(payload),
+      async () =>
+        client
+          .from("order_items")
+          .insert(payload)
+          .select("id")
+          .single(),
       "Order item created from mobile."
     );
 
     if (ok) {
+      const created = await client
+        .from("order_items")
+        .select("id")
+        .eq("site_order_id", siteOrderId)
+        .eq("product_id", selectedProduct.id)
+        .eq("source_user_id", profile.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setLastCreatedItemId(created.data?.id ?? null);
       setCategoryId("");
       setBrandId("");
       setProductSearch("");
@@ -219,6 +236,18 @@ export function OrderBuilderScreen() {
 
       {mutation.success ? <Notice message={mutation.success} tone="success" /> : null}
       {mutation.error ? <Notice message={mutation.error} tone="error" /> : null}
+      <WorkflowTimelineCard
+        entityType="site_order"
+        entityId={siteOrderId || null}
+        title="Selected order timeline"
+        description="Order header transitions now come from the shared workflow backbone instead of hidden UI state."
+      />
+      <WorkflowTimelineCard
+        entityType="order_item"
+        entityId={lastCreatedItemId}
+        title="Latest created line timeline"
+        description="After you add a line, use this to confirm it entered the approval workflow correctly."
+      />
     </ScreenShell>
   );
 }

@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:api": "npm --prefix apps/api run start:dev",
     "build": "next build",
+    "build:api": "npm --prefix apps/api run build",
     "start": "next start",
     "lint": "next lint"
   },

@@ -268,6 +268,340 @@ textarea::placeholder {
   justify-content: center;
 }
 
+.lighting-layout {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.lighting-visual-column,
+.lighting-panel-column {
+  display: grid;
+  gap: 1rem;
+}
+
+.lighting-compare-card {
+  border: 1px solid var(--border-color);
+  border-radius: 1.4rem;
+  background: var(--card-bg);
+  box-shadow: var(--shadow-lg);
+  padding: 1rem;
+}
+
+.lighting-compare-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.15rem;
+  min-height: 430px;
+  background: #1d2028;
+}
+
+.lighting-compare-after {
+  position: absolute;
+  inset: 0;
+}
+
+.lighting-compare-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255,255,255,0.75);
+  box-shadow: 0 0 0 6px rgba(255,255,255,0.1);
+}
+
+.lighting-compare-divider span {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: rgba(15, 23, 42, 0.74);
+  color: #fff;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.lighting-room-scene {
+  position: relative;
+  min-height: 430px;
+  overflow: hidden;
+  filter: saturate(1);
+}
+
+.lighting-room-image,
+.lighting-room-layer,
+.lighting-room-vignette {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.lighting-room-image {
+  object-fit: cover;
+}
+
+.lighting-room-brightness {
+  background: rgba(8, 10, 16, 0.12);
+  mix-blend-mode: multiply;
+}
+
+.lighting-room-warm {
+  background: linear-gradient(180deg, rgba(255, 171, 84, 0.82), rgba(247, 134, 54, 0.32));
+  mix-blend-mode: soft-light;
+}
+
+.lighting-room-cool {
+  background: linear-gradient(180deg, rgba(203, 231, 255, 0.8), rgba(156, 205, 255, 0.22));
+  mix-blend-mode: screen;
+}
+
+.lighting-room-dull {
+  background: rgba(94, 104, 114, 0.55);
+  mix-blend-mode: saturation;
+}
+
+.lighting-room-vignette {
+  background: radial-gradient(circle at center, transparent 46%, rgba(17, 24, 39, 0.75) 100%);
+}
+
+.lighting-room-glow {
+  position: absolute;
+  top: 8%;
+  width: 18%;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255, 250, 214, 0.95) 0%, rgba(255, 208, 138, 0.54) 35%, transparent 72%);
+  pointer-events: none;
+}
+
+.lighting-room-glow.left { left: 6%; }
+.lighting-room-glow.center { left: 41%; }
+.lighting-room-glow.right { right: 6%; }
+
+.lighting-room-caption {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  background: rgba(12, 17, 26, 0.62);
+  color: #f8fafc;
+  padding: 0.8rem 0.95rem;
+  border-radius: 1rem;
+  backdrop-filter: blur(10px);
+}
+
+.lighting-room-caption strong {
+  font-size: 0.95rem;
+}
+
+.lighting-room-caption span {
+  font-size: 0.82rem;
+  color: rgba(248, 250, 252, 0.82);
+}
+
+.lighting-tooltip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.lighting-tooltip {
+  position: relative;
+}
+
+.lighting-tooltip-trigger {
+  border: 1px solid var(--border-color);
+  background: var(--surface-tint);
+  color: var(--text-main);
+  border-radius: 999px;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.lighting-tooltip-card {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  width: min(28rem, 80vw);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  background: var(--surface);
+  padding: 0.9rem 1rem;
+  box-shadow: var(--shadow-md);
+}
+
+.lighting-tooltip-card p {
+  margin-bottom: 0.55rem;
+  font-size: 0.88rem;
+}
+
+.lighting-tooltip-card p:last-child {
+  margin-bottom: 0;
+}
+
+.lighting-product-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  text-align: left;
+  width: 100%;
+  border: 1px solid var(--border-color);
+  border-radius: 1.15rem;
+  background: var(--surface);
+  padding: 1rem;
+  color: var(--text-main);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.lighting-product-card:hover,
+.lighting-product-card.is-active {
+  transform: translateY(-1px);
+  border-color: var(--primary);
+  box-shadow: var(--shadow-md);
+}
+
+.lighting-product-brand {
+  color: var(--primary);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.3rem;
+}
+
+.lighting-product-card h3 {
+  margin-bottom: 0.35rem;
+}
+
+.lighting-product-summary {
+  font-size: 0.9rem;
+  margin-bottom: 0;
+}
+
+.lighting-product-meta {
+  min-width: 11rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  align-items: flex-end;
+}
+
+.lighting-product-meta span {
+  display: inline-flex;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.lighting-product-meta small {
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.lighting-bottom-sheet {
+  position: sticky;
+  bottom: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 1.4rem;
+  background: var(--card-bg);
+  box-shadow: var(--shadow-xl);
+  padding: 1.15rem;
+  display: grid;
+  gap: 0.95rem;
+}
+
+.lighting-bottom-sheet h3 {
+  margin: 0;
+}
+
+.lighting-range-field {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.lighting-range-field span {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.lighting-range-field input[type="range"] {
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.lighting-spec-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.lighting-spec-grid div {
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.45);
+  padding: 0.85rem;
+}
+
+.lighting-spec-grid span {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.lighting-spec-grid strong {
+  font-size: 0.98rem;
+}
+
+.lighting-quote-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  background: var(--surface-tint);
+  padding: 0.95rem 1rem;
+  margin-top: 1rem;
+}
+
+@media (min-width: 1080px) {
+  .lighting-layout {
+    grid-template-columns: minmax(0, 1.25fr) minmax(360px, 0.85fr);
+    align-items: start;
+  }
+}
+
+@media (max-width: 900px) {
+  .lighting-product-card {
+    flex-direction: column;
+  }
+
+  .lighting-product-meta {
+    min-width: 0;
+    align-items: flex-start;
+  }
+
+  .lighting-compare-stage,
+  .lighting-room-scene {
+    min-height: 320px;
+  }
+}
+
 .primary-button:hover:not(:disabled) {
   background: linear-gradient(135deg, #f59e0b, #92400e);
   transform: translateY(-1px);
@@ -1302,6 +1636,69 @@ textarea::placeholder {
 
 .order-review-strip strong {
   font-size: 0.98rem;
+}
+
+.workflow-monitor-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.workflow-panel {
+  border: 1px solid var(--border-color);
+  border-radius: 1.25rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem;
+}
+
+.workflow-panel h3 {
+  margin: 0 0 0.85rem;
+  font-size: 1rem;
+  color: var(--text-main);
+}
+
+.workflow-entity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.9rem;
+}
+
+.workflow-entity-card {
+  text-align: left;
+  border: 1px solid var(--border-color);
+  border-radius: 1.2rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.workflow-entity-card:hover,
+.workflow-entity-card.is-selected {
+  transform: translateY(-2px);
+  border-color: rgba(180, 83, 9, 0.4);
+  box-shadow: var(--shadow-md);
+}
+
+.workflow-entity-card span,
+.workflow-entity-card small {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.workflow-entity-card strong {
+  color: var(--text-main);
+  font-size: 1rem;
+}
+
+.workflow-entity-card p {
+  margin: 0;
+  color: var(--text-soft);
 }
 
 @media (max-width: 640px) {
