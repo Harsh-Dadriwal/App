@@ -1,12 +1,17 @@
 {
-  "name": "mahalaxmi-electricals-frontend",
+  "name": "mahalaxmi-electricals-monorepo",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "apps/api",
+    "packages/core"
+  ],
   "scripts": {
     "dev": "next dev",
     "dev:api": "npm --prefix apps/api run start:dev",
     "build": "next build",
-    "build:api": "npm --prefix apps/api run build",
+    "build:api": "npm run build --workspace=apps/api",
+    "start:api": "npm run start --workspace=apps/api",
     "start": "next start",
     "lint": "next lint"
   },
