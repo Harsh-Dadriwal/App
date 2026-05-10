@@ -1,28 +1,19 @@
 {
-  "name": "mahalaxmi-electricals-api",
+  "name": "mahalaxmi-monorepo",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "apps/api",
+    "packages/core"
+  ],
   "scripts": {
-    "start:dev": "npm run build && node dist/apps/api/src/main.js",
-    "start": "node dist/apps/api/src/main.js",
-    "build": "nest build"
+    "build:api": "npm run build --workspace=apps/api",
+    "start:api": "npm run start --workspace=apps/api"
   },
   "dependencies": {
-    "@nestjs/common": "^10.4.8",
-    "@nestjs/config": "^4.0.4",
-    "@nestjs/core": "^10.4.8",
-    "@nestjs/platform-express": "^10.4.8",
-    "@supabase/supabase-js": "^2.49.4",
-    "bullmq": "^5.12.12",
-    "ioredis": "^5.4.1",
-    "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "@supabase/supabase-js": "^2.49.4"
   },
   "devDependencies": {
-    "@nestjs/cli": "^10.4.8",
-    "@types/express": "^5.0.1",
-    "@types/node": "^22.14.1",
-    "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   }
 }
