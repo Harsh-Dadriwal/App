@@ -110,7 +110,7 @@ export function AuthScreen() {
             emailRedirectTo: `${window.location.origin}/auth`,
             data: {
               full_name: emailForm.fullName,
-              role: "customer",
+              role: emailForm.role,
               phone: emailForm.phone
             }
           }
