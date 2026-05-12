@@ -63,8 +63,19 @@ let browserClientPromise: Promise<BrowserSupabaseClient | null> | null = null;
 let readBrowserClientPromise: Promise<BrowserSupabaseClient | null> | null = null;
 
 function resolveEnvValue(keys: string[]) {
+  const envMap: Record<string, string | undefined> = {
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_SUPABASE_READ_URL: process.env.NEXT_PUBLIC_SUPABASE_READ_URL,
+    NEXT_PUBLIC_SUPABASE_READ_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_READ_ANON_KEY,
+    EXPO_PUBLIC_SUPABASE_READ_URL: process.env.EXPO_PUBLIC_SUPABASE_READ_URL,
+    EXPO_PUBLIC_SUPABASE_READ_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_READ_ANON_KEY,
+  };
+
   for (const key of keys) {
-    const value = process.env[key]?.trim();
+    const value = envMap[key]?.trim();
     if (value) {
       return value;
     }
