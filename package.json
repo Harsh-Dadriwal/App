@@ -11,7 +11,7 @@
     "dev:api": "npm run start:dev --workspace=apps/api",
     "build": "next build",
     "build:api": "npm run build --workspace=apps/api",
-    "start:api": "node dist/apps/api/main.js",
+    "start:api": "node apps/api/dist/apps/api/src/main.js",
     "start": "next start",
     "lint": "next lint"
   },
