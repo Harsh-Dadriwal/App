@@ -248,10 +248,10 @@ export function AuthScreen() {
               <small style={{ color: 'rgba(255,255,255,0.8)' }}>B2B & B2C Platform</small>
             </div>
           </div>
-          <span className="eyebrow" style={{ color: '#93c5fd' }}>Unified Access</span>
-          <h1>Phone and email access for every professional role.</h1>
+          <span className="eyebrow" style={{ color: '#93c5fd' }}>Secure Access</span>
+          <h1>Customer onboarding & secure professional workspace access.</h1>
           <p>
-            Architects, contractors, and customers work together harmoniously within our advanced secure procurement layers.
+            New accounts start as Customers. Platform Administrators can select your profile and instantly promote you to Electrician or Architect access.
           </p>
         </div>
 
@@ -259,11 +259,11 @@ export function AuthScreen() {
           {authRoleOptions.map((role) => (
             <article
               key={role.value}
-              className={`role-card ${role.signupAllowed ? "" : "role-card--locked"}`}
+              className={`role-card ${role.value === "customer" ? "" : "role-card--locked"}`}
             >
               <strong>{role.label}</strong>
               <p>{role.description}</p>
-              {role.signupAllowed ? null : <small>Manual creation only</small>}
+              {role.value === "customer" ? <small style={{ color: '#6ee7b7' }}>Default signup role</small> : <small>Admin promotion only</small>}
             </article>
           ))}
         </div>
@@ -345,19 +345,21 @@ export function AuthScreen() {
                     />
                   </label>
                   <label>
-                    Role
-                    <select className="input" name="role" value={emailForm.role} onChange={onEmailChange}>
-                      {authRoleOptions.map((role) => (
-                        <option
-                          key={role.value}
-                          value={role.value}
-                          disabled={!role.signupAllowed}
-                        >
-                          {role.label}
-                          {!role.signupAllowed ? " (manual only)" : ""}
-                        </option>
-                      ))}
-                    </select>
+                    Assigned Role
+                    <div style={{
+                      padding: '0.625rem 0.75rem',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 'var(--radius)',
+                      color: 'var(--text-color)',
+                      fontSize: '0.875rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <span>Customer</span>
+                      <span style={{ fontSize: '0.75rem', color: '#6ee7b7', background: 'rgba(110, 231, 183, 0.1)', padding: '2px 6px', borderRadius: 4 }}>Default</span>
+                    </div>
                   </label>
                 </div>
               ) : null}
@@ -449,19 +451,21 @@ export function AuthScreen() {
                     />
                   </label>
                   <label style={{ gridColumn: '1 / -1' }}>
-                    Role
-                    <select className="input" name="role" value={phoneForm.role} onChange={onPhoneChange}>
-                      {authRoleOptions.map((role) => (
-                        <option
-                          key={role.value}
-                          value={role.value}
-                          disabled={!role.signupAllowed}
-                        >
-                          {role.label}
-                          {!role.signupAllowed ? " (manual only)" : ""}
-                        </option>
-                      ))}
-                    </select>
+                    Assigned Role
+                    <div style={{
+                      padding: '0.625rem 0.75rem',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 'var(--radius)',
+                      color: 'var(--text-color)',
+                      fontSize: '0.875rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <span>Customer</span>
+                      <span style={{ fontSize: '0.75rem', color: '#6ee7b7', background: 'rgba(110, 231, 183, 0.1)', padding: '2px 6px', borderRadius: 4 }}>Default</span>
+                    </div>
                   </label>
                 </div>
               ) : null}

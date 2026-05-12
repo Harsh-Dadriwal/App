@@ -1605,6 +1605,20 @@ export function AdminUsersPage() {
     if (ok) users.refetch?.();
   }
 
+  async function promoteUserRole(userId: string, newRole: string) {
+    const client = await getSupabaseBrowserClient();
+    if (!client) return;
+    const ok = await mutation.run(
+      async () => client.from("users").update({ 
+        role: newRole, 
+        verification_status: "verified",
+        is_admin_verified: true 
+      }).eq("id", userId),
+      `User role changed to ${newRole} successfully.`
+    );
+    if (ok) users.refetch?.();
+  }
+
   async function verifyUser(userId: string, approve: boolean) {
     const ok = await mutation.run(async () => verifyProfessionalUser({
       target_user_id: userId,
@@ -1616,8 +1630,8 @@ export function AdminUsersPage() {
 
   return (
     <PageSection
-      title="Users and verification"
-      description="Admin can review customer, electrician, architect, and admin records here."
+      title="Users, verification & promotion"
+      description="Admin can review customer records and instantly promote them to electrician or architect roles."
     >
       <QueryState
         loading={users.loading}
@@ -1634,7 +1648,40 @@ export function AdminUsersPage() {
               {user.credit_limit !== undefined && (
                 <p>Credit: ₹{Number(user.credit_limit).toLocaleString("en-IN")}</p>
               )}
-              <div className="inline-actions">
+              <div className="inline-actions" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+                {user.role === "customer" && (
+                  <>
+                    <button 
+                      type="button" 
+                      className="primary-button" 
+                      disabled={mutation.isSubmitting} 
+                      onClick={() => void promoteUserRole(user.id, "electrician")}
+                      style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                    >
+                      Promote to Electrician
+                    </button>
+                    <button 
+                      type="button" 
+                      className="primary-button" 
+                      disabled={mutation.isSubmitting} 
+                      onClick={() => void promoteUserRole(user.id, "architect")}
+                      style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                    >
+                      Promote to Architect
+                    </button>
+                  </>
+                )}
+                {["electrician", "architect"].includes(user.role) && (
+                  <button 
+                    type="button" 
+                    className="secondary-button" 
+                    disabled={mutation.isSubmitting} 
+                    onClick={() => void promoteUserRole(user.id, "customer")}
+                    style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                  >
+                    Demote to Customer
+                  </button>
+                )}
                 {["electrician", "architect", "customer"].includes(user.role) && (
                   <button 
                     type="button" 
@@ -1643,14 +1690,15 @@ export function AdminUsersPage() {
                       const limit = prompt("Enter credit limit for this user:", String(user.credit_limit || 0));
                       if (limit !== null) setCreditLimit(user.id, limit);
                     }}
+                    style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
                   >
                     Set Credit
                   </button>
                 )}
                 {["electrician", "architect"].includes(user.role) && !user.is_admin_verified && (
                   <>
-                    <button type="button" className="primary-button" disabled={mutation.isSubmitting} onClick={() => void verifyUser(user.id, true)}>Verify</button>
-                    <button type="button" className="secondary-button" disabled={mutation.isSubmitting} onClick={() => void verifyUser(user.id, false)}>Reject</button>
+                    <button type="button" className="primary-button" disabled={mutation.isSubmitting} onClick={() => void verifyUser(user.id, true)} style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>Verify</button>
+                    <button type="button" className="secondary-button" disabled={mutation.isSubmitting} onClick={() => void verifyUser(user.id, false)} style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>Reject</button>
                   </>
                 )}
               </div>
