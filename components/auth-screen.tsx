@@ -107,9 +107,10 @@ export function AuthScreen() {
           email: emailForm.email,
           password: emailForm.password,
           options: {
+            emailRedirectTo: `${window.location.origin}/auth`,
             data: {
               full_name: emailForm.fullName,
-              role: emailForm.role,
+              role: "customer",
               phone: emailForm.phone
             }
           }
