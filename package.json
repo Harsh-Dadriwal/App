@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "workspaces": [
-    "apps/api",
-    "packages/core"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "dev": "next dev",
@@ -16,6 +16,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@mahalaxmi/core": "*",
     "@aws-sdk/client-s3": "^3.1024.0",
     "@aws-sdk/s3-request-presigner": "^3.1032.0",
     "@supabase/supabase-js": "2.49.4",
