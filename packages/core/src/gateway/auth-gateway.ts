@@ -12,7 +12,7 @@ type AuthGatewayDependencies = {
 };
 
 const profileSelect =
-  "id, auth_user_id, default_tenant_id, full_name, email, phone, role, city, state, company_name, verification_status, is_admin_verified";
+  "id, auth_user_id, default_tenant_id, username, full_name, email, phone, role, city, state, company_name, verification_status, is_admin_verified";
 
 export function resolveActiveTenant(
   profile: UserProfile | null,

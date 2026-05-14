@@ -15,7 +15,7 @@ export class IdentityService {
     const profileResult = await supabase
       .from("users")
       .select(
-        "id, auth_user_id, default_tenant_id, full_name, email, phone, role, city, state, company_name, verification_status, is_admin_verified"
+        "id, auth_user_id, default_tenant_id, username, full_name, email, phone, role, city, state, company_name, verification_status, is_admin_verified"
       )
       .eq("auth_user_id", actor.authUserId)
       .maybeSingle();

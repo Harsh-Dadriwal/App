@@ -12,6 +12,7 @@ type AuthMode = "login" | "signup";
 
 type EmailFormState = {
   fullName: string;
+  username: string;
   email: string;
   phone: string;
   password: string;
@@ -20,6 +21,7 @@ type EmailFormState = {
 
 type PhoneFormState = {
   fullName: string;
+  username: string;
   phone: string;
   otp: string;
   role: AppRole;
@@ -27,6 +29,7 @@ type PhoneFormState = {
 
 const defaultEmailForm: EmailFormState = {
   fullName: "",
+  username: "",
   email: "",
   phone: "",
   password: "",
@@ -35,10 +38,19 @@ const defaultEmailForm: EmailFormState = {
 
 const defaultPhoneForm: PhoneFormState = {
   fullName: "",
+  username: "",
   phone: "",
   otp: "",
   role: "customer"
 };
+
+function normalizeUsername(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._]/g, "")
+    .slice(0, 24);
+}
 
 export function AuthScreen() {
   const router = useRouter();
@@ -77,12 +89,18 @@ export function AuthScreen() {
 
   function onEmailChange(event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value } = event.target;
-    setEmailForm((current) => ({ ...current, [name]: value }));
+    setEmailForm((current) => ({
+      ...current,
+      [name]: name === "username" ? normalizeUsername(value) : value
+    }));
   }
 
   function onPhoneChange(event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value } = event.target;
-    setPhoneForm((current) => ({ ...current, [name]: value }));
+    setPhoneForm((current) => ({
+      ...current,
+      [name]: name === "username" ? normalizeUsername(value) : value
+    }));
   }
 
   async function handleEmailSubmit(event: FormEvent<HTMLFormElement>) {
@@ -103,6 +121,10 @@ export function AuthScreen() {
       }
 
       if (authMode === "signup") {
+        if (!emailForm.username) {
+          throw new Error("Username is required.");
+        }
+
         const { error, data } = await supabase.auth.signUp({
           email: emailForm.email,
           password: emailForm.password,
@@ -110,6 +132,7 @@ export function AuthScreen() {
             emailRedirectTo: `${window.location.origin}/auth`,
             data: {
               full_name: emailForm.fullName,
+              username: emailForm.username,
               role: emailForm.role,
               phone: emailForm.phone
             }
@@ -168,6 +191,10 @@ export function AuthScreen() {
         throw new Error("Admin accounts are created manually by the platform owner.");
       }
 
+      if (authMode === "signup" && !phoneForm.username) {
+        throw new Error("Username is required.");
+      }
+
       const { error } = await supabase.auth.signInWithOtp({
         phone: phoneForm.phone,
         options: {
@@ -176,6 +203,7 @@ export function AuthScreen() {
             authMode === "signup"
               ? {
                 full_name: phoneForm.fullName,
+                username: phoneForm.username,
                 role: phoneForm.role,
                 phone: phoneForm.phone
               }
@@ -252,7 +280,7 @@ export function AuthScreen() {
           <span className="eyebrow" style={{ color: '#93c5fd' }}>Secure Access</span>
           <h1>Customer onboarding & secure professional workspace access.</h1>
           <p>
-            New accounts start as Customers. Platform Administrators can select your profile and instantly promote you to Electrician or Architect access.
+            New accounts start as Customers. Platform Administrators can search your profile, verify your username, and promote you into electrician, architect, supplier, or specialized handyman roles like POP, painting, tiles, carpentry, and plumbing.
           </p>
         </div>
 
@@ -332,6 +360,20 @@ export function AuthScreen() {
                       value={emailForm.fullName}
                       onChange={onEmailChange}
                       placeholder="John Doe"
+                      required
+                    />
+                  </label>
+                  <label>
+                    Username
+                    <input
+                      className="input"
+                      name="username"
+                      value={emailForm.username}
+                      onChange={onEmailChange}
+                      placeholder="harshdadriwal"
+                      pattern="[a-z0-9._]{3,24}"
+                      minLength={3}
+                      maxLength={24}
                       required
                     />
                   </label>
@@ -448,6 +490,20 @@ export function AuthScreen() {
                       value={phoneForm.fullName}
                       onChange={onPhoneChange}
                       placeholder="John Doe"
+                      required
+                    />
+                  </label>
+                  <label style={{ gridColumn: '1 / -1' }}>
+                    Username
+                    <input
+                      className="input"
+                      name="username"
+                      value={phoneForm.username}
+                      onChange={onPhoneChange}
+                      placeholder="harshdadriwal"
+                      pattern="[a-z0-9._]{3,24}"
+                      minLength={3}
+                      maxLength={24}
                       required
                     />
                   </label>

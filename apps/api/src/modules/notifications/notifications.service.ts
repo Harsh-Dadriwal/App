@@ -110,4 +110,53 @@ export class NotificationsService {
 
     return notificationIds;
   }
+
+  async createBulkNotifications(args: {
+    tenantId: string;
+    userIds: string[];
+    title: string;
+    body: string;
+    type?: string;
+    data?: Record<string, unknown> | null;
+  }) {
+    const userIds = [...new Set(args.userIds.filter(Boolean))];
+
+    if (userIds.length === 0) {
+      return [];
+    }
+
+    const now = new Date().toISOString();
+    const rows = userIds.map((userId) => ({
+      tenant_id: args.tenantId,
+      user_id: userId,
+      type: args.type ?? "general",
+      title: args.title,
+      body: args.body,
+      data: args.data ?? null,
+      is_read: false,
+      created_at: now
+    }));
+
+    const result = await this.supabaseAdmin.getClient().from("notifications").insert(rows).select("id, user_id");
+
+    if (result.error) {
+      throw new Error(result.error.message);
+    }
+
+    await this.queueService.enqueue(
+      QUEUE_NAMES.notifications,
+      "notifications-created",
+      {
+        tenantId: args.tenantId,
+        notificationIds: (result.data ?? []).map((row) => row.id),
+        userIds
+      },
+      {
+        jobId: `notifications-created-${args.tenantId}-${Date.now()}`,
+        removeOnComplete: true
+      }
+    );
+
+    return result.data ?? [];
+  }
 }

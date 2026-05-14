@@ -11,6 +11,7 @@ export type AuthProfileDto = {
   id: string;
   auth_user_id?: string | null;
   default_tenant_id?: string | null;
+  username?: string | null;
   full_name: string | null;
   email: string | null;
   phone: string | null;
@@ -90,6 +91,15 @@ export type VerifyProfessionalRequestDto = {
   target_user_id: string;
   approve: boolean;
   admin_note?: string | null;
+};
+
+export type SubmitTaskBidRequestDto = {
+  amount: number;
+  estimated_days: number;
+};
+
+export type AcceptTaskBidRequestDto = {
+  bid_id: string;
 };
 
 export type PostWalletEntryRequestDto = Record<string, unknown>;

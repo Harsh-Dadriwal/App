@@ -13,6 +13,7 @@ import { HealthController } from "./health.controller";
 import { EventsModule } from "./common/events/events.module";
 import { TenancyModule } from "./common/tenancy/tenancy.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
+import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
 
 @Module({
   imports: [
@@ -32,7 +33,8 @@ import { PaymentsModule } from "./modules/payments/payments.module";
     WalletModule,
     NotificationsModule,
     InventoryModule,
-    PaymentsModule
+    PaymentsModule,
+    MaintenanceModule
   ],
   controllers: [HealthController]
 })

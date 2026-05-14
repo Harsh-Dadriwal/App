@@ -93,23 +93,25 @@ where email = 'owner@example.com';
 
 If 4 admins already exist, the database will reject the change.
 
-## Product image storage with Amazon S3
+## Product image storage with Cloudflare R2
 
-Admin product image uploads use Amazon S3 through a server-side Next.js route.
+Admin product image uploads use a server-side Next.js route and now prefer Cloudflare R2 to reduce storage cost. The same AWS S3-compatible SDK is used, so R2 works without changing the frontend upload flow.
 
 Add these variables to `.env.local`:
 
 ```bash
-AWS_REGION=ap-south-1
-AWS_ACCESS_KEY_ID=your-aws-access-key-id
-AWS_SECRET_ACCESS_KEY=your-aws-secret-access-key
-AWS_S3_BUCKET=your-public-product-bucket
-AWS_S3_PUBLIC_BASE_URL=https://your-public-product-bucket.s3.ap-south-1.amazonaws.com
+R2_ACCOUNT_ID=your-cloudflare-account-id
+R2_ACCESS_KEY_ID=your-r2-access-key-id
+R2_SECRET_ACCESS_KEY=your-r2-secret-access-key
+R2_BUCKET=your-product-images-bucket
+R2_PUBLIC_BASE_URL=https://cdn.example.com
 ```
 
-Recommended S3 setup:
+Recommended R2 setup:
 
 - create a bucket dedicated to product images
-- keep the bucket readable for product image delivery
-- use an IAM user with upload access only to that bucket
-- keep the AWS keys server-side only in `.env.local`
+- front it with a public custom domain or R2 public bucket URL
+- create an R2 API token with write access only to that bucket
+- keep the R2 keys server-side only in `.env.local`
+
+If you still need a temporary S3 fallback while migrating environments, the app can also read the legacy `AWS_*` variables.

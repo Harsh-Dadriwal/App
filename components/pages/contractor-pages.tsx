@@ -22,6 +22,7 @@ import {
   useRows
 } from "@/components/data-view";
 import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
+import { roleLabels, type AppRole } from "@mahalaxmi/core/types/domain";
 import {
   markOrderItemSupplied,
   reviewOrderItemByArchitect,
@@ -55,6 +56,18 @@ const ELECTRICIAN_BID_STEPS = [
   { label: "Project & offer", description: "Site and bid amount" },
   { label: "Details", description: "Timeline and notes" }
 ] as const;
+
+const ADMIN_MANAGED_USER_ROLES: AppRole[] = [
+  "customer",
+  "electrician",
+  "architect",
+  "pop_man",
+  "carpenter",
+  "painter",
+  "tiles_man",
+  "plumber",
+  "supplier"
+];
 
 export function ElectricianDashboardPage() {
   const { profile } = useAuth();
@@ -1583,17 +1596,32 @@ export function SupplierDashboardPage() {
 }
 
 export function AdminUsersPage() {
+  const [search, setSearch] = useState("");
   const mutation = useMutationAction();
   const users = useRows(
     async (client) => {
       const { data, error } = await client
         .from("users")
-        .select("id, full_name, email, phone, role, verification_status, is_admin_verified")
+        .select("id, username, full_name, email, phone, role, verification_status, is_admin_verified")
         .order("created_at", { ascending: false });
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
     []
   );
+
+  const visibleUsers = useMemo(() => {
+    const term = search.trim().toLowerCase();
+
+    if (!term) {
+      return users.data;
+    }
+
+    return users.data.filter((user: any) =>
+      [user.username, user.full_name, user.email, user.phone, roleLabels[user.role as AppRole] ?? user.role]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(term))
+    );
+  }, [search, users.data]);
 
   async function setCreditLimit(userId: string, limit: string) {
     const client = await getSupabaseBrowserClient();
@@ -1605,15 +1633,31 @@ export function AdminUsersPage() {
     if (ok) users.refetch?.();
   }
 
-  async function promoteUserRole(userId: string, newRole: string) {
+  async function promoteUserRole(userId: string, newRole: AppRole) {
     const client = await getSupabaseBrowserClient();
     if (!client) return;
     const ok = await mutation.run(
-      async () => client.from("users").update({ 
-        role: newRole, 
-        verification_status: "verified",
-        is_admin_verified: true 
-      }).eq("id", userId),
+      async () => {
+        const [userUpdate, membershipUpdate] = await Promise.all([
+          client
+            .from("users")
+            .update({
+              role: newRole,
+              verification_status: "verified",
+              is_admin_verified: true
+            })
+            .eq("id", userId),
+          client
+            .from("tenant_memberships")
+            .update({ role: newRole })
+            .eq("user_id", userId)
+            .eq("is_active", true)
+        ]);
+
+        return {
+          error: userUpdate.error ?? membershipUpdate.error ?? null
+        };
+      },
       `User role changed to ${newRole} successfully.`
     );
     if (ok) users.refetch?.();
@@ -1631,7 +1675,7 @@ export function AdminUsersPage() {
   return (
     <PageSection
       title="Users, verification & promotion"
-      description="Admin can review customer records and instantly promote them to electrician or architect roles."
+      description="Admin can search every user, review usernames, and promote customers into any supported handyman or professional role."
     >
       <QueryState
         loading={users.loading}
@@ -1640,71 +1684,77 @@ export function AdminUsersPage() {
         empty={{ title: "No users found", description: "Create auth users and public user profiles to populate this page." }}
       >
         <FormNotice error={mutation.error} success={mutation.success} />
-        <CardGrid>
-          {users.data.map((user: any) => (
-            <DataCard key={user.id} title={user.full_name ?? "-"} subtitle={user.email ?? user.phone} meta={user.role}>
-              <p>Verification: {user.verification_status}</p>
-              <p>Admin verified: {user.is_admin_verified ? "Yes" : "No"}</p>
-              {user.credit_limit !== undefined && (
-                <p>Credit: ₹{Number(user.credit_limit).toLocaleString("en-IN")}</p>
-              )}
-              <div className="inline-actions" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-                {user.role === "customer" && (
-                  <>
+        <ListSearchField
+          value={search}
+          onChange={setSearch}
+          placeholder="Search by username, full name, email, phone, or role"
+          ariaLabel="Search users"
+        />
+        <QueryState
+          loading={false}
+          error={null}
+          hasData={visibleUsers.length > 0}
+          empty={{ title: "No users match", description: "Try another name, username, phone number, or clear the search." }}
+        >
+          <CardGrid>
+            {visibleUsers.map((user: any) => (
+              <DataCard key={user.id} title={user.full_name ?? "-"} subtitle={user.email ?? user.phone} meta={user.role}>
+                <p>Username: {user.username ?? "-"}</p>
+                <p>Verification: {user.verification_status}</p>
+                <p>Admin verified: {user.is_admin_verified ? "Yes" : "No"}</p>
+                {user.credit_limit !== undefined && (
+                  <p>Credit: ₹{Number(user.credit_limit).toLocaleString("en-IN")}</p>
+                )}
+                <div className="inline-actions" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <label style={{ minWidth: 180 }}>
+                    <span style={{ display: "block", fontSize: "0.75rem", marginBottom: "0.25rem" }}>
+                      Promote or change role
+                    </span>
+                    <select
+                      className="input"
+                      value={user.role}
+                      disabled={mutation.isSubmitting}
+                      onChange={(event) => void promoteUserRole(user.id, event.target.value as AppRole)}
+                    >
+                      {ADMIN_MANAGED_USER_ROLES.map((role) => (
+                        <option key={role} value={role}>
+                          {roleLabels[role]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {["electrician", "architect", "customer"].includes(user.role) && (
                     <button 
                       type="button" 
-                      className="primary-button" 
-                      disabled={mutation.isSubmitting} 
-                      onClick={() => void promoteUserRole(user.id, "electrician")}
+                      className="secondary-button" 
+                      onClick={() => {
+                        const limit = prompt("Enter credit limit for this user:", String(user.credit_limit || 0));
+                        if (limit !== null) setCreditLimit(user.id, limit);
+                      }}
                       style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
                     >
-                      Promote to Electrician
+                      Set Credit
                     </button>
-                    <button 
-                      type="button" 
-                      className="primary-button" 
-                      disabled={mutation.isSubmitting} 
-                      onClick={() => void promoteUserRole(user.id, "architect")}
-                      style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                    >
-                      Promote to Architect
-                    </button>
-                  </>
-                )}
-                {["electrician", "architect"].includes(user.role) && (
-                  <button 
-                    type="button" 
-                    className="secondary-button" 
-                    disabled={mutation.isSubmitting} 
-                    onClick={() => void promoteUserRole(user.id, "customer")}
-                    style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                  >
-                    Demote to Customer
-                  </button>
-                )}
-                {["electrician", "architect", "customer"].includes(user.role) && (
-                  <button 
-                    type="button" 
-                    className="secondary-button" 
-                    onClick={() => {
-                      const limit = prompt("Enter credit limit for this user:", String(user.credit_limit || 0));
-                      if (limit !== null) setCreditLimit(user.id, limit);
-                    }}
-                    style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                  >
-                    Set Credit
-                  </button>
-                )}
-                {["electrician", "architect"].includes(user.role) && !user.is_admin_verified && (
-                  <>
-                    <button type="button" className="primary-button" disabled={mutation.isSubmitting} onClick={() => void verifyUser(user.id, true)} style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>Verify</button>
-                    <button type="button" className="secondary-button" disabled={mutation.isSubmitting} onClick={() => void verifyUser(user.id, false)} style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>Reject</button>
-                  </>
-                )}
-              </div>
-            </DataCard>
-          ))}
-        </CardGrid>
+                  )}
+                  {[
+                    "electrician",
+                    "architect",
+                    "pop_man",
+                    "carpenter",
+                    "painter",
+                    "tiles_man",
+                    "plumber"
+                  ].includes(user.role) && !user.is_admin_verified && (
+                    <>
+                      <button type="button" className="primary-button" disabled={mutation.isSubmitting} onClick={() => void verifyUser(user.id, true)} style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>Verify</button>
+                      <button type="button" className="secondary-button" disabled={mutation.isSubmitting} onClick={() => void verifyUser(user.id, false)} style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>Reject</button>
+                    </>
+                  )}
+                </div>
+              </DataCard>
+            ))}
+          </CardGrid>
+        </QueryState>
       </QueryState>
     </PageSection>
   );

@@ -15,6 +15,7 @@ export function AuthScreen() {
   const [authMethod, setAuthMethod] = useState<AuthMethod>("email");
   const [role, setRole] = useState<AppRole>("customer");
   const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -24,6 +25,14 @@ export function AuthScreen() {
   const [errorMessage, setErrorMessage] = useState("");
   const [notice, setNotice] = useState("");
 
+  function normalizeUsername(value: string) {
+    return value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9._]/g, "")
+      .slice(0, 24);
+  }
+
   async function handleEmail() {
     if (!supabase) return;
     setBusy(true);
@@ -31,12 +40,17 @@ export function AuthScreen() {
     setNotice("");
     try {
       if (authMode === "signup") {
+        if (!username) {
+          throw new Error("Username is required.");
+        }
+
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: {
               full_name: fullName,
+              username,
               role,
               phone
             }
@@ -64,11 +78,18 @@ export function AuthScreen() {
     setNotice("");
     try {
       if (!otpSent) {
+        if (authMode === "signup" && !username) {
+          throw new Error("Username is required.");
+        }
+
         const { error } = await supabase.auth.signInWithOtp({
           phone,
           options: {
             shouldCreateUser: authMode === "signup",
-            data: authMode === "signup" ? { full_name: fullName, role, phone } : undefined
+            data:
+              authMode === "signup"
+                ? { full_name: fullName, username, role, phone }
+                : undefined
           }
         });
         if (error) throw error;
@@ -122,6 +143,12 @@ export function AuthScreen() {
               ))}
             </View>
             <Field label="Full name" value={fullName} onChangeText={setFullName} />
+            <Field
+              label="Username"
+              value={username}
+              onChangeText={(value) => setUsername(normalizeUsername(value))}
+              placeholder="harshdadriwal"
+            />
           </>
         ) : null}
 

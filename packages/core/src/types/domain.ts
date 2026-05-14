@@ -1,9 +1,34 @@
-export type AppRole = "admin" | "customer" | "electrician" | "architect" | "supplier";
+export const USER_ROLE = {
+  ADMIN: "admin",
+  CUSTOMER: "customer",
+  ELECTRICIAN: "electrician",
+  ARCHITECT: "architect",
+  SUPPLIER: "supplier",
+  POP_MAN: "pop_man",
+  CARPENTER: "carpenter",
+  PAINTER: "painter",
+  TILES_MAN: "tiles_man",
+  PLUMBER: "plumber"
+} as const;
+
+export type AppRole = (typeof USER_ROLE)[keyof typeof USER_ROLE];
+
+export const HANDYMAN_SERVICE_ROLES = [
+  USER_ROLE.POP_MAN,
+  USER_ROLE.CARPENTER,
+  USER_ROLE.PAINTER,
+  USER_ROLE.TILES_MAN,
+  USER_ROLE.PLUMBER,
+  USER_ROLE.ELECTRICIAN
+] as const;
+
+export type HandymanServiceRole = (typeof HANDYMAN_SERVICE_ROLES)[number];
 
 export type UserProfile = {
   id: string;
   auth_user_id?: string | null;
   default_tenant_id?: string | null;
+  username?: string | null;
   full_name: string | null;
   email: string | null;
   phone: string | null;
@@ -54,12 +79,40 @@ export type ActiveTenant = {
   accent_color?: string | null;
 };
 
+export const TASK_STATUS = {
+  OPEN: "OPEN",
+  BIDDING_CLOSED: "BIDDING_CLOSED",
+  ASSIGNED: "ASSIGNED",
+  IN_PROGRESS: "IN_PROGRESS",
+  COMPLETED: "COMPLETED",
+  EXPIRED: "EXPIRED"
+} as const;
+
+export type MaintenanceTaskStatus =
+  (typeof TASK_STATUS)[keyof typeof TASK_STATUS];
+
+export const MAINTENANCE_TASK_STATUS = TASK_STATUS;
+
+export const BID_STATUS = {
+  PENDING: "PENDING",
+  ACCEPTED: "ACCEPTED",
+  REJECTED: "REJECTED",
+  EXPIRED: "EXPIRED"
+} as const;
+
+export type BidStatus = (typeof BID_STATUS)[keyof typeof BID_STATUS];
+
 export const roleLabels: Record<AppRole, string> = {
   admin: "Admin",
   customer: "Customer",
   electrician: "Electrician",
   architect: "Architect",
-  supplier: "Supplier"
+  supplier: "Supplier",
+  pop_man: "POP Man",
+  carpenter: "Carpenter",
+  painter: "Painter",
+  tiles_man: "Tiles Man",
+  plumber: "Plumber"
 };
 
 export function resolveActiveTenant(

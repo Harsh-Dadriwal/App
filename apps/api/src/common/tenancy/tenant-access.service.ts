@@ -138,6 +138,26 @@ export class TenantAccessService {
     return result.data;
   }
 
+  async assertTaskAccess(actor: RequestActor, taskId: string) {
+    const result = await this.supabaseAdmin
+      .getClient()
+      .from("tasks")
+      .select("id, tenant_id, handyman_id, status")
+      .eq("id", taskId)
+      .maybeSingle();
+
+    if (result.error) {
+      throw new Error(result.error.message);
+    }
+
+    if (!result.data) {
+      throw new ForbiddenException("Task not found.");
+    }
+
+    await this.assertTenantAccess(actor, result.data.tenant_id);
+    return result.data;
+  }
+
   async assertReferralRewardAccess(actor: RequestActor, rewardId: string) {
     const result = await this.supabaseAdmin
       .getClient()

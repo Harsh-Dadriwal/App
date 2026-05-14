@@ -1,10 +1,10 @@
 import { ScrollView, Text, View } from "react-native";
 import { useAuth } from "@/providers/auth-provider";
 import { AppButton, Card, ScreenShell, SectionTitle } from "@/components/ui";
-import { roleLabels } from "@mahalaxmi/core/types/domain";
+import { roleLabels, type AppRole } from "@mahalaxmi/core/types/domain";
 import { useMobileNavigation, type MobileScreen } from "@/providers/navigation-provider";
 
-const roleActions = {
+const roleActions: Record<AppRole, Array<{ label: string; route: MobileScreen }>> = {
   customer: [
     { label: "Lighting visualizer", route: "lighting" },
     { label: "Customer approvals", route: "approvals" },
@@ -32,8 +32,28 @@ const roleActions = {
     { label: "Lighting scene preview", route: "lighting" },
     { label: "Return to dashboard", route: "dashboard" },
     { label: "Project notes", route: "notes" }
+  ],
+  pop_man: [
+    { label: "Task dashboard", route: "dashboard" },
+    { label: "Project notes", route: "notes" }
+  ],
+  carpenter: [
+    { label: "Task dashboard", route: "dashboard" },
+    { label: "Project notes", route: "notes" }
+  ],
+  painter: [
+    { label: "Task dashboard", route: "dashboard" },
+    { label: "Project notes", route: "notes" }
+  ],
+  tiles_man: [
+    { label: "Task dashboard", route: "dashboard" },
+    { label: "Project notes", route: "notes" }
+  ],
+  plumber: [
+    { label: "Task dashboard", route: "dashboard" },
+    { label: "Project notes", route: "notes" }
   ]
-} as const satisfies Record<string, Array<{ label: string; route: MobileScreen }>>;
+};
 
 export function DashboardScreen() {
   const { profile, signOut } = useAuth();

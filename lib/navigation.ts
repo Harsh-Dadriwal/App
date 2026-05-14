@@ -5,7 +5,12 @@ export const roleLabels: Record<AppRole, string> = {
   customer: "Customer",
   electrician: "Electrician",
   architect: "Architect",
-  supplier: "Supplier"
+  supplier: "Supplier",
+  pop_man: "POP Man",
+  carpenter: "Carpenter",
+  painter: "Painter",
+  tiles_man: "Tiles Man",
+  plumber: "Plumber"
 };
 
 export const authRoleOptions = [
@@ -74,6 +79,21 @@ export const roleNav: Record<
   ],
   supplier: [
     { href: "/supplier", label: "Dashboard" }
+  ],
+  pop_man: [
+    { href: "/pop_man", label: "Dashboard" }
+  ],
+  carpenter: [
+    { href: "/carpenter", label: "Dashboard" }
+  ],
+  painter: [
+    { href: "/painter", label: "Dashboard" }
+  ],
+  tiles_man: [
+    { href: "/tiles_man", label: "Dashboard" }
+  ],
+  plumber: [
+    { href: "/plumber", label: "Dashboard" }
   ],
   admin: [
     { href: "/admin", label: "Dashboard" },
