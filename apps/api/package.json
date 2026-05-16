@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "start:dev": "npm run build && node dist/apps/api/src/main.js",
-    "start": "node dist/apps/api/src/main.js",
-    "build": "nest build"
+    "build": "nest build",
+    "start": "node dist/apps/api/main.js",
+    "start:prod": "node dist/apps/api/main.js",
+    "start:dev": "nest start --watch"
   },
   "dependencies": {
     "@mahalaxmi/core": "*",
