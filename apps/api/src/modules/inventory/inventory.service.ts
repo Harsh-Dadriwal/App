@@ -126,4 +126,42 @@ export class InventoryService {
         Number(row.available_qty ?? 0) <= Number(row.reorder_level ?? 0)
     );
   }
+
+  async listInventoryVelocity(actor: RequestActor, accessToken: string, days: number = 30) {
+    const tenantId = await this.requireTenantId(actor);
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - days);
+
+    // Get supplied order items within the last X days for this tenant
+    const result = await this.supabaseAdmin.createReadUserClient(accessToken)
+      .from("order_items")
+      .select("product_id, quantity_supplied, products:product_id(item_name, sku, tenant_id)")
+      .eq("status", "supplied")
+      .gte("supplied_at", thirtyDaysAgo.toISOString());
+
+    if (result.error) {
+      throw new Error(result.error.message);
+    }
+
+    const tenantItems = (result.data ?? []).filter((row: any) => String(row.products?.tenant_id ?? "") === tenantId);
+
+    // Aggregate quantities by product
+    const velocityMap = new Map<string, { productId: string; itemName: string; sku: string; totalSupplied: number }>();
+    
+    for (const item of tenantItems) {
+      const pId = item.product_id;
+      if (!velocityMap.has(pId)) {
+        velocityMap.set(pId, {
+          productId: pId,
+          itemName: item.products?.item_name || "Unknown",
+          sku: item.products?.sku || "Unknown",
+          totalSupplied: 0
+        });
+      }
+      const entry = velocityMap.get(pId)!;
+      entry.totalSupplied += Number(item.quantity_supplied || 0);
+    }
+
+    return Array.from(velocityMap.values()).sort((a, b) => b.totalSupplied - a.totalSupplied);
+  }
 }

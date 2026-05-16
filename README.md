@@ -1,117 +1,64 @@
-# Mahalaxmi Electricals App
+# Mahalaxmi Electricals - Construction Procurement & Fintech Platform
 
-Responsive Next.js starter connected to Supabase auth patterns for:
+This repository contains the full-stack architecture for a multi-tenant SaaS operating system designed for construction procurement, supplier operations, and embedded fintech workflows.
 
-- Customer
-- Electrician
-- Architect
-- Admin
+## 🏗 System Architecture Overview
 
-## Run
+The platform uses a modern, hybrid data-fetching model. The **Next.js Frontend** connects directly to the **Supabase PostgREST API** for lightning-fast reads and simple writes protected by Row Level Security (RLS). Complex workflows and background tasks are routed through the **NestJS Backend**.
 
-```bash
-npm install
-cp .env.example .env.local
-npm run dev
-```
+### 1. Frontend: Next.js (App Router)
+- **Framework**: React 18 / Next.js 14+ (App Router).
+- **Styling**: Tailwind CSS with custom utility classes.
+- **Routing**: A catch-all role-based routing architecture (`app/[role]/[[...slug]]/page.tsx`) that dynamically serves localized dashboards for:
+  - `admin` (Platform Management)
+  - `customer` (Procurement, Fintech, Project Approvals)
+  - `electrician` (Job site execution, Material Tracking)
+  - `architect` (Lighting Visualization, Product Approvals)
+  - `supplier` (Fulfillment Queue, Inventory Management)
+- **Data Fetching**: Primarily uses `@supabase/supabase-js` to directly query the database. For secure payment initiation, it uses Next.js server-side API routes (`app/api/*`).
 
-## API scaffold
+### 2. Database: Supabase Postgres
+- **Schema Management**: Managed declaratively via `db/full_project_rebuild.sql` and additive migrations (e.g., `db/supplier_rls_patch.sql`).
+- **Security (RLS)**: Row Level Security is heavily utilized. Every query from the frontend is evaluated against the current user's authenticated `role` and `tenant_id` to ensure absolute data isolation.
+- **RPCs (Remote Procedure Calls)**: Highly transactional operations (like `mark_order_item_supplied`) are implemented as Postgres Functions to ensure atomic execution and data integrity at the database layer.
 
-The repo now also includes a NestJS-ready backend scaffold under:
+### 3. Backend: NestJS API (`apps/api`)
+- **Role**: Handles operations that cannot be safely done on the frontend or within simple database queries.
+- **Key Modules**:
+  - `WorkflowsService`: Executes complex multi-step state transitions and emits Domain Events.
+  - `InventoryService`: Handles heavy data aggregation (e.g., calculating 30-day inventory velocity).
+  - `QueueService`: Uses Redis + BullMQ to handle background asynchronous tasks (e.g., syncing inventory, generating reports).
+- **Hosting**: Deployed as a Dockerized container on Railway.
 
-- `apps/api`
+### 4. Infrastructure Services
+- **Authentication**: Supabase Auth (JWT based).
+- **Payments**: Razorpay. The Next.js API acts as the secure intermediary to construct orders and verify signatures.
+- **Storage**: Cloudflare R2 (S3-compatible API) for blazing fast, cost-effective image and document storage.
+- **Caching/Queues**: Redis.
 
-This is the first enterprise migration layer between frontend and Supabase.
+## 🚀 Application Workflow
 
-Planned runtime pattern:
+1. **Onboarding**: Users register and are assigned a default `customer` role. Admin users can verify professionals and elevate their roles to `electrician` or `architect`.
+2. **Procurement**: 
+   - Customers or professionals request products.
+   - Orders are aggregated and pushed to the `Supplier Portal`.
+3. **Fulfillment (Supplier Portal)**:
+   - Suppliers see approved orders.
+   - When a supplier marks an item as "Supplied," the Next.js frontend calls the NestJS API `/workflows/order-items/mark-supplied`.
+   - The NestJS API securely executes the Postgres RPC, which deducts from `product_inventory` and updates the order status atomically.
+4. **Fintech**: Customers can deposit money into their digital Wallet via Razorpay, allowing for frictionless checkout and Savings Plan installments.
 
-- web/mobile call NestJS APIs for business actions
-- NestJS talks to Supabase Postgres/Auth/Storage/Realtime
-- Supabase remains the system of record
+## 💻 Running Locally
 
-When you are ready to bring the backend online:
+### Prerequisites
+- Node.js (v18+)
+- Postgres Database (Supabase)
+- Redis (Optional, for BullMQ)
 
-```bash
-cd apps/api
-npm install
-cp .env.example .env
-npm run start:dev
-```
+### Setup
+1. Copy `.env.example` to `.env` and fill in your Supabase and Razorpay credentials.
+2. Run `npm install` from the root directory.
 
-Or from the repo root:
-
-```bash
-npm run dev:api
-```
-
-## Supabase setup
-
-1. Create a Supabase project
-2. Copy `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` into `.env.local`
-3. Open the Supabase SQL editor
-4. Paste the SQL from:
-
-`db/mahalaxmi_electricals_schema.sql`
-
-If you are continuing from the current app state, also run the additive SQL files:
-
-- `db/collaboration_extensions.sql`
-- `db/notification_extensions.sql`
-- `db/product_image_extensions.sql`
-
-If you want a single rebuild file for a brand new project, use:
-
-- `db/full_project_rebuild.sql`
-
-## Auth flow
-
-- Email login: email + password
-- Email signup: email + password + role
-- Phone login: SMS OTP
-- Phone signup: SMS OTP + role
-- Admin login: supported
-- Admin signup: blocked in UI and limited in DB
-
-## Admin cap
-
-The database enforces a maximum of 4 admin accounts.
-
-Recommended pattern:
-
-- Let customers, electricians, and architects self-register
-- Promote trusted staff to admin manually in Supabase
-
-Example promotion query:
-
-```sql
-update public.users
-set role = 'admin',
-    is_admin_verified = true,
-    verification_status = 'verified'
-where email = 'owner@example.com';
-```
-
-If 4 admins already exist, the database will reject the change.
-
-## Product image storage with Cloudflare R2
-
-Admin product image uploads use a server-side Next.js route and now prefer Cloudflare R2 to reduce storage cost. The same AWS S3-compatible SDK is used, so R2 works without changing the frontend upload flow.
-
-Add these variables to `.env.local`:
-
-```bash
-R2_ACCOUNT_ID=your-cloudflare-account-id
-R2_ACCESS_KEY_ID=your-r2-access-key-id
-R2_SECRET_ACCESS_KEY=your-r2-secret-access-key
-R2_BUCKET=your-product-images-bucket
-R2_PUBLIC_BASE_URL=https://cdn.example.com
-```
-
-Recommended R2 setup:
-
-- create a bucket dedicated to product images
-- front it with a public custom domain or R2 public bucket URL
-- create an R2 API token with write access only to that bucket
-- keep the R2 keys server-side only in `.env.local`
-
-If you still need a temporary S3 fallback while migrating environments, the app can also read the legacy `AWS_*` variables.
+### Running the Application
+- **Frontend Only**: Run `npm run dev` in the root. The app will fetch data directly from Supabase. Payments will work via Next.js API routes.
+- **Backend API**: Navigate to `apps/api` and run `npm run start:dev`. Required only for background workflows and specific data aggregations.

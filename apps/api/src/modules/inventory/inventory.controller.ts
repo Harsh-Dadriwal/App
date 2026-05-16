@@ -33,6 +33,11 @@ export class InventoryController {
     return { data: await this.inventoryService.listLowStockAlerts(request.actor!, this.getAccessToken(request)) };
   }
 
+  @Get("/alerts/velocity")
+  async inventoryVelocity(@Req() request: AuthenticatedRequest) {
+    return { data: await this.inventoryService.listInventoryVelocity(request.actor!, this.getAccessToken(request), 30) };
+  }
+
   @Post("/products")
   async createProduct(@Req() request: AuthenticatedRequest, @Body() body: Record<string, unknown>) {
     return { data: await this.inventoryService.saveProduct(request.actor!, this.getAccessToken(request), null, body) };

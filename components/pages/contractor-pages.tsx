@@ -1492,105 +1492,195 @@ export function AdminDashboardPage() {
   );
 }
 
-export function SupplierDashboardPage() {
+export function SupplierFulfillmentQueue() {
   const { profile, activeTenant } = useAuth();
-  const supplierId = profile?.id ?? "";
   const tenantId = activeTenant?.id ?? "";
   const mutation = useMutationAction();
-
-  const products = useRows(
-    async (client) => {
-      const { data, error } = await client
-        .from("products")
-        .select("*")
-        .eq("tenant_id", tenantId); // Ideally suppliers only see their brands, but filtering by tenant for now
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
-    },
-    [tenantId]
-  );
 
   const orders = useRows(
     async (client) => {
       const { data, error } = await client
-        .from("site_orders")
-        .select("*, site:sites(site_name)")
-        .eq("tenant_id", tenantId)
-        .in("status", ["confirmed", "processing"]);
+        .from("order_items")
+        .select("*, site_orders!inner(order_number), products!inner(item_name, sku, unit, mrp)")
+        .in("status", ["approved_pending_shop_confirmation", "approved_pending_supply"])
+        .order("created_at", { ascending: true });
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
-    [tenantId]
+    [tenantId],
+    { realtimeTable: "order_items" }
   );
 
+  async function markSupplied(orderItemId: string, requiredQty: number) {
+    if (!profile) return;
+    const client = await getSupabaseBrowserClient();
+    if (!client) return;
+
+    const ok = await mutation.run(async () => {
+      const { data: { session } } = await client.auth.getSession();
+      const res = await fetch("/api/v1/workflows/order-items/mark-supplied", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({
+          target_order_item_id: orderItemId,
+          supplied_qty: requiredQty,
+          note_text: "Supplied by supplier portal"
+        })
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to mark as supplied");
+      }
+      return res.json();
+    }, "Item marked as supplied successfully.");
+
+    if (ok) {
+      orders.refetch?.();
+    }
+  }
+
   return (
-    <div className="page-stack">
+    <PageSection title="Fulfillment Queue" description="Orders approved and waiting for supply dispatch.">
+      <QueryState
+        loading={orders.loading}
+        error={orders.error}
+        hasData={orders.data.length > 0}
+        empty={{
+          title: "No pending orders",
+          description: "All approved orders have been fulfilled."
+        }}
+      >
+        <CardGrid>
+          {orders.data.map((item: any) => (
+            <DataCard
+              key={item.id}
+              title={item.products?.item_name || "Unknown Product"}
+              subtitle={`Order: ${item.site_orders?.order_number}`}
+              meta={item.status}
+            >
+              <p>SKU: {item.products?.sku}</p>
+              <p>Required Qty: {item.quantity_required} {item.unit_snapshot}</p>
+              <p>MRP: ₹{item.products?.mrp}</p>
+              <div className="inline-actions">
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => markSupplied(item.id, Number(item.quantity_required))}
+                  disabled={mutation.isSubmitting}
+                >
+                  Mark Supplied
+                </button>
+              </div>
+            </DataCard>
+          ))}
+        </CardGrid>
+        <FormNotice error={mutation.error} success={mutation.success} />
+      </QueryState>
+    </PageSection>
+  );
+}
+
+export function SupplierInventoryManager() {
+  const { profile, activeTenant } = useAuth();
+  const tenantId = activeTenant?.id ?? "";
+  const mutation = useMutationAction();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [newQty, setNewQty] = useState<string>("");
+
+  const inventory = useRows(
+    async (client) => {
+      const { data, error } = await client
+        .from("product_inventory")
+        .select("*, products!inner(item_name, sku, stock_status, tenant_id)")
+        .eq("products.tenant_id", tenantId)
+        .order("available_qty", { ascending: true });
+      return { data: (data ?? []) as any[], error: error?.message ?? null };
+    },
+    [tenantId],
+    { realtimeTable: "product_inventory" }
+  );
+
+  async function saveQty(productId: string) {
+    const qty = Number(newQty);
+    if (isNaN(qty) || qty < 0) return;
+    
+    const client = await getSupabaseBrowserClient();
+    if (!client) return;
+
+    const ok = await mutation.run(async () => {
+      const { error } = await client
+        .from("product_inventory")
+        .update({ available_qty: qty })
+        .eq("product_id", productId);
+      if (error) throw new Error(error.message);
+    }, "Inventory updated");
+
+    if (ok) {
+      setEditingId(null);
+      inventory.refetch?.();
+    }
+  }
+
+  const lowStockCount = inventory.data.filter((item: any) => Number(item.available_qty) <= Number(item.reorder_level)).length;
+
+  return (
+    <div className="page-stack mt-12">
       <StatsGrid
         items={[
-          { label: "My products", value: products.data.length },
-          { label: "Active orders", value: orders.data.length },
-          { label: "Pending fulfillment", value: orders.data.filter(o => o.status === "confirmed").length }
+          { label: "Total Tracked Items", value: inventory.data.length },
+          { label: "Low Stock Items", value: lowStockCount },
         ]}
       />
-      
-      <PageSection title="Active Supply Orders" description="Orders ready for fulfillment and dispatch.">
-        <QueryState
-          loading={orders.loading}
-          error={orders.error}
-          hasData={orders.data.length > 0}
-          empty={{ title: "No active orders", description: "You will see orders here when they are confirmed by customers." }}
-        >
-          <FormNotice error={mutation.error} success={mutation.success} />
-          <CardGrid>
-            {orders.data.map((order: any) => (
-              <DataCard key={order.id} title={order.order_number} subtitle={order.site?.site_name} meta={order.status}>
-                <p>Total: ₹{Number(order.total_amount).toLocaleString("en-IN")}</p>
-                <div className="inline-actions">
-                  {order.status === "confirmed" && (
-                    <button 
-                      className="primary-button" 
-                      onClick={async () => {
-                        const ok = await mutation.run(
-                          async () => transitionSiteOrder({
-                            target_site_order_id: order.id,
-                            target_transition_key: "admin_start_processing",
-                            note_text: "Supplier accepted order for processing",
-                            event_payload: {},
-                            target_source_module: "supplier_dashboard"
-                          }),
-                          "Order moved to processing."
-                        );
-                        if (ok) orders.refetch?.();
-                      }}
-                    >
-                      Accept Order
-                    </button>
-                  )}
-                  {["processing", "partially_supplied", "confirmed"].includes(order.status) && (
-                    <button 
-                      className="primary-button" 
-                      onClick={async () => {
-                        const ok = await mutation.run(
-                          async () => transitionSiteOrder({
-                            target_site_order_id: order.id,
-                            target_transition_key: "admin_mark_supplied",
-                            note_text: "Supplier marked order supplied",
-                            event_payload: {},
-                            target_source_module: "supplier_dashboard"
-                          }),
-                          "Order marked supplied."
-                        );
-                        if (ok) orders.refetch?.();
-                      }}
-                    >
-                      Mark supplied
-                    </button>
-                  )}
-                  <Link href={`/orders/${order.id}`} className="secondary-button">View details</Link>
+      <PageSection title="Inventory Management" description="Quickly adjust available quantities.">
+        <QueryState loading={inventory.loading} error={inventory.error} hasData={inventory.data.length > 0}>
+          <DataTable
+            columns={["Product", "SKU", "Available", "Reserved", "Reorder Level", "Actions"]}
+            rows={inventory.data.map((item: any) => [
+              item.products?.item_name,
+              item.products?.sku,
+              editingId === item.product_id ? (
+                <input 
+                  type="number" 
+                  value={newQty} 
+                  onChange={e => setNewQty(e.target.value)} 
+                  className="w-24 px-2 py-1 border rounded bg-white text-black dark:bg-zinc-800 dark:text-white dark:border-zinc-700" 
+                />
+              ) : (
+                <span className={Number(item.available_qty) <= Number(item.reorder_level) ? "text-red-500 font-bold" : ""}>
+                  {item.available_qty}
+                </span>
+              ),
+              item.reserved_qty,
+              item.reorder_level,
+              editingId === item.product_id ? (
+                <div className="flex gap-2">
+                  <button onClick={() => saveQty(item.product_id)} className="text-green-600 hover:underline">Save</button>
+                  <button onClick={() => setEditingId(null)} className="text-zinc-500 hover:underline">Cancel</button>
                 </div>
-              </DataCard>
-            ))}
-          </CardGrid>
+              ) : (
+                <button 
+                  onClick={() => { setEditingId(item.product_id); setNewQty(item.available_qty); }} 
+                  className="text-blue-600 hover:underline"
+                >
+                  Edit
+                </button>
+              )
+            ])}
+          />
+          <FormNotice error={mutation.error} success={mutation.success} />
         </QueryState>
       </PageSection>
+    </div>
+  );
+}
+
+export function SupplierDashboardPage() {
+  return (
+    <div className="page-stack">
+      <SupplierFulfillmentQueue />
+      <SupplierInventoryManager />
     </div>
   );
 }
@@ -2508,7 +2598,82 @@ export function AdminProductsPage() {
           </CardGrid>
         </QueryState>
       </PageSection>
+
+      <InventoryIntelligenceDashboard />
     </div>
+  );
+}
+
+export function InventoryIntelligenceDashboard() {
+  const { activeTenant } = useAuth();
+  
+  const intelligence = useRows(async (client) => {
+    // For a real app, this would hit the new NestJS endpoints we created:
+    // /api/v1/inventory/alerts/low-stock and /api/v1/inventory/alerts/velocity
+    // But since this component is using Supabase client directly in the frontend pattern:
+    
+    // Low Stock
+    const { data: lowStock } = await client
+      .from("product_inventory")
+      .select("*, products!inner(item_name, sku, tenant_id)")
+      .eq("products.tenant_id", activeTenant?.id ?? "")
+      .lte("available_qty", 5); // Using 5 as fallback threshold
+
+    // Velocity (Mocked via recent supplied orders for now since we don't have the RPC frontend wrapper here yet)
+    const { data: velocity } = await client
+      .from("order_items")
+      .select("*, products!inner(item_name, sku, tenant_id)")
+      .eq("products.tenant_id", activeTenant?.id ?? "")
+      .eq("status", "supplied")
+      .order("supplied_at", { ascending: false })
+      .limit(10);
+
+    return { 
+      data: [{ lowStock: lowStock || [], velocity: velocity || [] }], 
+      error: null 
+    };
+  }, [activeTenant?.id], { realtimeTable: "product_inventory" });
+
+  const data = intelligence.data[0] || { lowStock: [], velocity: [] };
+
+  return (
+    <PageSection title="Inventory Intelligence" description="Automated insights for stock levels and supply velocity.">
+      <QueryState loading={intelligence.loading} error={intelligence.error} hasData={true}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <CardGrid>
+            <DataCard title="Low Stock Alerts" subtitle="Items below reorder thresholds" meta={`${data.lowStock.length} items`}>
+              {data.lowStock.length === 0 ? (
+                <p>All stock levels are healthy.</p>
+              ) : (
+                <ul className="list-disc pl-4 mt-2">
+                  {data.lowStock.map((item: any) => (
+                    <li key={item.product_id} className="text-red-500 font-medium">
+                      {item.products?.item_name} ({item.available_qty} left)
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </DataCard>
+          </CardGrid>
+
+          <CardGrid>
+            <DataCard title="Recent Velocity" subtitle="Most recently supplied items" meta={`${data.velocity.length} actions`}>
+              {data.velocity.length === 0 ? (
+                <p>No recent supply activity.</p>
+              ) : (
+                <ul className="list-disc pl-4 mt-2">
+                  {data.velocity.map((item: any) => (
+                    <li key={item.id} className="text-zinc-700 dark:text-zinc-300">
+                      {item.products?.item_name} ({item.quantity_supplied} supplied)
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </DataCard>
+          </CardGrid>
+        </div>
+      </QueryState>
+    </PageSection>
   );
 }
 
