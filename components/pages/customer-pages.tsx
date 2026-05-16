@@ -97,8 +97,8 @@ export function CustomerDashboardPage() {
           error={sites.error}
           hasData={sites.data.length > 0}
           empty={{
-            title: "No sites yet",
-            description: "Create your first site in the database to see live customer project tracking here."
+            title: "No sites assigned",
+            description: "You have no sites assigned to you in the database. Create your first site below to see live project tracking."
           }}
         >
           <CardGrid>
@@ -161,8 +161,8 @@ export function DirectoryPage({
           error={directory.error}
           hasData={directory.data.length > 0}
           empty={{
-            title: "No verified professionals yet",
-            description: "Admin-verify users in the database and they will appear automatically."
+            title: `No ${role}s in database`,
+            description: `There are currently no verified ${role}s available in the database. When admin verifies them, they will appear here.`
           }}
         >
           <ListSearchField
@@ -268,10 +268,9 @@ export function CustomerSitesPage() {
       return;
     }
 
-    const payload = {
+    const payload: any = {
       customer_id: customerId,
       created_by: customerId,
-      site_code: form.site_code,
       site_name: form.site_name,
       project_type: form.project_type || null,
       site_address_line1: form.site_address_line1,
@@ -281,6 +280,11 @@ export function CustomerSitesPage() {
       estimated_budget: Number(form.estimated_budget || 0),
       description: form.description || null
     };
+    
+    // Only pass site_code if editing, else let trigger auto-assign it
+    if (editingSiteId) {
+      payload.site_code = form.site_code;
+    }
 
     const ok = await mutation.run(async () => {
       if (editingSiteId) {
@@ -315,13 +319,8 @@ export function CustomerSitesPage() {
             <div className="wizard-step-body">
               <FormGrid>
                 <label>
-                  Site code
-                  <input value={form.site_code} onChange={(e) => setForm((s) => ({ ...s, site_code: e.target.value }))} required autoFocus />
-                  <FormFieldHint>Short internal reference (for example ME-001).</FormFieldHint>
-                </label>
-                <label>
                   Site name
-                  <input value={form.site_name} onChange={(e) => setForm((s) => ({ ...s, site_name: e.target.value }))} required />
+                  <input value={form.site_name} onChange={(e) => setForm((s) => ({ ...s, site_name: e.target.value }))} required autoFocus />
                 </label>
                 <label>
                   Project type
@@ -333,7 +332,7 @@ export function CustomerSitesPage() {
                 </label>
               </FormGrid>
               <div className="wizard-nav">
-                <button type="button" className="primary-button" disabled={!form.site_code.trim() || !form.site_name.trim()} onClick={() => setSiteCreateStep(2)}>
+                <button type="button" className="primary-button" disabled={!form.site_name.trim()} onClick={() => setSiteCreateStep(2)}>
                   Continue to location
                 </button>
               </div>
@@ -398,8 +397,8 @@ export function CustomerSitesPage() {
             <>
               <FormGrid>
                 <label>
-                  Site code
-                  <input value={form.site_code} onChange={(e) => setForm((s) => ({ ...s, site_code: e.target.value }))} required />
+                  Site code (Assigned)
+                  <input value={form.site_code} readOnly className="bg-gray-100 text-gray-500 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-500" />
                 </label>
                 <label>
                   Site name
@@ -457,8 +456,8 @@ export function CustomerSitesPage() {
           error={sites.error}
           hasData={sites.data.length > 0}
           empty={{
-            title: "No site records found",
-            description: "Insert site data in the database to populate this section."
+            title: "No site records found in database",
+            description: "Insert site data using the wizard above to populate this section."
           }}
         >
           <ListSearchField value={siteSearch} onChange={setSiteSearch} placeholder="Search by name, code, city, or status" ariaLabel="Search sites" />
@@ -544,8 +543,8 @@ export function TipsPage({ category }: { category: "electrical_tips" | "home_tip
           error={posts.error}
           hasData={posts.data.length > 0}
           empty={{
-            title: "No published posts yet",
-            description: "Add and publish content from the admin content page or directly in the database."
+            title: "No published tips in database",
+            description: `There is no content in the database for the category "${category}".`
           }}
         >
           <ListSearchField value={tipSearch} onChange={setTipSearch} placeholder="Search tips by title or summary" ariaLabel="Search tips" />
@@ -596,8 +595,8 @@ export function CustomerBudgetPage() {
         error={budgets.error}
         hasData={budgets.data.length > 0}
         empty={{
-          title: "No budget rows found",
-          description: "Create budget tracker rows for the customer's sites to see live spend tracking."
+          title: "No budget records in database",
+          description: "There are no budget tracker rows for your sites. Approvals will populate this data automatically."
         }}
       >
         <DataTable

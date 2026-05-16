@@ -137,6 +137,8 @@ CREATE TABLE public.user_professional_profiles (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE SEQUENCE IF NOT EXISTS public.site_code_seq START 1000;
+
 CREATE TABLE public.sites (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id UUID NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT,
@@ -453,6 +455,22 @@ CREATE TRIGGER trg_finance_applications_updated_at BEFORE UPDATE ON public.finan
 CREATE TRIGGER trg_content_posts_updated_at BEFORE UPDATE ON public.content_posts FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 CREATE TRIGGER trg_product_requests_updated_at BEFORE UPDATE ON public.product_requests FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 CREATE TRIGGER trg_site_notes_updated_at BEFORE UPDATE ON public.site_notes FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- UX Polish: Automated Site Code Generation
+CREATE OR REPLACE FUNCTION public.set_default_site_code()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.site_code IS NULL OR NEW.site_code = '' THEN
+    NEW.site_code := 'SIT-' || nextval('public.site_code_seq')::TEXT;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_set_default_site_code
+BEFORE INSERT ON public.sites
+FOR EACH ROW
+EXECUTE FUNCTION public.set_default_site_code();
 
 CREATE INDEX idx_sites_customer_id ON public.sites(customer_id);
 CREATE INDEX idx_sites_status ON public.sites(status);

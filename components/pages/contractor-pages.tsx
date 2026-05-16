@@ -1548,8 +1548,8 @@ export function SupplierFulfillmentQueue() {
         error={orders.error}
         hasData={orders.data.length > 0}
         empty={{
-          title: "No pending orders",
-          description: "All approved orders have been fulfilled."
+          title: "No pending orders in database",
+          description: "There are no approved orders waiting for supply dispatch in the database."
         }}
       >
         <CardGrid>
@@ -2559,7 +2559,7 @@ export function AdminProductsPage() {
           loading={products.loading}
           error={products.error}
           hasData={visibleProducts.length > 0}
-          empty={{ title: "No products found", description: "Add product catalog records to populate this screen." }}
+          empty={{ title: "No products found in database", description: "Add product catalog records to the database to populate this screen." }}
         >
           <CardGrid>
             {visibleProducts.map((product: any) => (
@@ -2760,7 +2760,7 @@ export function AdminSubstitutionsPage() {
           loading={substitutions.loading}
           error={substitutions.error}
           hasData={substitutions.data.length > 0}
-          empty={{ title: "No substitution records", description: "Substitute suggestion rows will appear here when created." }}
+          empty={{ title: "No substitution records in database", description: "Substitute suggestion rows will appear here when they are created in the database." }}
         >
           <DataTable
             columns={["Suggestion ID", "Original Item", "Status", "Reason", "Customer Response"]}
