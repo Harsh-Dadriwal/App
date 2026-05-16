@@ -150,11 +150,14 @@ export class InventoryService {
     
     for (const item of tenantItems) {
       const pId = item.product_id;
+      // Handle Supabase returning an array or object for a joined relation depending on schema
+      const productObj = Array.isArray(item.products) ? item.products[0] : item.products;
+      
       if (!velocityMap.has(pId)) {
         velocityMap.set(pId, {
           productId: pId,
-          itemName: item.products?.item_name || "Unknown",
-          sku: item.products?.sku || "Unknown",
+          itemName: productObj?.item_name || "Unknown",
+          sku: productObj?.sku || "Unknown",
           totalSupplied: 0
         });
       }

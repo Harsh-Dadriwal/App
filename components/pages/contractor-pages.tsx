@@ -1634,7 +1634,12 @@ export function SupplierInventoryManager() {
         ]}
       />
       <PageSection title="Inventory Management" description="Quickly adjust available quantities.">
-        <QueryState loading={inventory.loading} error={inventory.error} hasData={inventory.data.length > 0}>
+        <QueryState 
+          loading={inventory.loading} 
+          error={inventory.error} 
+          hasData={inventory.data.length > 0}
+          empty={{ title: "No inventory tracked", description: "You don't have any active product inventory to manage." }}
+        >
           <DataTable
             columns={["Product", "SKU", "Available", "Reserved", "Reorder Level", "Actions"]}
             rows={inventory.data.map((item: any) => [
@@ -2638,7 +2643,12 @@ export function InventoryIntelligenceDashboard() {
 
   return (
     <PageSection title="Inventory Intelligence" description="Automated insights for stock levels and supply velocity.">
-      <QueryState loading={intelligence.loading} error={intelligence.error} hasData={true}>
+      <QueryState 
+        loading={intelligence.loading} 
+        error={intelligence.error} 
+        hasData={true}
+        empty={{ title: "No intelligence data", description: "Insufficient data to provide inventory intelligence." }}
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <CardGrid>
             <DataCard title="Low Stock Alerts" subtitle="Items below reorder thresholds" meta={`${data.lowStock.length} items`}>
