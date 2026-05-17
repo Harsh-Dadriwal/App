@@ -33,6 +33,28 @@ export function AuthScreen() {
       .slice(0, 24);
   }
 
+  function normalizeEmail(value: string) {
+    return value.trim().toLowerCase();
+  }
+
+  function normalizePhone(value: string) {
+    return value.replace(/[^0-9+]/g, "");
+  }
+
+  function mapAuthErrorMessage(error: unknown) {
+    const message = error instanceof Error ? error.message : "Unable to continue.";
+
+    if (message.toLowerCase().includes("database error saving new user")) {
+      return "Signup could not finish because the database signup trigger needs the latest patch. Run db/user_roles_username_patch.sql in Supabase, then try again.";
+    }
+
+    if (message.toLowerCase().includes("user already registered")) {
+      return "This email is already registered. Log in instead or use another email address.";
+    }
+
+    return message;
+  }
+
   async function handleEmail() {
     if (!supabase) return;
     setBusy(true);
@@ -65,7 +87,7 @@ export function AuthScreen() {
       }
       replace("dashboard");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to continue.");
+      setErrorMessage(mapAuthErrorMessage(error));
     } finally {
       setBusy(false);
     }
@@ -101,7 +123,7 @@ export function AuthScreen() {
         replace("dashboard");
       }
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to continue.");
+      setErrorMessage(mapAuthErrorMessage(error));
     } finally {
       setBusy(false);
     }
@@ -154,14 +176,14 @@ export function AuthScreen() {
 
         {authMethod === "email" ? (
           <>
-            <Field label="Email" value={email} onChangeText={setEmail} placeholder="you@example.com" />
-            {authMode === "signup" ? <Field label="Phone (optional)" value={phone} onChangeText={setPhone} placeholder="+91..." /> : null}
+            <Field label="Email" value={email} onChangeText={(value) => setEmail(normalizeEmail(value))} placeholder="you@example.com" />
+            {authMode === "signup" ? <Field label="Phone (optional)" value={phone} onChangeText={(value) => setPhone(normalizePhone(value))} placeholder="+91..." /> : null}
             <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
             <AppButton label={busy ? "Please wait..." : authMode === "signup" ? "Create account" : "Login"} onPress={() => void handleEmail()} disabled={busy} />
           </>
         ) : (
           <>
-            <Field label="Phone" value={phone} onChangeText={setPhone} placeholder="+91..." />
+            <Field label="Phone" value={phone} onChangeText={(value) => setPhone(normalizePhone(value))} placeholder="+91..." />
             {otpSent ? <Field label="OTP" value={otp} onChangeText={setOtp} placeholder="6-digit code" /> : null}
             <AppButton label={busy ? "Please wait..." : otpSent ? "Verify OTP" : "Send OTP"} onPress={() => void handlePhone()} disabled={busy} />
           </>

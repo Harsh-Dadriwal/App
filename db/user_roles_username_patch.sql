@@ -33,6 +33,14 @@ AS $$
   )
 $$;
 
+CREATE OR REPLACE FUNCTION public.normalize_phone(raw_value text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT regexp_replace(coalesce(raw_value, ''), '[^0-9+]+', '', 'g')
+$$;
+
 CREATE OR REPLACE FUNCTION public.make_unique_username(base_username text, current_user_id uuid DEFAULT NULL)
 RETURNS text
 LANGUAGE plpgsql
@@ -90,6 +98,14 @@ WHERE username IS NULL
 CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_key
   ON public.users (lower(username));
 
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_key
+  ON public.users (lower(email))
+  WHERE email IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_phone_normalized_key
+  ON public.users (public.normalize_phone(phone))
+  WHERE phone IS NOT NULL AND trim(phone) <> '';
+
 ALTER TABLE public.users
   ALTER COLUMN username SET NOT NULL;
 
@@ -102,11 +118,11 @@ AS $$
 DECLARE
   requested_role TEXT;
   safe_role public.user_role;
-  safe_membership_role TEXT;
   matched_user_id UUID;
   target_tenant_id UUID;
   requested_username TEXT;
   safe_username TEXT;
+  membership_role_type TEXT;
 BEGIN
   requested_role := LOWER(COALESCE(NEW.raw_user_meta_data ->> 'role', 'customer'));
   requested_username := COALESCE(
@@ -116,7 +132,15 @@ BEGIN
     NULLIF(regexp_replace(coalesce(NEW.phone, ''), '[^0-9]+', '', 'g'), ''),
     'user'
   );
-  safe_username := public.make_unique_username(requested_username);
+  safe_username := NULLIF(public.normalize_username(requested_username), '');
+
+  IF safe_username IS NULL THEN
+    safe_username := 'user';
+  END IF;
+
+  IF length(safe_username) < 3 THEN
+    safe_username := rpad(safe_username, 3, 'x');
+  END IF;
 
   safe_role := CASE
     WHEN requested_role = 'electrician' THEN 'electrician'::public.user_role
@@ -129,7 +153,14 @@ BEGIN
     WHEN requested_role = 'plumber' THEN 'plumber'::public.user_role
     ELSE 'customer'::public.user_role
   END;
-  safe_membership_role := safe_role::text;
+
+  SELECT c.udt_name
+  INTO membership_role_type
+  FROM information_schema.columns c
+  WHERE c.table_schema = 'public'
+    AND c.table_name = 'tenant_memberships'
+    AND c.column_name = 'role'
+  LIMIT 1;
 
   SELECT id
   INTO target_tenant_id
@@ -154,7 +185,7 @@ BEGIN
     SET
       auth_user_id = NEW.id,
       default_tenant_id = COALESCE(default_tenant_id, target_tenant_id),
-      username = COALESCE(NULLIF(username, ''), public.make_unique_username(safe_username, id)),
+      username = COALESCE(NULLIF(username, ''), safe_username),
       email = COALESCE(NULLIF(NEW.email, ''), email),
       phone = COALESCE(NULLIF(NEW.phone, ''), phone),
       full_name = COALESCE(NULLIF(NEW.raw_user_meta_data ->> 'full_name', ''), full_name, 'User'),
@@ -209,26 +240,24 @@ BEGIN
   END IF;
 
   IF matched_user_id IS NOT NULL AND target_tenant_id IS NOT NULL THEN
-    INSERT INTO public.tenant_memberships (
-      tenant_id,
-      user_id,
-      role,
-      is_default,
-      is_active
+    EXECUTE format(
+      'INSERT INTO public.tenant_memberships (
+         tenant_id,
+         user_id,
+         role,
+         is_default,
+         is_active
+       )
+       VALUES ($1, $2, $3::public.%I, TRUE, TRUE)
+       ON CONFLICT (tenant_id, user_id) DO UPDATE
+       SET
+         role = EXCLUDED.role,
+         is_default = TRUE,
+         is_active = TRUE,
+         updated_at = NOW()',
+      COALESCE(membership_role_type, 'user_role')
     )
-    VALUES (
-      target_tenant_id,
-      matched_user_id,
-      safe_membership_role,
-      TRUE,
-      TRUE
-    )
-    ON CONFLICT (tenant_id, user_id) DO UPDATE
-    SET
-      role = EXCLUDED.role,
-      is_default = TRUE,
-      is_active = TRUE,
-      updated_at = NOW();
+    USING target_tenant_id, matched_user_id, safe_role::text;
   END IF;
 
   RETURN NEW;

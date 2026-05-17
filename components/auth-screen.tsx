@@ -52,6 +52,28 @@ function normalizeUsername(value: string) {
     .slice(0, 24);
 }
 
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function normalizePhone(value: string) {
+  return value.replace(/[^0-9+]/g, "");
+}
+
+function mapAuthErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "Unable to continue.";
+
+  if (message.toLowerCase().includes("database error saving new user")) {
+    return "Signup could not finish because the database signup trigger needs the latest patch. Run db/user_roles_username_patch.sql in Supabase, then try again.";
+  }
+
+  if (message.toLowerCase().includes("user already registered")) {
+    return "This email is already registered. Log in instead or use another email address.";
+  }
+
+  return message;
+}
+
 export function AuthScreen() {
   const router = useRouter();
   const { refreshProfile } = useAuth();
@@ -91,7 +113,14 @@ export function AuthScreen() {
     const { name, value } = event.target;
     setEmailForm((current) => ({
       ...current,
-      [name]: name === "username" ? normalizeUsername(value) : value
+      [name]:
+        name === "username"
+          ? normalizeUsername(value)
+          : name === "email"
+            ? normalizeEmail(value)
+            : name === "phone"
+              ? normalizePhone(value)
+              : value
     }));
   }
 
@@ -99,8 +128,52 @@ export function AuthScreen() {
     const { name, value } = event.target;
     setPhoneForm((current) => ({
       ...current,
-      [name]: name === "username" ? normalizeUsername(value) : value
+      [name]:
+        name === "username"
+          ? normalizeUsername(value)
+          : name === "phone"
+            ? normalizePhone(value)
+            : value
     }));
+  }
+
+  async function validateSignupAvailability(values: {
+    username: string;
+    email?: string;
+    phone?: string;
+  }) {
+    const response = await fetch("/api/auth/check-availability", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(values)
+    });
+
+    const payload = (await response.json().catch(() => null)) as
+      | {
+          error?: string;
+          checks?: {
+            username?: { available: boolean };
+            email?: { available: boolean };
+            phone?: { available: boolean };
+          };
+        }
+      | null;
+
+    if (!response.ok) {
+      throw new Error(payload?.error ?? "Unable to validate your signup details right now.");
+    }
+
+    if (!payload?.checks?.username?.available) {
+      throw new Error("This username is already taken. Please choose another one.");
+    }
+
+    if (values.email && payload?.checks?.email?.available === false) {
+      throw new Error("This email address is already being used by another user.");
+    }
+
+    if (values.phone && payload?.checks?.phone?.available === false) {
+      throw new Error("This mobile number is already being used by another user.");
+    }
   }
 
   async function handleEmailSubmit(event: FormEvent<HTMLFormElement>) {
@@ -124,6 +197,12 @@ export function AuthScreen() {
         if (!emailForm.username) {
           throw new Error("Username is required.");
         }
+
+        await validateSignupAvailability({
+          username: emailForm.username,
+          email: emailForm.email,
+          phone: emailForm.phone
+        });
 
         const { error, data } = await supabase.auth.signUp({
           email: emailForm.email,
@@ -168,7 +247,7 @@ export function AuthScreen() {
         await completeLoginRedirect();
       }
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to continue.");
+      setErrorMessage(mapAuthErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -195,6 +274,13 @@ export function AuthScreen() {
         throw new Error("Username is required.");
       }
 
+      if (authMode === "signup") {
+        await validateSignupAvailability({
+          username: phoneForm.username,
+          phone: phoneForm.phone
+        });
+      }
+
       const { error } = await supabase.auth.signInWithOtp({
         phone: phoneForm.phone,
         options: {
@@ -218,7 +304,7 @@ export function AuthScreen() {
       setOtpSent(true);
       setNotice("OTP sent. Enter the code to continue.");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to send OTP.");
+      setErrorMessage(mapAuthErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
