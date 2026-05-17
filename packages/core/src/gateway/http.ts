@@ -26,6 +26,19 @@ export function createBackendRequester({ getBaseUrl, isConfigured, getAuthHeader
     }
 
     try {
+      const baseUrl = getBaseUrl();
+      if (
+        typeof window !== "undefined" &&
+        window.location.protocol === "https:" &&
+        baseUrl.startsWith("http://")
+      ) {
+        return {
+          data: null,
+          error:
+            "Backend API URL uses http on an https site. Set NEXT_PUBLIC_API_BASE_URL to your public https backend URL and redeploy."
+        };
+      }
+
       const authHeaders = options.requireAuth === false ? {} : await getAuthHeaders();
       const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
       let requestBody: BodyInit | undefined;
@@ -37,7 +50,7 @@ export function createBackendRequester({ getBaseUrl, isConfigured, getAuthHeader
       } else {
         requestBody = JSON.stringify(options.body);
       }
-      const response = await fetch(`${getBaseUrl()}${path}`, {
+      const response = await fetch(`${baseUrl}${path}`, {
         method: options.method ?? "GET",
         headers: {
           ...authHeaders,
@@ -69,9 +82,22 @@ export function createBackendRequester({ getBaseUrl, isConfigured, getAuthHeader
         error: null
       };
     } catch (error) {
+      const baseUrl = getBaseUrl();
+      const pathLabel = `${baseUrl}${path}`;
+      const message = error instanceof Error ? error.message : "Backend request failed.";
+
+      if (message === "Load failed" || message === "Failed to fetch") {
+        return {
+          data: null,
+          error:
+            `Could not reach the backend at ${pathLabel}. ` +
+            "Check that NEXT_PUBLIC_API_BASE_URL points to the public https Railway API URL, not localhost, a private Railway domain, or an http endpoint."
+        };
+      }
+
       return {
         data: null,
-        error: error instanceof Error ? error.message : "Backend request failed."
+        error: message
       };
     }
   };
