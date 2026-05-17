@@ -75,3 +75,5 @@ services:
     region: singapore
     plan: free
     maxmemoryPolicy: noeviction
+    # ── FIX: Explicit Network Guardrail for Free Tier Redis ─────────────
+    ipAllowList: [] # Leaving this blank instructs Render to block ALL public traffic, keeping it internal-only
