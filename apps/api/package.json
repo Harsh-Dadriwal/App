@@ -6,7 +6,7 @@
     "build": "nest build",
     "start": "node dist/apps/api/src/main.js",
     "start:prod": "node dist/apps/api/src/main.js",
-    "start:dev": "nest start --watch"
+    "start:dev": "node --watch -r ts-node/register -r tsconfig-paths/register src/main.ts"
   },
   "dependencies": {
     "@mahalaxmi/core": "*",
@@ -18,7 +18,9 @@
     "bullmq": "^5.12.12",
     "ioredis": "^5.4.1",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "sharp": "^0.34.3",
+    "tesseract.js": "^6.0.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.8",

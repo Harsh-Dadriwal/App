@@ -84,7 +84,7 @@ type FetchResult<T> = {
 export function useRows<T>(
   fetcher: (client: NonNullable<Awaited<ReturnType<typeof getSupabaseBrowserClient>>>) => Promise<FetchResult<T>>,
   deps: DependencyList,
-  options?: { realtimeTable?: string; clientType?: "primary" | "read" }
+  options?: { realtimeTable?: string; clientType?: "primary" | "read"; enabled?: boolean }
 ) {
   const [data, setData] = useState<T[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -96,6 +96,14 @@ export function useRows<T>(
     let channel: any = null;
 
     void (async () => {
+      if (options?.enabled === false) {
+        if (active) {
+          setLoading(false);
+          setError(null);
+        }
+        return;
+      }
+
       setLoading(true);
       const resolvedClientType =
         options?.clientType ?? (options?.realtimeTable ? "primary" : "read");
@@ -140,7 +148,7 @@ export function useRows<T>(
         void getSupabaseBrowserClient().then(c => c && c.removeChannel(channel));
       }
     };
-  }, [...deps, reloadKey]);
+  }, [...deps, reloadKey, options?.enabled]);
 
   return { data, error, loading, refetch: () => setReloadKey((value) => value + 1) };
 }

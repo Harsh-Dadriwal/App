@@ -102,6 +102,119 @@ export const BID_STATUS = {
 
 export type BidStatus = (typeof BID_STATUS)[keyof typeof BID_STATUS];
 
+export const REQUIREMENT_BATCH_STATUS = {
+  UPLOADED: "uploaded",
+  QUEUED: "queued",
+  PROCESSING: "processing",
+  AWAITING_REVIEW: "awaiting_review",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+  GENERATED: "generated",
+  FAILED: "failed"
+} as const;
+
+export type RequirementBatchStatus =
+  (typeof REQUIREMENT_BATCH_STATUS)[keyof typeof REQUIREMENT_BATCH_STATUS];
+
+export const REQUIREMENT_SOURCE_TYPE = {
+  XLSX: "xlsx",
+  CSV: "csv",
+  PDF: "pdf",
+  IMAGE: "image",
+  HANDWRITTEN_IMAGE: "handwritten_image",
+  WHATSAPP_SCREENSHOT: "whatsapp_screenshot",
+  PLAIN_TEXT: "plain_text",
+  MIXED_NOTE: "mixed_note"
+} as const;
+
+export type RequirementSourceType =
+  (typeof REQUIREMENT_SOURCE_TYPE)[keyof typeof REQUIREMENT_SOURCE_TYPE];
+
+export const REQUIREMENT_REVIEW_STATUS = {
+  PENDING: "pending",
+  AUTO_MATCHED: "auto_matched",
+  NEEDS_REVIEW: "needs_review",
+  APPROVED: "approved",
+  REJECTED: "rejected"
+} as const;
+
+export type RequirementReviewStatus =
+  (typeof REQUIREMENT_REVIEW_STATUS)[keyof typeof REQUIREMENT_REVIEW_STATUS];
+
+export type RequirementBatch = {
+  id: string;
+  tenant_id: string;
+  site_id: string | null;
+  created_by: string | null;
+  source_channel: string;
+  status: RequirementBatchStatus;
+  review_status: RequirementReviewStatus;
+  input_language: string | null;
+  overall_confidence: number | null;
+  generated_site_order_id?: string | null;
+  processing_started_at?: string | null;
+  processing_completed_at?: string | null;
+  approved_at?: string | null;
+  approved_by?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RequirementBatchSource = {
+  id: string;
+  requirement_batch_id: string;
+  tenant_id: string;
+  source_type: RequirementSourceType;
+  mime_type: string | null;
+  original_filename: string | null;
+  storage_bucket: string | null;
+  storage_key: string | null;
+  public_url: string | null;
+  page_count?: number | null;
+  raw_text: string | null;
+  metadata_json?: Record<string, unknown> | null;
+  created_at: string;
+};
+
+export type RequirementBatchItem = {
+  id: string;
+  requirement_batch_id: string;
+  tenant_id: string;
+  source_id: string | null;
+  source_page: number | null;
+  source_line_number: number | null;
+  raw_text: string;
+  normalized_text: string | null;
+  extracted_quantity: number | null;
+  extracted_unit: string | null;
+  extracted_brand: string | null;
+  extracted_specifications: string | null;
+  extracted_dimensions: string | null;
+  extracted_category: string | null;
+  matched_product_id: string | null;
+  match_confidence: number | null;
+  extraction_confidence: number | null;
+  review_status: RequirementReviewStatus;
+  review_notes?: string | null;
+  source_coordinates?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RequirementBatchItemCandidate = {
+  id: string;
+  requirement_batch_item_id: string;
+  candidate_product_id: string | null;
+  candidate_reason: string | null;
+  semantic_score: number | null;
+  fuzzy_score: number | null;
+  brand_score: number | null;
+  availability_score: number | null;
+  final_score: number | null;
+  is_substitute: boolean;
+  created_at: string;
+};
+
 export const roleLabels: Record<AppRole, string> = {
   admin: "Admin",
   customer: "Customer",

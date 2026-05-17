@@ -5,7 +5,7 @@ type BackendResult<T> = {
 
 export type BackendRequestOptions = {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
-  body?: Record<string, unknown> | null;
+  body?: Record<string, unknown> | FormData | null;
   headers?: Record<string, string>;
   requireAuth?: boolean;
 };
@@ -27,14 +27,24 @@ export function createBackendRequester({ getBaseUrl, isConfigured, getAuthHeader
 
     try {
       const authHeaders = options.requireAuth === false ? {} : await getAuthHeaders();
+      const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+      let requestBody: BodyInit | undefined;
+
+      if (options.body == null) {
+        requestBody = undefined;
+      } else if (isFormData) {
+        requestBody = options.body as FormData;
+      } else {
+        requestBody = JSON.stringify(options.body);
+      }
       const response = await fetch(`${getBaseUrl()}${path}`, {
         method: options.method ?? "GET",
         headers: {
-          "Content-Type": "application/json",
           ...authHeaders,
+          ...(isFormData ? {} : { "Content-Type": "application/json" }),
           ...(options.headers ?? {})
         },
-        body: options.body ? JSON.stringify(options.body) : undefined
+        body: requestBody
       });
 
       const payload = await response.json().catch(() => null);

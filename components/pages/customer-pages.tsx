@@ -21,6 +21,7 @@ import {
   useRows
 } from "@/components/data-view";
 import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
+import { roleLabels, type AppRole } from "@mahalaxmi/core/types/domain";
 import {
   approveOrderItemByCustomer,
   respondToSubstitute
@@ -38,6 +39,43 @@ const CUSTOMER_FINANCE_STEPS = [
   { label: "Finish", description: "Tenure and remarks" }
 ] as const;
 
+const CUSTOMER_DIRECTORY_TRADE_ROLES: AppRole[] = [
+  "electrician",
+  "pop_man",
+  "carpenter",
+  "painter",
+  "tiles_man",
+  "plumber"
+];
+
+function formatDirectoryTitle(roles: AppRole[]) {
+  if (roles.length === 1) {
+    const role = roles[0];
+    if (role === "electrician") return "Verified electricians";
+    if (role === "architect") return "Verified architects";
+    if (role === "supplier") return "Verified suppliers";
+    return `Verified ${roleLabels[role].toLowerCase()}s`;
+  }
+
+  if (roles.every((role) => CUSTOMER_DIRECTORY_TRADE_ROLES.includes(role))) {
+    return "Verified handymen and trade partners";
+  }
+
+  return "Verified professionals";
+}
+
+function formatDirectoryPlaceholder(roles: AppRole[]) {
+  if (roles.length === 1) {
+    return `Search ${roleLabels[roles[0]].toLowerCase()}s`;
+  }
+
+  if (roles.every((role) => CUSTOMER_DIRECTORY_TRADE_ROLES.includes(role))) {
+    return "Search handymen, trade skills, city, or company";
+  }
+
+  return "Search professionals";
+}
+
 export function CustomerDashboardPage() {
   const { profile } = useAuth();
   const customerId = profile?.id ?? "";
@@ -49,7 +87,8 @@ export function CustomerDashboardPage() {
         .eq("customer_id", customerId);
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
-    [customerId]
+    [customerId],
+    { enabled: Boolean(customerId) }
   );
   const approvals = useRows(
     async (client) => {
@@ -59,7 +98,8 @@ export function CustomerDashboardPage() {
         .eq("customer_id", customerId);
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
-    [customerId]
+    [customerId],
+    { enabled: Boolean(customerId) }
   );
   const budgets = useRows(
     async (client) => {
@@ -69,7 +109,8 @@ export function CustomerDashboardPage() {
         .eq("customer_id", customerId);
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
-    [customerId]
+    [customerId],
+    { enabled: Boolean(customerId) }
   );
 
   const totalBudget = budgets.data.reduce((sum, item: any) => sum + Number(item.revised_budget ?? 0), 0);
@@ -122,30 +163,41 @@ export function CustomerDashboardPage() {
 }
 
 export function DirectoryPage({
-  role
+  roles
 }: {
-  role: "electrician" | "architect";
+  roles: AppRole[];
 }) {
   const [dirSearch, setDirSearch] = useState("");
+  const title = useMemo(() => formatDirectoryTitle(roles), [roles]);
+  const placeholder = useMemo(() => formatDirectoryPlaceholder(roles), [roles]);
   const directory = useRows(
     async (client) => {
       const { data, error } = await client
         .from("users")
-        .select("full_name, city, state, phone, email, company_name, verification_status")
-        .eq("role", role)
+        .select("full_name, username, city, state, phone, email, company_name, verification_status, role")
+        .in("role", roles)
         .eq("status", "active")
         .eq("verification_status", "verified")
         .eq("is_admin_verified", true);
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
-    [role]
+    [roles.join("|")]
   );
 
   const visibleDirectory = useMemo(() => {
     const q = dirSearch.trim().toLowerCase();
     if (!q) return directory.data;
     return directory.data.filter((person: any) =>
-      [person.full_name, person.city, person.state, person.email, person.phone, person.company_name]
+      [
+        person.full_name,
+        person.username,
+        person.city,
+        person.state,
+        person.email,
+        person.phone,
+        person.company_name,
+        roleLabels[person.role as AppRole]
+      ]
         .some((value) => String(value ?? "").toLowerCase().includes(q))
     );
   }, [directory.data, dirSearch]);
@@ -153,22 +205,22 @@ export function DirectoryPage({
   return (
     <div className="page-stack">
       <PageSection
-        title={role === "electrician" ? "Verified electricians" : "Verified architects"}
-        description="Only database records that are active and admin-verified appear here."
+        title={title}
+        description="Only database records that are active, verified, and admin-approved appear here."
       >
         <QueryState
           loading={directory.loading}
           error={directory.error}
           hasData={directory.data.length > 0}
           empty={{
-            title: `No ${role}s in database`,
-            description: `There are currently no verified ${role}s available in the database. When admin verifies them, they will appear here.`
+            title: "No matching professionals in database",
+            description: "There are currently no verified professionals in this directory. When admin verifies them, they will appear here automatically."
           }}
         >
           <ListSearchField
             value={dirSearch}
             onChange={setDirSearch}
-            placeholder={`Search ${role === "electrician" ? "electricians" : "architects"}`}
+            placeholder={placeholder}
             ariaLabel="Search directory"
           />
           <QueryState
@@ -180,11 +232,13 @@ export function DirectoryPage({
             <CardGrid>
               {visibleDirectory.map((person: any) => (
                 <DataCard
-                  key={`${role}-${person.email ?? person.phone}`}
+                  key={`${person.role}-${person.email ?? person.phone}`}
                   title={person.full_name ?? "Unnamed"}
                   subtitle={[person.city, person.state].filter(Boolean).join(", ")}
-                  meta={person.company_name ?? role}
+                  meta={person.company_name ?? roleLabels[person.role as AppRole] ?? "Professional"}
                 >
+                  <p>Role: {roleLabels[person.role as AppRole] ?? person.role}</p>
+                  <p>Username: {person.username ?? "-"}</p>
                   <p>Email: {person.email ?? "-"}</p>
                   <p>Phone: {person.phone ?? "-"}</p>
                 </DataCard>
@@ -224,7 +278,8 @@ export function CustomerSitesPage() {
         .order("created_at", { ascending: false });
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
-    [customerId]
+    [customerId],
+    { enabled: Boolean(customerId) }
   );
 
   const visibleSites = useMemo(() => {
@@ -582,7 +637,8 @@ export function CustomerBudgetPage() {
         .eq("customer_id", customerId);
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
-    [customerId]
+    [customerId],
+    { enabled: Boolean(customerId) }
   );
 
   return (
@@ -633,7 +689,7 @@ export function CustomerFinancePage() {
   const siteOptions = useRows(async (client) => {
     const { data, error } = await client.from("sites").select("id, site_name").eq("customer_id", customerId);
     return { data: (data ?? []) as any[], error: error?.message ?? null };
-  }, [customerId]);
+  }, [customerId], { enabled: Boolean(customerId) });
   const finance = useRows(
     async (client) => {
       const { data, error } = await client
@@ -642,7 +698,8 @@ export function CustomerFinancePage() {
         .eq("customer_id", customerId);
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
-    [customerId]
+    [customerId],
+    { enabled: Boolean(customerId) }
   );
 
   const visibleFinance = useMemo(() => {
@@ -903,7 +960,8 @@ export function CustomerApprovalsPage() {
         .eq("customer_id", customerId);
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
-    [customerId]
+    [customerId],
+    { enabled: Boolean(customerId) }
   );
 
   const mutation = useMutationAction();
@@ -916,7 +974,8 @@ export function CustomerApprovalsPage() {
         .eq("status", "suggested");
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
-    [customerId]
+    [customerId],
+    { enabled: Boolean(customerId) }
   );
 
   async function respond(orderItemId: string, approve: boolean) {

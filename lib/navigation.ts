@@ -46,9 +46,12 @@ export const roleNav: Record<
 > = {
   customer: [
     { href: "/customer", label: "Dashboard" },
+    { href: "/customer/requirements", label: "Requirements", shortLabel: "Requirements" },
     { href: "/customer/lighting", label: "Lighting Visualizer", shortLabel: "Lighting" },
     { href: "/customer/electricians", label: "Electricians" },
     { href: "/customer/architects", label: "Architects" },
+    { href: "/customer/handymen", label: "Handymen & Trades", shortLabel: "Handymen" },
+    { href: "/customer/suppliers", label: "Suppliers" },
     { href: "/customer/sites", label: "Sites" },
     { href: "/customer/tips/electrical", label: "Electrical Tips", shortLabel: "Elec Tips" },
     { href: "/customer/tips/home", label: "Home Tips" },
@@ -62,6 +65,7 @@ export const roleNav: Record<
   ],
   electrician: [
     { href: "/electrician", label: "Dashboard" },
+    { href: "/electrician/requirements", label: "Requirements", shortLabel: "Requirements" },
     { href: "/electrician/projects/new", label: "New Projects" },
     { href: "/electrician/projects/market", label: "Assigned to Others", shortLabel: "Market" },
     { href: "/electrician/projects/ongoing", label: "Ongoing Projects", shortLabel: "Ongoing" },
@@ -70,6 +74,7 @@ export const roleNav: Record<
   ],
   architect: [
     { href: "/architect", label: "Dashboard" },
+    { href: "/architect/requirements", label: "Requirements", shortLabel: "Requirements" },
     { href: "/architect/lighting", label: "Lighting Visualizer", shortLabel: "Lighting" },
     { href: "/architect/projects/new", label: "New Projects" },
     { href: "/architect/projects/ongoing", label: "Ongoing Projects", shortLabel: "Ongoing" },
@@ -97,6 +102,7 @@ export const roleNav: Record<
   ],
   admin: [
     { href: "/admin", label: "Dashboard" },
+    { href: "/admin/requirements", label: "Requirements Queue", shortLabel: "Requirements" },
     { href: "/admin/lighting", label: "Lighting Leads", shortLabel: "Lighting" },
     { href: "/admin/users", label: "Users & Verification", shortLabel: "Users" },
     { href: "/admin/assignments", label: "Site Assignments", shortLabel: "Assignments" },

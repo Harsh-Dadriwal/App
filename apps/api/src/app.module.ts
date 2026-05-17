@@ -14,6 +14,7 @@ import { EventsModule } from "./common/events/events.module";
 import { TenancyModule } from "./common/tenancy/tenancy.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
 import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
+import { RequirementsModule } from "./modules/requirements/requirements.module";
 
 @Module({
   imports: [
@@ -34,7 +35,8 @@ import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
     NotificationsModule,
     InventoryModule,
     PaymentsModule,
-    MaintenanceModule
+    MaintenanceModule,
+    RequirementsModule
   ],
   controllers: [HealthController]
 })

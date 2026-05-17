@@ -5,3 +5,4 @@ export { createWorkflowGateway } from "./workflow-gateway";
 export { createFintechGateway } from "./fintech-gateway";
 export { createInventoryGateway } from "./inventory-gateway";
 export { createNotificationsGateway } from "./notifications-gateway";
+export { createRequirementsGateway } from "./requirements-gateway";

@@ -141,3 +141,33 @@ export type WalletReconciliationRowDto = {
   wallet_snapshot_drift: number;
   last_ledger_entry_id?: string | null;
 };
+
+export type CreateRequirementTextBatchRequestDto = {
+  site_id?: string | null;
+  source_channel?: string | null;
+  input_language?: string | null;
+  raw_text: string;
+};
+
+export type CreateRequirementUploadBatchRequestDto = {
+  site_id?: string | null;
+  source_channel?: string | null;
+  input_language?: string | null;
+};
+
+export type ReviewRequirementBatchItemRequestDto = {
+  review_status: string;
+  normalized_text?: string | null;
+  extracted_quantity?: number | null;
+  extracted_unit?: string | null;
+  extracted_brand?: string | null;
+  extracted_specifications?: string | null;
+  extracted_dimensions?: string | null;
+  extracted_category?: string | null;
+  matched_product_id?: string | null;
+  review_notes?: string | null;
+};
+
+export type GenerateRequirementProcurementRequestDto = {
+  site_order_id?: string | null;
+};

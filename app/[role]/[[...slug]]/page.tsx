@@ -3,7 +3,7 @@
 import { use, useMemo } from "react";
 import { notFound } from "next/navigation";
 import { AppFrame } from "@/components/app-frame";
-import type { AppRole } from "@mahalaxmi/core/types/domain";
+import { USER_ROLE, type AppRole } from "@mahalaxmi/core/types/domain";
 import { roleLabels } from "@/lib/navigation";
 import {
   ProjectNotesPage,
@@ -44,6 +44,10 @@ import {
 } from "@/components/pages/fintech-pages";
 import { LightingVisualizerPage } from "@/components/pages/lighting-pages";
 import { AdminWorkflowHubPage } from "@/components/order-workflow";
+import {
+  AdminRequirementsPage,
+  RequirementIntakePage
+} from "@/components/pages/requirements-pages";
 
 export default function RolePage({
   params
@@ -64,9 +68,12 @@ export default function RolePage({
       case "customer":
         switch (pathPart) {
           case "": return { title: "Dashboard", component: <CustomerDashboardPage /> };
+          case "requirements": return { title: "Requirements", component: <RequirementIntakePage role="customer" /> };
           case "lighting": return { title: "Lighting Visualizer", component: <LightingVisualizerPage role="customer" /> };
-          case "electricians": return { title: "Electricians Directory", component: <DirectoryPage role="electrician" /> };
-          case "architects": return { title: "Architects Directory", component: <DirectoryPage role="architect" /> };
+          case "electricians": return { title: "Electricians Directory", component: <DirectoryPage roles={[USER_ROLE.ELECTRICIAN]} /> };
+          case "architects": return { title: "Architects Directory", component: <DirectoryPage roles={[USER_ROLE.ARCHITECT]} /> };
+          case "handymen": return { title: "Handymen & Trades", component: <DirectoryPage roles={[USER_ROLE.ELECTRICIAN, USER_ROLE.POP_MAN, USER_ROLE.CARPENTER, USER_ROLE.PAINTER, USER_ROLE.TILES_MAN, USER_ROLE.PLUMBER]} /> };
+          case "suppliers": return { title: "Suppliers", component: <DirectoryPage roles={[USER_ROLE.SUPPLIER]} /> };
           case "sites": return { title: "Sites", component: <CustomerSitesPage /> };
           case "tips/electrical": return { title: "Electrical Tips", component: <TipsPage category="electrical_tips" /> };
           case "tips/home": return { title: "Home Tips", component: <TipsPage category="home_tips" /> };
@@ -82,6 +89,7 @@ export default function RolePage({
       case "electrician":
         switch (pathPart) {
           case "": return { title: "Dashboard", component: <ElectricianDashboardPage /> };
+          case "requirements": return { title: "Requirements", component: <RequirementIntakePage role="electrician" /> };
           case "projects/new": return { title: "New Projects", component: <ElectricianProjectsPage mode="new" /> };
           case "projects/market": return { title: "Assigned to Others", component: <ElectricianProjectsPage mode="market" /> };
           case "projects/ongoing": return { title: "Ongoing Projects", component: <ElectricianProjectsPage mode="ongoing" /> };
@@ -92,6 +100,7 @@ export default function RolePage({
       case "architect":
         switch (pathPart) {
           case "": return { title: "Dashboard", component: <ArchitectDashboardPage /> };
+          case "requirements": return { title: "Requirements", component: <RequirementIntakePage role="architect" /> };
           case "lighting": return { title: "Lighting Visualizer", component: <LightingVisualizerPage role="architect" /> };
           case "projects/new": return { title: "New Projects", component: <ArchitectProjectsPage mode="new" /> };
           case "projects/ongoing": return { title: "Ongoing Projects", component: <ArchitectProjectsPage mode="ongoing" /> };
@@ -103,6 +112,7 @@ export default function RolePage({
       case "admin":
         switch (pathPart) {
           case "": return { title: "Dashboard", component: <AdminDashboardPage /> };
+          case "requirements": return { title: "Requirements Queue", component: <AdminRequirementsPage /> };
           case "lighting": return { title: "Lighting Leads", component: <LightingVisualizerPage role="admin" /> };
           case "users": return { title: "Users & Verification", component: <AdminUsersPage /> };
           case "assignments": return { title: "Site Assignments", component: <AdminAssignmentsPage /> };

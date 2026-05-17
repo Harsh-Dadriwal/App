@@ -80,7 +80,8 @@ export function ElectricianDashboardPage() {
         .eq("electrician_id", electricianId);
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
-    [electricianId]
+    [electricianId],
+    { enabled: Boolean(electricianId) }
   );
   const newProjects = useRows(
     async (client) => {
@@ -163,7 +164,8 @@ export function ElectricianProjectsPage({
         .eq("electrician_id", electricianId);
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
-    [mode, electricianId]
+    [mode, electricianId],
+    { enabled: mode !== "ongoing" || Boolean(electricianId) }
   );
 
   const titleMap = {
@@ -184,7 +186,7 @@ export function ElectricianProjectsPage({
       .eq("bidder_role", "electrician")
       .order("submitted_at", { ascending: false });
     return { data: (data ?? []) as any[], error: error?.message ?? null };
-  }, [electricianId]);
+  }, [electricianId], { enabled: Boolean(electricianId) });
 
   const visibleBids = useMemo(() => {
     const q = bidSearch.trim().toLowerCase();
@@ -467,7 +469,7 @@ export function ElectricianMaterialsPage() {
   const ongoingProjects = useRows(async (client) => {
     const { data, error } = await client.from("vw_electrician_ongoing_projects").select("site_id, site_name").eq("electrician_id", electricianId);
     return { data: (data ?? []) as any[], error: error?.message ?? null };
-  }, [electricianId]);
+  }, [electricianId], { enabled: Boolean(electricianId) });
   const siteOrders = useRows(async (client) => {
     const { data, error } = await client.from("site_orders").select("id, order_number, site_id");
     return { data: (data ?? []) as any[], error: error?.message ?? null };
@@ -494,7 +496,8 @@ export function ElectricianMaterialsPage() {
         .eq("electrician_id", electricianId);
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
-    [electricianId]
+    [electricianId],
+    { enabled: Boolean(electricianId) }
   );
 
   const filteredOrders = useMemo(
@@ -1150,7 +1153,8 @@ export function ArchitectDashboardPage() {
         .eq("architect_id", architectId);
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
-    [architectId]
+    [architectId],
+    { enabled: Boolean(architectId) }
   );
   const newProjects = useRows(
     async (client) => {
@@ -1219,7 +1223,8 @@ export function ArchitectProjectsPage({ mode }: { mode: "new" | "ongoing" }) {
         .eq("architect_id", architectId);
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
-    [mode, architectId]
+    [mode, architectId],
+    { enabled: mode !== "ongoing" || Boolean(architectId) }
   );
 
   return (
@@ -1279,7 +1284,8 @@ export function ArchitectMaterialsPage() {
         .eq("architect_id", architectId);
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
-    [architectId]
+    [architectId],
+    { enabled: Boolean(architectId) }
   );
 
   const mutation = useMutationAction();
