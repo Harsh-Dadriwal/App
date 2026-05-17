@@ -892,7 +892,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$$
+AS $$
 BEGIN
   UPDATE public.users
   SET email = COALESCE(NULLIF(NEW.email, ''), email),
@@ -1129,7 +1129,7 @@ RETURNS public.order_items
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$$
+AS $$
 DECLARE updated_item public.order_items; previous_status public.order_item_status;
 BEGIN
   SELECT status INTO previous_status FROM public.order_items WHERE id = target_order_item_id;
@@ -1145,7 +1145,7 @@ RETURNS public.order_items
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$$
+AS $$
 DECLARE target_site UUID; next_status public.order_item_status;
 BEGIN
   SELECT site_id INTO target_site FROM public.order_items WHERE id = target_order_item_id;
@@ -1167,7 +1167,7 @@ RETURNS public.order_items
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$$
+AS $$
 DECLARE target_site UUID; next_status public.order_item_status;
 BEGIN
   SELECT site_id INTO target_site FROM public.order_items WHERE id = target_order_item_id;
@@ -1189,7 +1189,7 @@ RETURNS public.substitute_suggestions
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$$
+AS $$
 DECLARE result_row public.substitute_suggestions; item_customer UUID; previous_status public.order_item_status;
 BEGIN
   IF NOT public.is_admin_user() THEN
@@ -1220,7 +1220,7 @@ RETURNS public.substitute_suggestions
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$$
+AS $$
 DECLARE result_row public.substitute_suggestions; original_item UUID; previous_status public.order_item_status; next_status public.order_item_status;
 BEGIN
   UPDATE public.substitute_suggestions
@@ -1263,7 +1263,7 @@ RETURNS public.order_items
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$$
+AS $$
 DECLARE current_required NUMERIC; current_supplied NUMERIC; new_total NUMERIC; next_status public.order_item_status;
   item_product_id UUID;
 BEGIN
@@ -1298,7 +1298,7 @@ RETURNS public.users
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$$
+AS $$
 DECLARE result_row public.users;
 BEGIN
   IF NOT public.is_admin_user() THEN
@@ -1320,7 +1320,7 @@ RETURNS public.users
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$$
+AS $$
 DECLARE updated_user public.users;
 BEGIN
   UPDATE public.users
@@ -1337,7 +1337,7 @@ RETURNS public.users
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$$
+AS $$
 DECLARE updated_user public.users;
 BEGIN
   UPDATE public.users SET role = 'customer', updated_at = NOW()
@@ -1353,7 +1353,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$$
+AS $$
 BEGIN
   IF NEW.recipient_user_id IS NOT NULL THEN
     INSERT INTO public.notifications (user_id, type, title, body, data)
@@ -1381,7 +1381,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$$
+AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     INSERT INTO public.notifications (user_id, type, title, body, data)
