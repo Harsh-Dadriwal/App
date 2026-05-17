@@ -58,7 +58,7 @@ BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$ LANGUAGE plpgsql SET search_path = '';
 
 DROP TABLE IF EXISTS public.users CASCADE;
 CREATE TABLE public.users (
@@ -642,7 +642,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$ LANGUAGE plpgsql SET search_path = '';
 
 CREATE TRIGGER trigger_set_default_site_code
 BEFORE INSERT ON public.sites
@@ -678,7 +678,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$ LANGUAGE plpgsql SET search_path = '';
 
 CREATE TRIGGER trg_users_admin_limit BEFORE INSERT OR UPDATE OF role ON public.users FOR EACH ROW EXECUTE FUNCTION public.enforce_admin_limit();
 
@@ -1280,7 +1280,7 @@ $$;
 CREATE TRIGGER trg_site_notes_notify AFTER INSERT ON public.site_notes FOR EACH ROW EXECUTE FUNCTION public.create_site_note_notifications();
 CREATE TRIGGER trg_product_requests_notify AFTER INSERT OR UPDATE OF status, admin_notes, matched_product_id ON public.product_requests FOR EACH ROW EXECUTE FUNCTION public.create_product_request_notifications();
 
-CREATE OR REPLACE VIEW public.vw_site_order_item_enriched AS
+CREATE OR REPLACE VIEW public.vw_site_order_item_enriched WITH (security_invoker = true) AS
 SELECT
   oi.id AS order_item_id,
   oi.site_order_id,
@@ -1349,7 +1349,7 @@ LEFT JOIN public.users electrician ON electrician.id = sa_electrician.user_id
 LEFT JOIN public.site_assignments sa_architect ON sa_architect.site_id = s.id AND sa_architect.role = 'architect' AND sa_architect.status = 'active'
 LEFT JOIN public.users architect ON architect.id = sa_architect.user_id;
 
-CREATE OR REPLACE VIEW public.vw_customer_site_projects AS
+CREATE OR REPLACE VIEW public.vw_customer_site_projects WITH (security_invoker = true) AS
 SELECT
   s.id AS site_id,
   s.customer_id,
@@ -1379,7 +1379,7 @@ LEFT JOIN public.users architect ON architect.id = sa_architect.user_id
 LEFT JOIN public.order_items oi ON oi.site_id = s.id
 GROUP BY s.id, electrician.id, architect.id;
 
-CREATE OR REPLACE VIEW public.vw_customer_budget_tracker AS
+CREATE OR REPLACE VIEW public.vw_customer_budget_tracker WITH (security_invoker = true) AS
 SELECT
   s.id AS site_id,
   s.customer_id,
@@ -1393,10 +1393,10 @@ SELECT
 FROM public.sites s
 LEFT JOIN public.budget_trackers bt ON bt.site_id = s.id;
 
-CREATE OR REPLACE VIEW public.vw_customer_items_on_approval AS
+CREATE OR REPLACE VIEW public.vw_customer_items_on_approval WITH (security_invoker = true) AS
 SELECT * FROM public.vw_site_order_item_enriched WHERE status IN ('pending_customer_approval', 'substitute_suggested');
 
-CREATE OR REPLACE VIEW public.vw_electrician_new_projects AS
+CREATE OR REPLACE VIEW public.vw_electrician_new_projects WITH (security_invoker = true) AS
 SELECT
   s.id AS site_id, s.site_code, s.site_name, s.project_type, s.city, s.state, s.area_sqft,
   s.architect_required, s.approval_mode, s.estimated_budget, s.status, s.description, s.created_at,
@@ -1406,7 +1406,7 @@ JOIN public.users customer ON customer.id = s.customer_id
 WHERE s.status = 'open_for_bidding'
   AND NOT EXISTS (SELECT 1 FROM public.site_assignments sa WHERE sa.site_id = s.id AND sa.role = 'electrician' AND sa.status = 'active');
 
-CREATE OR REPLACE VIEW public.vw_electrician_projects_assigned_to_others AS
+CREATE OR REPLACE VIEW public.vw_electrician_projects_assigned_to_others WITH (security_invoker = true) AS
 SELECT
   s.id AS site_id, s.site_code, s.site_name, s.project_type, s.city, s.state, s.area_sqft,
   s.architect_required, s.approval_mode, s.estimated_budget, s.status,
@@ -1418,7 +1418,7 @@ JOIN public.site_assignments sa ON sa.site_id = s.id AND sa.role = 'electrician'
 JOIN public.users assigned_electrician ON assigned_electrician.id = sa.user_id
 WHERE s.status IN ('assigned', 'in_progress', 'on_hold') AND assigned_electrician.role = 'electrician';
 
-CREATE OR REPLACE VIEW public.vw_electrician_ongoing_projects AS
+CREATE OR REPLACE VIEW public.vw_electrician_ongoing_projects WITH (security_invoker = true) AS
 SELECT
   s.id AS site_id, s.site_code, s.site_name, s.project_type, s.city, s.state, s.area_sqft,
   s.architect_required, s.approval_mode, s.estimated_budget, s.actual_spend, s.status AS site_status,
@@ -1440,7 +1440,7 @@ LEFT JOIN public.order_items oi ON oi.site_id = s.id
 WHERE sa.role = 'electrician' AND sa.status = 'active' AND s.status IN ('assigned', 'in_progress', 'on_hold')
 GROUP BY s.id, customer.id, sa.user_id, electrician.full_name, architect.id, architect.full_name;
 
-CREATE OR REPLACE VIEW public.vw_electrician_material_tracker AS
+CREATE OR REPLACE VIEW public.vw_electrician_material_tracker WITH (security_invoker = true) AS
 SELECT v.*,
   CASE WHEN v.status <> 'cancelled' THEN TRUE ELSE FALSE END AS in_master_requirement_list,
   CASE WHEN v.status = 'supplied' THEN TRUE ELSE FALSE END AS in_material_already_on_site,
@@ -1451,7 +1451,7 @@ SELECT v.*,
 FROM public.vw_site_order_item_enriched v
 WHERE v.electrician_id IS NOT NULL;
 
-CREATE OR REPLACE VIEW public.vw_architect_new_projects AS
+CREATE OR REPLACE VIEW public.vw_architect_new_projects WITH (security_invoker = true) AS
 SELECT
   s.id AS site_id, s.site_code, s.site_name, s.project_type, s.city, s.state, s.area_sqft,
   s.architect_required, s.approval_mode, s.estimated_budget, s.status, s.description, s.created_at,
@@ -1462,7 +1462,7 @@ WHERE s.status = 'open_for_bidding'
   AND s.architect_required = TRUE
   AND NOT EXISTS (SELECT 1 FROM public.site_assignments sa WHERE sa.site_id = s.id AND sa.role = 'architect' AND sa.status = 'active');
 
-CREATE OR REPLACE VIEW public.vw_architect_ongoing_projects AS
+CREATE OR REPLACE VIEW public.vw_architect_ongoing_projects WITH (security_invoker = true) AS
 SELECT
   s.id AS site_id, s.site_code, s.site_name, s.project_type, s.city, s.state, s.area_sqft,
   s.approval_mode, s.estimated_budget, s.actual_spend, s.status AS site_status,
@@ -1484,7 +1484,7 @@ LEFT JOIN public.order_items oi ON oi.site_id = s.id
 WHERE sa.role = 'architect' AND sa.status = 'active' AND s.status IN ('assigned', 'in_progress', 'on_hold')
 GROUP BY s.id, customer.id, sa.user_id, architect.full_name, electrician.id, electrician.full_name;
 
-CREATE OR REPLACE VIEW public.vw_architect_material_tracker AS
+CREATE OR REPLACE VIEW public.vw_architect_material_tracker WITH (security_invoker = true) AS
 SELECT v.*,
   CASE WHEN v.status <> 'cancelled' THEN TRUE ELSE FALSE END AS in_master_materials_required_list,
   CASE WHEN v.status = 'pending_architect_approval' THEN TRUE ELSE FALSE END AS in_materials_required_by_electrician,
@@ -1494,7 +1494,7 @@ SELECT v.*,
 FROM public.vw_site_order_item_enriched v
 WHERE v.architect_id IS NOT NULL;
 
-CREATE OR REPLACE VIEW public.vw_product_requests_enriched AS
+CREATE OR REPLACE VIEW public.vw_product_requests_enriched WITH (security_invoker = true) AS
 SELECT
   pr.id,
   pr.site_id,
@@ -1522,7 +1522,7 @@ JOIN public.sites s ON s.id = pr.site_id
 JOIN public.users requester ON requester.id = pr.requested_by_user_id
 LEFT JOIN public.products matched_product ON matched_product.id = pr.matched_product_id;
 
-CREATE OR REPLACE VIEW public.vw_site_notes_enriched AS
+CREATE OR REPLACE VIEW public.vw_site_notes_enriched WITH (security_invoker = true) AS
 SELECT
   sn.id,
   sn.site_id,
