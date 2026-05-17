@@ -2,16 +2,27 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+DROP TYPE IF EXISTS public.user_role CASCADE;
 CREATE TYPE public.user_role AS ENUM ('admin', 'customer', 'electrician', 'architect', 'supplier', 'pop_man', 'carpenter', 'painter', 'tiles_man', 'plumber');
+DROP TYPE IF EXISTS public.user_status CASCADE;
 CREATE TYPE public.user_status AS ENUM ('active', 'inactive', 'blocked');
+DROP TYPE IF EXISTS public.verification_status CASCADE;
 CREATE TYPE public.verification_status AS ENUM ('pending', 'verified', 'rejected');
+DROP TYPE IF EXISTS public.site_status CASCADE;
 CREATE TYPE public.site_status AS ENUM ('draft', 'open_for_bidding', 'assigned', 'in_progress', 'on_hold', 'completed', 'cancelled');
+DROP TYPE IF EXISTS public.bid_status CASCADE;
 CREATE TYPE public.bid_status AS ENUM ('submitted', 'shortlisted', 'accepted', 'rejected', 'withdrawn');
+DROP TYPE IF EXISTS public.assignment_role CASCADE;
 CREATE TYPE public.assignment_role AS ENUM ('electrician', 'architect');
+DROP TYPE IF EXISTS public.assignment_status CASCADE;
 CREATE TYPE public.assignment_status AS ENUM ('active', 'removed', 'completed');
+DROP TYPE IF EXISTS public.inventory_stock_status CASCADE;
 CREATE TYPE public.inventory_stock_status AS ENUM ('in_stock', 'out_of_stock', 'limited');
+DROP TYPE IF EXISTS public.requirement_source CASCADE;
 CREATE TYPE public.requirement_source AS ENUM ('electrician', 'architect', 'admin', 'customer');
+DROP TYPE IF EXISTS public.approval_mode CASCADE;
 CREATE TYPE public.approval_mode AS ENUM ('architect_then_customer', 'customer_only');
+DROP TYPE IF EXISTS public.order_item_status CASCADE;
 CREATE TYPE public.order_item_status AS ENUM (
   'draft_by_electrician',
   'draft_by_architect',
@@ -28,11 +39,17 @@ CREATE TYPE public.order_item_status AS ENUM (
   'substitute_rejected',
   'cancelled'
 );
+DROP TYPE IF EXISTS public.substitute_status CASCADE;
 CREATE TYPE public.substitute_status AS ENUM ('suggested', 'accepted', 'rejected', 'expired');
+DROP TYPE IF EXISTS public.order_status CASCADE;
 CREATE TYPE public.order_status AS ENUM ('draft', 'awaiting_approval', 'partially_approved', 'confirmed', 'processing', 'partially_supplied', 'supplied', 'cancelled');
+DROP TYPE IF EXISTS public.finance_application_status CASCADE;
 CREATE TYPE public.finance_application_status AS ENUM ('draft', 'submitted', 'under_review', 'approved', 'rejected', 'disbursed', 'closed');
+DROP TYPE IF EXISTS public.content_category CASCADE;
 CREATE TYPE public.content_category AS ENUM ('electrical_tips', 'home_tips');
+DROP TYPE IF EXISTS public.notification_type CASCADE;
 CREATE TYPE public.notification_type AS ENUM ('general', 'approval_requested', 'approval_completed', 'substitute_suggested', 'substitute_response', 'bid_update', 'order_update', 'finance_update');
+DROP TYPE IF EXISTS public.product_request_status CASCADE;
 CREATE TYPE public.product_request_status AS ENUM ('submitted', 'reviewing', 'matched', 'ordered', 'fulfilled', 'rejected');
 
 CREATE OR REPLACE FUNCTION public.set_updated_at()
@@ -43,6 +60,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TABLE IF EXISTS public.users CASCADE;
 CREATE TABLE public.users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   auth_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -123,6 +141,7 @@ BEGIN
 END;
 $$;
 
+DROP TABLE IF EXISTS public.user_professional_profiles CASCADE;
 CREATE TABLE public.user_professional_profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL UNIQUE REFERENCES public.users(id) ON DELETE CASCADE,
@@ -137,8 +156,10 @@ CREATE TABLE public.user_professional_profiles (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP SEQUENCE IF EXISTS public.site_code_seq CASCADE;
 CREATE SEQUENCE IF NOT EXISTS public.site_code_seq START 1000;
 
+DROP TABLE IF EXISTS public.sites CASCADE;
 CREATE TABLE public.sites (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id UUID NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT,
@@ -167,6 +188,7 @@ CREATE TABLE public.sites (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TABLE IF EXISTS public.site_assignments CASCADE;
 CREATE TABLE public.site_assignments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   site_id UUID NOT NULL REFERENCES public.sites(id) ON DELETE CASCADE,
@@ -179,6 +201,7 @@ CREATE TABLE public.site_assignments (
   UNIQUE (site_id, user_id, role)
 );
 
+DROP TABLE IF EXISTS public.project_bids CASCADE;
 CREATE TABLE public.project_bids (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   site_id UUID NOT NULL REFERENCES public.sites(id) ON DELETE CASCADE,
@@ -195,6 +218,7 @@ CREATE TABLE public.project_bids (
   UNIQUE (site_id, bidder_user_id, bidder_role)
 );
 
+DROP TABLE IF EXISTS public.product_categories CASCADE;
 CREATE TABLE public.product_categories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(100) NOT NULL,
@@ -207,6 +231,7 @@ CREATE TABLE public.product_categories (
 
 CREATE UNIQUE INDEX uq_product_categories_name_lower ON public.product_categories (LOWER(name));
 
+DROP TABLE IF EXISTS public.product_brands CASCADE;
 CREATE TABLE public.product_brands (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   category_id UUID NOT NULL REFERENCES public.product_categories(id) ON DELETE CASCADE,
@@ -221,6 +246,7 @@ CREATE TABLE public.product_brands (
 
 CREATE UNIQUE INDEX uq_product_brands_category_name_lower ON public.product_brands (category_id, LOWER(name));
 
+DROP TABLE IF EXISTS public.products CASCADE;
 CREATE TABLE public.products (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   category_id UUID NOT NULL REFERENCES public.product_categories(id) ON DELETE RESTRICT,
@@ -242,6 +268,7 @@ CREATE TABLE public.products (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TABLE IF EXISTS public.product_inventory CASCADE;
 CREATE TABLE public.product_inventory (
   product_id UUID PRIMARY KEY REFERENCES public.products(id) ON DELETE CASCADE,
   available_qty NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (available_qty >= 0),
@@ -250,6 +277,7 @@ CREATE TABLE public.product_inventory (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TABLE IF EXISTS public.site_orders CASCADE;
 CREATE TABLE public.site_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   site_id UUID NOT NULL REFERENCES public.sites(id) ON DELETE CASCADE,
@@ -271,6 +299,7 @@ CREATE TABLE public.site_orders (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TABLE IF EXISTS public.order_items CASCADE;
 CREATE TABLE public.order_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   site_order_id UUID NOT NULL REFERENCES public.site_orders(id) ON DELETE CASCADE,
@@ -320,6 +349,7 @@ CREATE TABLE public.order_items (
   )
 );
 
+DROP TABLE IF EXISTS public.order_item_status_history CASCADE;
 CREATE TABLE public.order_item_status_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_item_id UUID NOT NULL REFERENCES public.order_items(id) ON DELETE CASCADE,
@@ -331,6 +361,7 @@ CREATE TABLE public.order_item_status_history (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TABLE IF EXISTS public.substitute_suggestions CASCADE;
 CREATE TABLE public.substitute_suggestions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   original_order_item_id UUID NOT NULL REFERENCES public.order_items(id) ON DELETE CASCADE,
@@ -344,6 +375,7 @@ CREATE TABLE public.substitute_suggestions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TABLE IF EXISTS public.budget_trackers CASCADE;
 CREATE TABLE public.budget_trackers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   site_id UUID NOT NULL UNIQUE REFERENCES public.sites(id) ON DELETE CASCADE,
@@ -356,6 +388,7 @@ CREATE TABLE public.budget_trackers (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TABLE IF EXISTS public.finance_applications CASCADE;
 CREATE TABLE public.finance_applications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id UUID NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT,
@@ -373,6 +406,7 @@ CREATE TABLE public.finance_applications (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TABLE IF EXISTS public.content_posts CASCADE;
 CREATE TABLE public.content_posts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   category public.content_category NOT NULL,
@@ -388,6 +422,7 @@ CREATE TABLE public.content_posts (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TABLE IF EXISTS public.notifications CASCADE;
 CREATE TABLE public.notifications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
@@ -400,6 +435,7 @@ CREATE TABLE public.notifications (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TABLE IF EXISTS public.audit_logs CASCADE;
 CREATE TABLE public.audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   actor_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
@@ -411,6 +447,7 @@ CREATE TABLE public.audit_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TABLE IF EXISTS public.product_requests CASCADE;
 CREATE TABLE public.product_requests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   site_id UUID NOT NULL REFERENCES public.sites(id) ON DELETE CASCADE,
@@ -428,6 +465,7 @@ CREATE TABLE public.product_requests (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TABLE IF EXISTS public.site_notes CASCADE;
 CREATE TABLE public.site_notes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   site_id UUID NOT NULL REFERENCES public.sites(id) ON DELETE CASCADE,
