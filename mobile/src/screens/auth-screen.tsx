@@ -45,7 +45,7 @@ export function AuthScreen() {
     const message = error instanceof Error ? error.message : "Unable to continue.";
 
     if (message.toLowerCase().includes("database error saving new user")) {
-      return "Signup could not finish because the database signup trigger needs the latest patch. Run db/user_roles_username_patch.sql in Supabase, then try again.";
+      return "Signup could not finish because the Supabase signup trigger is still failing. Run db/auth_trigger_username_roles_repair.sql in Supabase first, then try again.";
     }
 
     if (message.toLowerCase().includes("user already registered")) {
