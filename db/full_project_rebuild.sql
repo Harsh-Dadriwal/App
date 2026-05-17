@@ -95,18 +95,25 @@ CREATE OR REPLACE FUNCTION public.normalize_username(raw_value text)
 RETURNS text
 LANGUAGE sql
 IMMUTABLE
-SET search_path = ''
-AS $$
+AS $
   SELECT left(
     regexp_replace(lower(coalesce(raw_value, '')), '[^a-z0-9._]+', '', 'g'),
     24
   )
 $$;
 
+CREATE OR REPLACE FUNCTION public.normalize_phone(raw_value text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+AS $
+  SELECT regexp_replace(coalesce(raw_value, ''), '[^0-9+]+', '', 'g')
+$$;
+
 CREATE OR REPLACE FUNCTION public.make_unique_username(base_username text, current_user_id uuid DEFAULT NULL)
 RETURNS text
 LANGUAGE plpgsql
-AS $$
+AS $
 DECLARE
   sanitized_base text;
   candidate text;
@@ -131,7 +138,7 @@ BEGIN
     EXIT WHEN NOT EXISTS (
       SELECT 1
       FROM public.users
-      WHERE lower(username) = lower(candidate)
+      WHERE lower(coalesce(username, '')) = lower(candidate)
         AND (current_user_id IS NULL OR id <> current_user_id)
     );
 
@@ -141,6 +148,64 @@ BEGIN
   RETURN candidate;
 END;
 $$;
+
+CREATE OR REPLACE FUNCTION public.enforce_public_user_identity_uniqueness()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $
+DECLARE
+  normalized_username text;
+  normalized_email text;
+  normalized_phone text;
+BEGIN
+  normalized_username := NULLIF(public.normalize_username(NEW.username), '');
+  normalized_email := NULLIF(lower(trim(coalesce(NEW.email, ''))), '');
+  normalized_phone := NULLIF(public.normalize_phone(NEW.phone), '');
+
+  IF normalized_username IS NULL THEN
+    RAISE EXCEPTION 'Username is required';
+  END IF;
+
+  NEW.username := normalized_username;
+  NEW.email := normalized_email;
+  NEW.phone := normalized_phone;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.users
+    WHERE lower(username) = normalized_username
+      AND id <> COALESCE(NEW.id, gen_random_uuid())
+  ) THEN
+    RAISE EXCEPTION 'Username already exists';
+  END IF;
+
+  IF normalized_email IS NOT NULL AND EXISTS (
+    SELECT 1
+    FROM public.users
+    WHERE lower(email) = normalized_email
+      AND id <> COALESCE(NEW.id, gen_random_uuid())
+  ) THEN
+    RAISE EXCEPTION 'Email already exists';
+  END IF;
+
+  IF normalized_phone IS NOT NULL AND EXISTS (
+    SELECT 1
+    FROM public.users
+    WHERE public.normalize_phone(phone) = normalized_phone
+      AND id <> COALESCE(NEW.id, gen_random_uuid())
+  ) THEN
+    RAISE EXCEPTION 'Phone already exists';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_users_identity_uniqueness ON public.users;
+CREATE TRIGGER trg_users_identity_uniqueness
+BEFORE INSERT OR UPDATE ON public.users
+FOR EACH ROW
+EXECUTE FUNCTION public.enforce_public_user_identity_uniqueness();
 
 DROP TABLE IF EXISTS public.user_professional_profiles CASCADE;
 CREATE TABLE public.user_professional_profiles (
@@ -688,23 +753,25 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$
+AS $
 DECLARE
-  requested_role TEXT;
+  requested_role text;
   safe_role public.user_role;
-  matched_user_id UUID;
-  requested_username TEXT;
-  safe_username TEXT;
+  matched_user_id uuid;
+  target_tenant_id uuid;
+  safe_username text;
+  membership_role_type text;
 BEGIN
-  requested_role := LOWER(COALESCE(NEW.raw_user_meta_data ->> 'role', 'customer'));
-  requested_username := COALESCE(
-    NULLIF(NEW.raw_user_meta_data ->> 'username', ''),
-    NULLIF(split_part(lower(COALESCE(NEW.email, '')), '@', 1), ''),
-    NULLIF(public.normalize_username(NEW.raw_user_meta_data ->> 'full_name'), ''),
-    NULLIF(regexp_replace(coalesce(NEW.phone, ''), '[^0-9]+', '', 'g'), ''),
-    'user'
+  requested_role := lower(coalesce(NEW.raw_user_meta_data ->> 'role', 'customer'));
+  safe_username := public.make_unique_username(
+    COALESCE(
+      NULLIF(NEW.raw_user_meta_data ->> 'username', ''),
+      NULLIF(split_part(lower(coalesce(NEW.email, '')), '@', 1), ''),
+      NULLIF(public.normalize_username(NEW.raw_user_meta_data ->> 'full_name'), ''),
+      NULLIF(public.normalize_phone(NEW.phone), ''),
+      'user'
+    )
   );
-  safe_username := public.make_unique_username(requested_username);
 
   safe_role := CASE
     WHEN requested_role = 'electrician' THEN 'electrician'::public.user_role
@@ -719,13 +786,19 @@ BEGIN
   END;
 
   SELECT id
+  INTO target_tenant_id
+  FROM public.tenants
+  WHERE slug = 'mahalaxmi-electricals'
+  LIMIT 1;
+
+  SELECT id
   INTO matched_user_id
   FROM public.users
   WHERE auth_user_id IS NULL
     AND (
-      (NEW.email IS NOT NULL AND email IS NOT NULL AND LOWER(email) = LOWER(NEW.email))
+      (NEW.email IS NOT NULL AND email IS NOT NULL AND lower(email) = lower(NEW.email))
       OR
-      (NEW.phone IS NOT NULL AND phone IS NOT NULL AND phone = NEW.phone)
+      (NEW.phone IS NOT NULL AND phone IS NOT NULL AND public.normalize_phone(phone) = public.normalize_phone(NEW.phone))
     )
   ORDER BY created_at
   LIMIT 1;
@@ -734,20 +807,32 @@ BEGIN
     UPDATE public.users
     SET
       auth_user_id = NEW.id,
-      username = COALESCE(NULLIF(username, ''), public.make_unique_username(safe_username, id)),
-      email = COALESCE(NULLIF(NEW.email, ''), email),
-      phone = COALESCE(NULLIF(NEW.phone, ''), phone),
+      default_tenant_id = COALESCE(default_tenant_id, target_tenant_id),
+      username = COALESCE(NULLIF(username, ''), safe_username),
+      email = COALESCE(NULLIF(lower(NEW.email), ''), email),
+      phone = COALESCE(NULLIF(public.normalize_phone(NEW.phone), ''), phone),
       full_name = COALESCE(NULLIF(NEW.raw_user_meta_data ->> 'full_name', ''), full_name, 'User'),
       role = COALESCE(role, safe_role),
       last_login_at = NEW.last_sign_in_at,
-      updated_at = NOW()
+      updated_at = now()
     WHERE id = matched_user_id;
   ELSE
     INSERT INTO public.users (
-      auth_user_id, username, role, full_name, phone, email, status, verification_status, is_admin_verified, last_login_at
+      auth_user_id,
+      default_tenant_id,
+      username,
+      role,
+      full_name,
+      phone,
+      email,
+      status,
+      verification_status,
+      is_admin_verified,
+      last_login_at
     )
     VALUES (
       NEW.id,
+      target_tenant_id,
       safe_username,
       safe_role,
       COALESCE(
@@ -755,15 +840,49 @@ BEGIN
         split_part(COALESCE(NULLIF(NEW.email, ''), NULLIF(NEW.phone, ''), 'user'), '@', 1),
         'User'
       ),
-      NULLIF(NEW.phone, ''),
-      NULLIF(NEW.email, ''),
+      NULLIF(public.normalize_phone(NEW.phone), ''),
+      NULLIF(lower(NEW.email), ''),
       'active',
-      CASE WHEN safe_role = 'customer' THEN 'verified'::public.verification_status ELSE 'pending'::public.verification_status END,
-      CASE WHEN safe_role = 'customer' THEN TRUE ELSE FALSE END,
+      CASE
+        WHEN safe_role = 'customer' THEN 'verified'::public.verification_status
+        ELSE 'pending'::public.verification_status
+      END,
+      CASE
+        WHEN safe_role = 'customer' THEN TRUE
+        ELSE FALSE
+      END,
       NEW.last_sign_in_at
     )
     ON CONFLICT (auth_user_id) DO NOTHING;
+
+    SELECT id
+    INTO matched_user_id
+    FROM public.users
+    WHERE auth_user_id = NEW.id
+    LIMIT 1;
   END IF;
+
+  IF matched_user_id IS NOT NULL AND target_tenant_id IS NOT NULL THEN
+    SELECT c.udt_name
+    INTO membership_role_type
+    FROM information_schema.columns c
+    WHERE c.table_schema = 'public'
+      AND c.table_name = 'tenant_memberships'
+      AND c.column_name = 'role'
+    LIMIT 1;
+
+    EXECUTE format(
+      'INSERT INTO public.tenant_memberships (
+         tenant_id, user_id, role, is_default, is_active
+       )
+       VALUES ($1, $2, $3::public.%I, TRUE, TRUE)
+       ON CONFLICT (tenant_id, user_id) DO UPDATE
+       SET role = EXCLUDED.role, is_default = TRUE, is_active = TRUE, updated_at = now()',
+      COALESCE(membership_role_type, 'user_role')
+    )
+    USING target_tenant_id, matched_user_id, safe_role::text;
+  END IF;
+
   RETURN NEW;
 END;
 $$;
@@ -787,7 +906,11 @@ END;
 $$;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_auth_user();
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+AFTER INSERT ON auth.users
+FOR EACH ROW
+EXECUTE FUNCTION public.handle_new_auth_user();
 DROP TRIGGER IF EXISTS on_auth_user_updated ON auth.users;
 CREATE TRIGGER on_auth_user_updated AFTER UPDATE OF email, phone, raw_user_meta_data, last_sign_in_at ON auth.users FOR EACH ROW EXECUTE FUNCTION public.sync_auth_user_profile();
 
