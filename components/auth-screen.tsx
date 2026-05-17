@@ -67,6 +67,13 @@ function mapAuthErrorMessage(error: unknown) {
     return "Signup could not finish because the Supabase signup trigger is still failing. Run db/auth_trigger_username_roles_repair.sql in Supabase first, then try again.";
   }
 
+  if (
+    message.toLowerCase().includes("error sending confirmation email") ||
+    message.includes("535 5.7.8")
+  ) {
+    return "Signup reached email confirmation, but your SMTP credentials were rejected by Gmail. Recheck the SMTP username, app password, host, port, and encryption settings in Supabase Auth.";
+  }
+
   if (message.toLowerCase().includes("user already registered")) {
     return "This email is already registered. Log in instead or use another email address.";
   }
