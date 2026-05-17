@@ -58,7 +58,7 @@ BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$ LANGUAGE plpgsql SET search_path = '';
+$$ LANGUAGE plpgsql SET search_path = '';
 
 DROP TABLE IF EXISTS public.users CASCADE;
 CREATE TABLE public.users (
@@ -95,6 +95,7 @@ CREATE OR REPLACE FUNCTION public.normalize_username(raw_value text)
 RETURNS text
 LANGUAGE sql
 IMMUTABLE
+SET search_path = ''
 AS $$
   SELECT left(
     regexp_replace(lower(coalesce(raw_value, '')), '[^a-z0-9._]+', '', 'g'),
@@ -642,7 +643,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$ LANGUAGE plpgsql SET search_path = '';
+$$ LANGUAGE plpgsql SET search_path = '';
 
 CREATE TRIGGER trigger_set_default_site_code
 BEFORE INSERT ON public.sites
@@ -678,7 +679,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$ LANGUAGE plpgsql SET search_path = '';
+$$ LANGUAGE plpgsql SET search_path = '';
 
 CREATE TRIGGER trg_users_admin_limit BEFORE INSERT OR UPDATE OF role ON public.users FOR EACH ROW EXECUTE FUNCTION public.enforce_admin_limit();
 
