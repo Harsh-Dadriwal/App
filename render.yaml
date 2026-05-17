@@ -21,6 +21,9 @@ services:
     branch: main
     autoDeploy: true
 
+    # Allow all public traffic (required by Render's schema)
+    ipAllowList: []
+
     # Render injects PORT automatically; NestJS reads it in main.ts
     envVars:
       - key: NODE_ENV
