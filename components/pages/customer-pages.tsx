@@ -292,9 +292,9 @@ export function CustomerSitesPage() {
 
   useEffect(() => {
     if (editingSiteId) return;
-    if (siteCreateStep >= 2 && (!form.site_code.trim() || !form.site_name.trim())) setSiteCreateStep(1);
+    if (siteCreateStep >= 2 && !form.site_name.trim()) setSiteCreateStep(1);
     else if (siteCreateStep >= 3 && (!form.site_address_line1.trim() || !form.city.trim() || !form.state.trim())) setSiteCreateStep(2);
-  }, [editingSiteId, siteCreateStep, form.site_code, form.site_name, form.site_address_line1, form.city, form.state]);
+  }, [editingSiteId, siteCreateStep, form.site_name, form.site_address_line1, form.city, form.state]);
 
   const emptySiteForm = {
     site_code: "",
