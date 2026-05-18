@@ -38,3 +38,7 @@ yarn-error.log*
 next-env.d.ts
 next-swc.darwin-arm64.node
 .aider*
+# Monorepo Compiled Outputs
+apps/api/dist/
+*.tsbuildinfo
+.expo/
