@@ -65,3 +65,14 @@ export async function generateRequirementProcurement(
   });
   return handleResponse<any>(res);
 }
+
+export async function updateRequirementBatch(
+  batchId: string,
+  body: { site_id?: string | null }
+) {
+  const res = await apiFetch(`/api/v1/requirements/${batchId}`, {
+    method: "PATCH",
+    body: JSON.stringify(body)
+  });
+  return handleResponse<any>(res);
+}

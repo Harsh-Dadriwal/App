@@ -938,6 +938,21 @@ export class RequirementsService {
     };
   }
 
+  async updateBatch(
+    actor: RequestActor,
+    batchId: string,
+    body: { site_id?: string | null }
+  ) {
+    const batch = await this.getBatchRow(batchId);
+    await this.assertReviewAccess(actor, batch.tenant_id);
+
+    await this.updateBatchStatus(batchId, {
+      site_id: body.site_id ?? null
+    });
+
+    return this.getBatch(actor, batchId);
+  }
+
   async reviewItem(
     actor: RequestActor,
     batchId: string,

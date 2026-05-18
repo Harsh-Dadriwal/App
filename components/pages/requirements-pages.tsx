@@ -31,7 +31,8 @@ import {
   generateRequirementProcurement,
   getRequirementBatch,
   listRequirementBatches,
-  reviewRequirementBatchItem
+  reviewRequirementBatchItem,
+  updateRequirementBatch
 } from "@/lib/backend/modules/requirements-gateway";
 
 type IntakeRole = "customer" | "electrician" | "architect";
@@ -450,6 +451,30 @@ export function AdminRequirementsPage() {
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const selectedBatch = useRequirementBatchDetail(selectedBatchId);
 
+  const siteOptions = useRows(
+    async (client) => {
+      const { data, error } = await client
+        .from("sites")
+        .select("id, site_name")
+        .order("site_name");
+      return { data: (data ?? []) as any[], error: error?.message ?? null };
+    },
+    []
+  );
+
+  async function handleLinkSite(siteId: string) {
+    if (!selectedBatchId) return;
+
+    const ok = await mutation.run(
+      () => updateRequirementBatch(selectedBatchId, { site_id: siteId || null }),
+      "Site linked to the requirement batch successfully."
+    );
+
+    if (!ok) return;
+
+    await Promise.all([selectedBatch.refetch(), batches.refetch()]);
+  }
+
   const visibleBatches = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return batches.data;
@@ -573,12 +598,42 @@ export function AdminRequirementsPage() {
           }}
         >
           <div className="page-stack">
-            <div className="button-row">
+            <div className="button-row" style={{ display: "flex", gap: 16, alignItems: "flex-end", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary, #666)" }}>
+                  Link Site for Procurement
+                </label>
+                <select
+                  value={selectedBatch.data?.site_id || ""}
+                  onChange={(e) => void handleLinkSite(e.target.value)}
+                  disabled={mutation.isSubmitting}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 6,
+                    border: "1px solid var(--border-color, #ccc)",
+                    backgroundColor: "var(--bg-card, #fff)",
+                    color: "var(--text-main, #333)",
+                    minWidth: 240,
+                    height: 38,
+                    fontSize: 14
+                  }}
+                >
+                  <option value="">-- Select a Site --</option>
+                  {(siteOptions.data || []).map((site: any) => (
+                    <option key={site.id} value={site.id}>
+                      {site.site_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <button
                 type="button"
                 className="primary-button"
                 onClick={() => void handleGenerateProcurement()}
-                disabled={mutation.isSubmitting}
+                disabled={mutation.isSubmitting || !selectedBatch.data?.site_id}
+                title={!selectedBatch.data?.site_id ? "A site must be linked before procurement draft can be generated" : ""}
+                style={{ height: 38 }}
               >
                 Generate procurement draft
               </button>

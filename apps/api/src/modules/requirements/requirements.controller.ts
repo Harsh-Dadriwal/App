@@ -73,6 +73,17 @@ export class RequirementsController {
     };
   }
 
+  @Patch(":id")
+  async updateBatch(
+    @Req() request: AuthenticatedRequest,
+    @Param("id") id: string,
+    @Body() body: { site_id?: string | null }
+  ) {
+    return {
+      data: await this.requirementsService.updateBatch(request.actor!, id, body)
+    };
+  }
+
   @Patch(":batchId/items/:itemId/review")
   async reviewItem(
     @Req() request: AuthenticatedRequest,
