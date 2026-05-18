@@ -2,9 +2,12 @@ import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
 
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const supabase = await getSupabaseBrowserClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  let session = null;
+
+  if (supabase) {
+    const { data } = await supabase.auth.getSession();
+    session = data.session;
+  }
 
   const headers = new Headers(options.headers);
 
