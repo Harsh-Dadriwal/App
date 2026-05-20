@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -81,6 +82,17 @@ export class RequirementsController {
   ) {
     return {
       data: await this.requirementsService.updateBatch(request.actor!, id, body)
+    };
+  }
+
+  @Delete(":id")
+  async deleteBatch(
+    @Req() request: AuthenticatedRequest,
+    @Param("id") id: string
+  ) {
+    await this.requirementsService.deleteBatch(request.actor!, id);
+    return {
+      success: true
     };
   }
 

@@ -12,6 +12,14 @@ function normalizeMutationError(error: MutationErrorLike) {
   return typeof error === "string" ? error : error?.message ?? null;
 }
 
+export function broadcastMutation() {
+  if (typeof window !== "undefined") {
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("supabase-mutation"));
+    }, 0);
+  }
+}
+
 export function useSharedMutationAction() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +47,9 @@ export function useSharedMutationAction() {
         setSuccess(successMessage);
       }
 
+      // Instantly trigger global refresh of all active UI data views
+      broadcastMutation();
+
       return true;
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Action failed.");
@@ -55,3 +66,4 @@ export function useSharedMutationAction() {
 
   return { loading, error, success, run, reset };
 }
+

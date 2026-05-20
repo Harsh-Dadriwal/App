@@ -19,9 +19,15 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     headers.set("Content-Type", "application/json");
   }
 
+  // Disable aggressive caching to ensure data is always fresh and fetched instantly
+  headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
+  headers.set("Pragma", "no-cache");
+  headers.set("Expires", "0");
+
   const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}${endpoint}`;
 
   return fetch(url, {
+    cache: "no-store",
     ...options,
     headers,
   });

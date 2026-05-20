@@ -996,14 +996,47 @@ export function AdminCatalogPage() {
       [category.name, category.slug].some((value) => String(value ?? "").toLowerCase().includes(query))
     );
   }, [categories.data, categorySearch]);
-  const filteredBrands = useMemo(() => {
+  const consolidatedBrands = useMemo(() => {
+    const groups = new Map<string, {
+      name: string;
+      slug: string;
+      sort_order: number;
+      rows: any[];
+    }>();
+
+    brands.data.forEach((brand: any) => {
+      if (!brand.name) return;
+      const key = brand.name.trim().toLowerCase();
+      const existing = groups.get(key);
+      if (existing) {
+        existing.rows.push(brand);
+      } else {
+        groups.set(key, {
+          name: brand.name,
+          slug: brand.slug,
+          sort_order: brand.sort_order ?? 0,
+          rows: [brand]
+        });
+      }
+    });
+
+    return Array.from(groups.values());
+  }, [brands.data]);
+
+  const filteredConsolidatedBrands = useMemo(() => {
     const query = brandSearch.trim().toLowerCase();
-    if (!query) return brands.data;
-    return brands.data.filter((brand: any) =>
-      [brand.name, brand.slug, categoryLookup.get(brand.category_id)]
-        .some((value) => String(value ?? "").toLowerCase().includes(query))
-    );
-  }, [brands.data, brandSearch, categoryLookup]);
+    if (!query) return consolidatedBrands;
+    return consolidatedBrands.filter((brand: any) => {
+      const matchName = brand.name.toLowerCase().includes(query);
+      const matchSlug = brand.slug.toLowerCase().includes(query);
+      const matchCategory = brand.rows.some((row: any) => {
+        const catName = categoryLookup.get(row.category_id);
+        return String(catName ?? "").toLowerCase().includes(query);
+      });
+      return matchName || matchSlug || matchCategory;
+    });
+  }, [consolidatedBrands, brandSearch, categoryLookup]);
+
 
   function closeCategoryModal() {
     setEditingCategoryId(null);
@@ -1296,39 +1329,91 @@ export function AdminCatalogPage() {
         <QueryState
           loading={brands.loading}
           error={brands.error}
-          hasData={filteredBrands.length > 0}
+          hasData={filteredConsolidatedBrands.length > 0}
           empty={{ title: "No brands yet", description: "Create brands here after your categories are ready." }}
         >
           <CardGrid>
-            {filteredBrands.map((brand: any) => (
-              <DataCard key={brand.id} title={brand.name} subtitle={categoryLookup.get(brand.category_id) ?? "Unlinked category"} meta={`Sort ${brand.sort_order ?? 0}`}>
-                <p>{brand.slug}</p>
-                <p>Products linked: {productCountsByBrand.get(brand.id) ?? 0}</p>
-                <div className="inline-actions">
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => {
-                      setEditingBrandId(brand.id);
-                      setBrandSlugTouched(false);
-                      setBrandForm({
-                        category_id: brand.category_id ?? "",
-                        name: brand.name ?? "",
-                        slug: brand.slug ?? "",
-                        sort_order: String(brand.sort_order ?? 0)
-                      });
-                      brandMutation.reset();
-                      setIsBrandModalOpen(true);
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button type="button" className="secondary-button" onClick={() => void deleteBrand(brand.id)} disabled={brandMutation.isSubmitting}>
-                    Delete
-                  </button>
-                </div>
-              </DataCard>
-            ))}
+            {filteredConsolidatedBrands.map((brand: any) => {
+              const totalProducts = brand.rows.reduce((sum: number, r: any) => sum + (productCountsByBrand.get(r.id) ?? 0), 0);
+
+              return (
+                <DataCard key={brand.slug} title={brand.name} subtitle={brand.slug} meta={`Sort ${brand.sort_order ?? 0}`}>
+                  <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: "var(--text-primary, #1e293b)" }}>Linked Categories:</p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+                    {brand.rows.map((row: any) => {
+                      const catName = categoryLookup.get(row.category_id) ?? "Unlinked category";
+                      return (
+                        <div
+                          key={row.id}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            backgroundColor: "rgba(148, 163, 184, 0.08)",
+                            border: "1px solid rgba(148, 163, 184, 0.2)",
+                            borderRadius: 100,
+                            padding: "4px 10px",
+                            fontSize: 12
+                          }}
+                        >
+                          <span style={{ color: "var(--text-secondary, #475569)" }}>{catName}</span>
+                          <button
+                            type="button"
+                            style={{ border: "none", background: "none", color: "#d97706", cursor: "pointer", fontSize: 11, padding: "2px 4px", display: "inline-flex", alignItems: "center" }}
+                            onClick={() => {
+                              setEditingBrandId(row.id);
+                              setBrandSlugTouched(false);
+                              setBrandForm({
+                                category_id: row.category_id ?? "",
+                                name: row.name ?? "",
+                                slug: row.slug ?? "",
+                                sort_order: String(row.sort_order ?? 0)
+                              });
+                              brandMutation.reset();
+                              setIsBrandModalOpen(true);
+                            }}
+                            title={`Edit linkage for ${catName}`}
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            type="button"
+                            style={{ border: "none", background: "none", color: "#dc2626", cursor: "pointer", fontSize: 11, padding: "2px 4px", display: "inline-flex", alignItems: "center" }}
+                            onClick={() => void deleteBrand(row.id)}
+                            disabled={brandMutation.isSubmitting}
+                            title={`Delete linkage for ${catName}`}
+                          >
+                            ❌
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--text-muted, #64748b)" }}>Total products linked: {totalProducts}</p>
+                  <div style={{ marginTop: 12 }}>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      style={{ width: "100%", fontSize: 12, padding: "6px 8px" }}
+                      onClick={() => {
+                        setEditingBrandId(null);
+                        setBrandSlugTouched(false);
+                        setBrandForm({
+                          category_id: "",
+                          name: brand.name,
+                          slug: brand.slug,
+                          sort_order: String(brand.sort_order)
+                        });
+                        brandMutation.reset();
+                        setIsBrandModalOpen(true);
+                      }}
+                    >
+                      + Link to another category
+                    </button>
+                  </div>
+                </DataCard>
+              );
+            })}
           </CardGrid>
         </QueryState>
       </PageSection>

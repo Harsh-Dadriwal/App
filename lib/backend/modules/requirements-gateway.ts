@@ -76,3 +76,10 @@ export async function updateRequirementBatch(
   });
   return handleResponse<any>(res);
 }
+
+export async function deleteRequirementBatch(batchId: string) {
+  const res = await apiFetch(`/api/v1/requirements/${batchId}`, {
+    method: "DELETE"
+  });
+  return handleResponse<any>(res);
+}

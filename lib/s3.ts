@@ -71,3 +71,20 @@ export function getS3PublicBaseUrl() {
   const region = getRequiredEnv("AWS_REGION");
   return `https://${bucket}.s3.${region}.amazonaws.com`;
 }
+
+export function getServeUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  if (url.includes("cloudflarestorage.com") || url.includes("amazonaws.com")) {
+    try {
+      const parsed = new URL(url);
+      const pathParts = parsed.pathname.split("/").filter(Boolean);
+      if (pathParts[0] === "product-image-store" || pathParts[0] === "photo-product-bucket") {
+        return `/api/view-image?key=${pathParts.slice(1).join("/")}`;
+      }
+      return `/api/view-image?key=${pathParts.join("/")}`;
+    } catch {
+      return url;
+    }
+  }
+  return url;
+}

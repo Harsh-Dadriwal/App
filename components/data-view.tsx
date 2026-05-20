@@ -150,6 +150,19 @@ export function useRows<T>(
     };
   }, [...deps, reloadKey, options?.enabled]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleMutation = () => {
+      setReloadKey((k) => k + 1);
+    };
+
+    window.addEventListener("supabase-mutation", handleMutation);
+    return () => {
+      window.removeEventListener("supabase-mutation", handleMutation);
+    };
+  }, []);
+
   return { data, error, loading, refetch: () => setReloadKey((value) => value + 1) };
 }
 

@@ -2,9 +2,10 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   UnauthorizedException
 } from "@nestjs/common";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
 import {
   REQUIREMENT_BATCH_STATUS,
@@ -149,8 +150,14 @@ function detectCategory(line: string) {
   return null;
 }
 
+function isMissingRequirementSchemaError(message: string) {
+  return /relation .*requirement_batch/i.test(message) || /column .*requirement_batch/i.test(message);
+}
+
 @Injectable()
 export class RequirementsService {
+  private readonly logger = new Logger(RequirementsService.name);
+
   constructor(
     private readonly supabaseAdmin: SupabaseAdminService,
     private readonly tenantAccess: TenantAccessService,
@@ -390,6 +397,27 @@ export class RequirementsService {
     }
   }
 
+  /**
+   * Fire-and-forget: kick off the processing pipeline in the background.
+   * Any errors are caught, logged, and the batch status set to 'failed'.
+   * The caller does NOT await this — the HTTP response returns immediately.
+   */
+  private fireAndForgetPipeline(batchId: string, actorId?: string | null) {
+    // Intentionally NOT awaited by the caller
+    this.runPreprocessStage(batchId, actorId).catch(async (err: any) => {
+      this.logger.error(
+        `Pipeline failed for batch ${batchId}: ${err?.message ?? String(err)}`
+      );
+      try {
+        await this.updateBatchStatus(batchId, {
+          status: REQUIREMENT_BATCH_STATUS.FAILED
+        });
+      } catch (_e) {
+        // best-effort
+      }
+    });
+  }
+
   private async persistExtractedItems(batch: RequirementBatchRow, items: ExtractedItemDraft[]) {
     if (!items.length) {
       return [];
@@ -511,6 +539,26 @@ export class RequirementsService {
     }
   }
 
+  private async fetchSourceBuffer(source: any): Promise<Buffer> {
+    if (!source.storage_bucket || !source.storage_key) {
+      throw new Error("Source does not have a stored object reference.");
+    }
+
+    const object = (await this.getStorageClient().send(
+      new GetObjectCommand({
+        Bucket: source.storage_bucket,
+        Key: source.storage_key
+      })
+    )) as any;
+
+    if (!object.Body) {
+      throw new Error("Source object body is empty.");
+    }
+
+    const bytes = await object.Body.transformToByteArray();
+    return Buffer.from(bytes);
+  }
+
   private async runPreprocessStage(batchId: string, actorId?: string | null) {
     const batch = await this.getBatchRow(batchId);
     await this.updateBatchStatus(batch.id, {
@@ -572,6 +620,51 @@ export class RequirementsService {
         continue;
       }
 
+      if (source.source_type === REQUIREMENT_SOURCE_TYPE.PDF) {
+        try {
+          const buffer = await this.fetchSourceBuffer(source);
+          const pdfParse = require("pdf-parse");
+          const pdfData = await pdfParse(buffer);
+          const text = pdfData.text || "";
+          if (text.trim()) {
+            extracted.push(...this.parsePlainText(text, source.id));
+            await this.supabaseAdmin
+              .getClient()
+              .from("requirement_batch_sources")
+              .update({ raw_text: text })
+              .eq("id", source.id);
+            continue;
+          }
+        } catch (err: any) {
+          this.logger.error(`Failed to parse PDF text: ${err.message}`);
+        }
+      }
+
+      if (source.source_type === REQUIREMENT_SOURCE_TYPE.XLSX) {
+        try {
+          const buffer = await this.fetchSourceBuffer(source);
+          const XLSX = require("xlsx");
+          const workbook = XLSX.read(buffer, { type: "buffer" });
+          let fullText = "";
+          for (const sheetName of workbook.SheetNames) {
+            const sheet = workbook.Sheets[sheetName];
+            const csvText = XLSX.utils.sheet_to_csv(sheet);
+            fullText += csvText + "\n";
+          }
+          if (fullText.trim()) {
+            extracted.push(...this.parseCsv(fullText, source.id));
+            await this.supabaseAdmin
+              .getClient()
+              .from("requirement_batch_sources")
+              .update({ raw_text: fullText })
+              .eq("id", source.id);
+            continue;
+          }
+        } catch (err: any) {
+          this.logger.error(`Failed to parse Excel file: ${err.message}`);
+        }
+      }
+
       extracted.push(...this.createManualReviewPlaceholder(source));
     }
 
@@ -617,6 +710,22 @@ export class RequirementsService {
   private async runMatchStage(batchId: string) {
     const batch = await this.getBatchRow(batchId);
     const items = await this.getBatchItems(batchId);
+
+    if (!items.length) {
+      return;
+    }
+
+    const itemIds = items.map((item: any) => item.id);
+    const candidateDelete = await this.supabaseAdmin
+      .getClient()
+      .from("requirement_batch_item_candidates")
+      .delete()
+      .in("requirement_batch_item_id", itemIds);
+
+    if (candidateDelete.error) {
+      throw new Error(candidateDelete.error.message);
+    }
+
     const productsResult = await this.supabaseAdmin
       .getReadClient()
       .from("products")
@@ -768,6 +877,50 @@ export class RequirementsService {
     return result.data ?? [];
   }
 
+  private async maybeRunMatchStageAfterOcr(batchId: string) {
+    const batch = await this.getBatchRow(batchId);
+    const batchStatus = batch.status as RequirementBatchStatus;
+    if (
+      batchStatus !== REQUIREMENT_BATCH_STATUS.PROCESSING &&
+      batchStatus !== REQUIREMENT_BATCH_STATUS.QUEUED
+    ) {
+      return false;
+    }
+
+    const sources = await this.getBatchSources(batchId);
+    const ocrSources = sources.filter((source) => this.isOcrSource(source));
+
+    if (!ocrSources.length) {
+      await this.runMatchStage(batchId);
+      return true;
+    }
+
+    const sourceIds = ocrSources.map((source) => source.id);
+    const itemsResult = await this.supabaseAdmin
+      .getClient()
+      .from("requirement_batch_items")
+      .select("source_id")
+      .eq("requirement_batch_id", batchId)
+      .in("source_id", sourceIds);
+
+    if (itemsResult.error) {
+      throw new Error(itemsResult.error.message);
+    }
+
+    const completedSourceIds = new Set(
+      (itemsResult.data ?? [])
+        .map((item: { source_id: string | null }) => item.source_id)
+        .filter((sourceId): sourceId is string => Boolean(sourceId))
+    );
+
+    if (sourceIds.some((sourceId) => !completedSourceIds.has(sourceId))) {
+      return false;
+    }
+
+    await this.runMatchStage(batchId);
+    return true;
+  }
+
   async createTextBatch(actor: RequestActor, body: CreateRequirementTextBatchRequestDto) {
     const tenantId = await this.requireTenant(actor);
     const batch = await this.insertBatch({
@@ -797,12 +950,8 @@ export class RequirementsService {
       sourceType: REQUIREMENT_SOURCE_TYPE.PLAIN_TEXT
     });
 
-    await this.enqueueOrRun(
-      QUEUE_NAMES.requirementPreprocess,
-      REQUIREMENT_PREPROCESS_JOB,
-      { batchId: batch.id, actorId: actor.appUserId },
-      () => this.runPreprocessStage(batch.id, actor.appUserId)
-    );
+    // Fire pipeline in background — don't block the HTTP response
+    this.fireAndForgetPipeline(batch.id, actor.appUserId);
 
     return batch;
   }
@@ -870,12 +1019,8 @@ export class RequirementsService {
       filename: file.originalname
     });
 
-    await this.enqueueOrRun(
-      QUEUE_NAMES.requirementPreprocess,
-      REQUIREMENT_PREPROCESS_JOB,
-      { batchId: batch.id, actorId: actor.appUserId },
-      () => this.runPreprocessStage(batch.id, actor.appUserId)
-    );
+    // Fire pipeline in background — don't block the HTTP response
+    this.fireAndForgetPipeline(batch.id, actor.appUserId);
 
     return batch;
   }
@@ -895,6 +1040,11 @@ export class RequirementsService {
 
     const result = await query;
     if (result.error) {
+      if (isMissingRequirementSchemaError(result.error.message)) {
+        throw new BadRequestException(
+          "Requirement ingestion tables are not deployed yet. Apply db/requirement_ingestion_foundation.sql to this environment."
+        );
+      }
       throw new Error(result.error.message);
     }
     return result.data ?? [];
@@ -944,13 +1094,81 @@ export class RequirementsService {
     body: { site_id?: string | null }
   ) {
     const batch = await this.getBatchRow(batchId);
-    await this.assertReviewAccess(actor, batch.tenant_id);
+    await this.tenantAccess.assertTenantAccess(actor, batch.tenant_id);
+
+    // Allow the batch creator OR admin/architect to update it
+    if (actor.role !== "admin" && actor.role !== "architect" && batch.created_by !== actor.appUserId) {
+      throw new ForbiddenException("Only the batch creator or an admin can update this batch.");
+    }
 
     await this.updateBatchStatus(batchId, {
       site_id: body.site_id ?? null
     });
 
     return this.getBatch(actor, batchId);
+  }
+
+  async deleteBatch(actor: RequestActor, batchId: string) {
+    const batch = await this.getBatchRow(batchId);
+    await this.tenantAccess.assertTenantAccess(actor, batch.tenant_id);
+
+    if (actor.role !== "admin" && actor.role !== "customer" && batch.created_by !== actor.appUserId) {
+      throw new ForbiddenException("Only administrators, customers, or the batch creator can delete requirement batches.");
+    }
+
+    // 1. Fetch all sources for this batch to delete their files from S3/R2
+    const sourcesResult = await this.supabaseAdmin
+      .getClient()
+      .from("requirement_batch_sources")
+      .select("storage_bucket, storage_key")
+      .eq("requirement_batch_id", batchId);
+
+    if (sourcesResult.data && sourcesResult.data.length > 0) {
+      const storageClient = this.getStorageClient();
+      for (const source of sourcesResult.data) {
+        if (source.storage_bucket && source.storage_key) {
+          try {
+            await storageClient.send(
+              new DeleteObjectCommand({
+                Bucket: source.storage_bucket,
+                Key: source.storage_key
+              })
+            );
+            this.logger.log(`Successfully deleted S3 object: ${source.storage_key}`);
+          } catch (err: any) {
+            this.logger.error(
+              `Failed to delete S3 object ${source.storage_key}: ${err?.message ?? String(err)}`
+            );
+            // Don't block the database cleanup if S3 delete fails
+          }
+        }
+      }
+    }
+
+    // 2. Delete candidates and items
+    await this.clearBatchArtifacts(batchId);
+
+    // 3. Delete sources from Supabase
+    const sourcesDelete = await this.supabaseAdmin
+      .getClient()
+      .from("requirement_batch_sources")
+      .delete()
+      .eq("requirement_batch_id", batchId);
+    
+    if (sourcesDelete.error) {
+      throw new Error(sourcesDelete.error.message);
+    }
+
+    // 4. Delete the batch itself from Supabase
+    const batchDelete = await this.supabaseAdmin
+      .getClient()
+      .from("requirement_batches")
+      .delete()
+      .eq("id", batchId);
+
+    if (batchDelete.error) {
+      throw new Error(batchDelete.error.message);
+    }
   }
 
   async reviewItem(
@@ -1207,7 +1425,40 @@ export class RequirementsService {
   }
 
   async processOcrJob(batchId: string, sourceId: string) {
-    await this.requirementOcrService.processOcrPayload({ batchId, sourceId });
-    await this.runMatchStage(batchId);
+    try {
+      await this.requirementOcrService.processOcrPayload({ batchId, sourceId });
+    } catch (err: any) {
+      this.logger.error(`OCR failed for batch ${batchId}, source ${sourceId}: ${err?.message ?? String(err)}`);
+      // Insert a placeholder item so the batch can still progress to review
+      try {
+        const batch = await this.getBatchRow(batchId);
+        const sources = await this.getBatchSources(batchId);
+        const source = sources.find((s) => s.id === sourceId);
+        if (source) {
+          await this.persistExtractedItems(batch, [
+            {
+              sourceId: source.id,
+              rawText: `OCR failed for file: ${source.original_filename ?? "uploaded image"}. Please review manually.`,
+              normalizedText: null,
+              extractedQuantity: null,
+              extractedUnit: null,
+              extractedBrand: null,
+              extractedSpecifications: null,
+              extractedDimensions: null,
+              extractedCategory: null,
+              extractionConfidence: 0.1,
+              reviewStatus: REQUIREMENT_REVIEW_STATUS.NEEDS_REVIEW
+            }
+          ]);
+        }
+      } catch (_e) {
+        // best-effort placeholder insertion
+      }
+    }
+    try {
+      await this.maybeRunMatchStageAfterOcr(batchId);
+    } catch (matchErr: any) {
+      this.logger.error(`Match stage failed after OCR for batch ${batchId}: ${matchErr?.message ?? String(matchErr)}`);
+    }
   }
 }

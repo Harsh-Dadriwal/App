@@ -126,21 +126,28 @@ export async function getSupabaseReadBrowserClient() {
     return null;
   }
 
+  // Reuse the primary browser client if no separate read URL is configured,
+  // preventing localStorage conflicts and auth promise hangs on first load!
+  const hasSeparateRead = resolveEnvValue([
+    "NEXT_PUBLIC_SUPABASE_READ_URL",
+    "EXPO_PUBLIC_SUPABASE_READ_URL"
+  ]);
+  
+  if (!hasSeparateRead) {
+    return getSupabaseBrowserClient();
+  }
+
   const url = resolveEnvValue([
     "NEXT_PUBLIC_SUPABASE_READ_URL",
-    "EXPO_PUBLIC_SUPABASE_READ_URL",
-    "NEXT_PUBLIC_SUPABASE_URL",
-    "EXPO_PUBLIC_SUPABASE_URL"
+    "EXPO_PUBLIC_SUPABASE_READ_URL"
   ]);
   const anonKey = resolveEnvValue([
     "NEXT_PUBLIC_SUPABASE_READ_ANON_KEY",
-    "EXPO_PUBLIC_SUPABASE_READ_ANON_KEY",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-    "EXPO_PUBLIC_SUPABASE_ANON_KEY"
+    "EXPO_PUBLIC_SUPABASE_READ_ANON_KEY"
   ]);
 
   if (!url || !anonKey) {
-    return null;
+    return getSupabaseBrowserClient();
   }
 
   if (!readBrowserClientPromise) {

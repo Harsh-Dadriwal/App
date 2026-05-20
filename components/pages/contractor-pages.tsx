@@ -22,6 +22,7 @@ import {
   useRows
 } from "@/components/data-view";
 import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
+import { getServeUrl } from "@/lib/s3";
 import { roleLabels, type AppRole } from "@mahalaxmi/core/types/domain";
 import {
   markOrderItemSupplied,
@@ -2439,7 +2440,7 @@ export function AdminProductsPage() {
               </label>
               {form.image_url ? (
                 <div className="product-media">
-                  <img src={form.image_url} alt={form.item_name || "Product image"} />
+                  <img src={getServeUrl(form.image_url)} alt={form.item_name || "Product image"} />
                 </div>
               ) : null}
               <p className="form-field-hint" style={{ marginBottom: 0 }}>
@@ -2534,7 +2535,7 @@ export function AdminProductsPage() {
               </label>
               {form.image_url ? (
                 <div className="product-media">
-                  <img src={form.image_url} alt={form.item_name || "Product image"} />
+                  <img src={getServeUrl(form.image_url)} alt={form.item_name || "Product image"} />
                 </div>
               ) : null}
               <div className="form-actions">
@@ -2579,7 +2580,7 @@ export function AdminProductsPage() {
               >
                 {product.image_url ? (
                   <div className="product-media">
-                    <img src={product.image_url} alt={product.item_name} />
+                    <img src={getServeUrl(product.image_url)} alt={product.item_name} />
                   </div>
                 ) : null}
                 <p>Unit: {product.unit}</p>
