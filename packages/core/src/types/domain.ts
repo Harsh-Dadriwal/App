@@ -93,6 +93,50 @@ export type MaintenanceTaskStatus =
 
 export const MAINTENANCE_TASK_STATUS = TASK_STATUS;
 
+export const LEAD_STATUS = {
+  NEW: "new",
+  CONTACTED: "contacted",
+  QUOTED: "quoted",
+  SAMPLE_DISPATCHED: "sample_dispatched",
+  WON: "won",
+  LOST: "lost"
+} as const;
+
+export type LeadStatus = (typeof LEAD_STATUS)[keyof typeof LEAD_STATUS];
+
+export type LeadConfiguration = {
+  productId?: string | null;
+  productName?: string | null;
+  brand?: string | null;
+  kelvin?: number | null;
+  cri?: number | null;
+  ugr?: number | null;
+  lumens?: number | null;
+  compareMode?: "before" | "after";
+  roomType?: string | null;
+  dealValue?: number | null;
+  priorityScore?: number | null;
+  slaBreached?: boolean;
+  [key: string]: any;
+};
+
+export type Lead = {
+  id: string;
+  tenant_id: string;
+  requester_user_id: string | null;
+  product_id: string | null;
+  module: string;
+  room_type: string | null;
+  contact_name: string;
+  contact_phone: string | null;
+  contact_email: string | null;
+  notes: string | null;
+  status: LeadStatus;
+  configuration: LeadConfiguration;
+  created_at: string;
+};
+
+
 export const BID_STATUS = {
   PENDING: "PENDING",
   ACCEPTED: "ACCEPTED",
@@ -221,10 +265,10 @@ export const roleLabels: Record<AppRole, string> = {
   electrician: "Electrician",
   architect: "Architect",
   supplier: "Supplier",
-  pop_man: "POP Man",
+  pop_man: "POP Contractor",
   carpenter: "Carpenter",
   painter: "Painter",
-  tiles_man: "Tiles Man",
+  tiles_man: "Tiling Contractor",
   plumber: "Plumber"
 };
 

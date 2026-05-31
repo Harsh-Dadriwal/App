@@ -710,3 +710,199 @@ const styles = StyleSheet.create({
 });
 
 export const uiStyles = styles;
+
+export function BottomActionSheet({
+  visible,
+  onClose,
+  title,
+  children
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <Pressable style={sheetStyles.overlay} onPress={onClose}>
+        <Pressable style={sheetStyles.container} pointerEvents="box-none">
+          <View style={sheetStyles.handle} />
+          <View style={sheetStyles.header}>
+            <Text style={sheetStyles.title}>{title}</Text>
+            <Pressable style={sheetStyles.closeBtn} onPress={onClose}>
+              <Feather name="x" size={20} color={palette.ink} />
+            </Pressable>
+          </View>
+          <View style={sheetStyles.content}>{children}</View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+import { PanResponder, Animated, Modal } from "react-native";
+import { useRef, useMemo } from "react";
+
+export function SlideToConfirm({
+  label = "Slide to confirm",
+  onConfirm,
+  color = palette.brand
+}: {
+  label?: string;
+  onConfirm: () => void;
+  color?: string;
+}) {
+  const pan = useRef(new Animated.Value(0)).current;
+  const containerWidth = useRef(0);
+  const knobWidth = 50;
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onPanResponderMove: (_, gestureState) => {
+          const maxDx = containerWidth.current - knobWidth - 8;
+          if (gestureState.dx > 0) {
+            pan.setValue(Math.min(gestureState.dx, maxDx));
+          }
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          const maxDx = containerWidth.current - knobWidth - 8;
+          if (gestureState.dx >= maxDx * 0.85) {
+            Animated.timing(pan, {
+              toValue: maxDx,
+              duration: 100,
+              useNativeDriver: true,
+            }).start(() => {
+              onConfirm();
+              Animated.timing(pan, {
+                toValue: 0,
+                duration: 200,
+                useNativeDriver: true,
+              }).start();
+            });
+          } else {
+            Animated.spring(pan, {
+              toValue: 0,
+              useNativeDriver: true,
+            }).start();
+          }
+        },
+      }),
+    [onConfirm, pan]
+  );
+
+  return (
+    <View
+      style={slideStyles.track}
+      onLayout={(e) => {
+        containerWidth.current = e.nativeEvent.layout.width;
+      }}
+    >
+      <Text style={slideStyles.label}>{label}</Text>
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={[
+          slideStyles.knob,
+          {
+            backgroundColor: color,
+            transform: [{ translateX: pan }],
+          },
+        ]}
+      >
+        <Feather name="chevrons-right" size={20} color="#fff" />
+      </Animated.View>
+    </View>
+  );
+}
+
+const sheetStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.4)",
+    justifyContent: "flex-end",
+  },
+  container: {
+    backgroundColor: palette.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 12,
+    paddingBottom: 34,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: palette.line,
+  },
+  handle: {
+    width: 44,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: palette.lineStrong,
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: palette.ink,
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: palette.surfaceSoft,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: palette.line,
+  },
+  content: {
+    gap: 12,
+  },
+});
+
+const slideStyles = StyleSheet.create({
+  track: {
+    height: 58,
+    borderRadius: 20,
+    backgroundColor: palette.surfaceSoft,
+    borderWidth: 1,
+    borderColor: palette.lineStrong,
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    overflow: "hidden",
+    position: "relative",
+  },
+  label: {
+    textAlign: "center",
+    fontWeight: "800",
+    fontSize: 14,
+    color: palette.muted,
+    width: "100%",
+  },
+  knob: {
+    position: "absolute",
+    left: 4,
+    width: 50,
+    height: 50,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+});
+

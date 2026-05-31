@@ -392,6 +392,10 @@ DECLARE
   new_total NUMERIC;
   next_status public.order_item_status;
   item_product_id UUID;
+  current_available NUMERIC;
+  current_reserved NUMERIC;
+  reserved_deduction NUMERIC;
+  available_deduction NUMERIC;
 BEGIN
   IF NOT public.is_admin_user() AND public.current_profile_role() != 'supplier'::public.user_role THEN
     RAISE EXCEPTION 'Only admin or supplier can mark supply';
@@ -414,10 +418,20 @@ BEGIN
       shop_confirmed_at = COALESCE(shop_confirmed_at, NOW())
   WHERE id = target_order_item_id;
 
+  -- Query current product_inventory values
+  SELECT COALESCE(available_qty, 0), COALESCE(reserved_qty, 0)
+  INTO current_available, current_reserved
+  FROM public.product_inventory
+  WHERE product_id = item_product_id;
+
+  -- Calculate how much can be deducted from reserved_qty and available_qty
+  reserved_deduction := LEAST(current_reserved, COALESCE(supplied_qty, 0));
+  available_deduction := COALESCE(supplied_qty, 0) - reserved_deduction;
+
   -- Deduct from inventory
   UPDATE public.product_inventory
-  SET available_qty = GREATEST(available_qty - COALESCE(supplied_qty, 0), 0),
-      reserved_qty = GREATEST(reserved_qty - COALESCE(supplied_qty, 0), 0)
+  SET available_qty = GREATEST(available_qty - available_deduction, 0),
+      reserved_qty = GREATEST(reserved_qty - reserved_deduction, 0)
   WHERE product_id = item_product_id;
 
   RETURN public.record_order_item_status(target_order_item_id, next_status, note_text);

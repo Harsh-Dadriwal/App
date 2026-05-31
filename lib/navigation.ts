@@ -6,10 +6,10 @@ export const roleLabels: Record<AppRole, string> = {
   electrician: "Electrician",
   architect: "Architect",
   supplier: "Supplier",
-  pop_man: "POP Man",
+  pop_man: "POP Contractor",
   carpenter: "Carpenter",
   painter: "Painter",
-  tiles_man: "Tiles Man",
+  tiles_man: "Tiling Contractor",
   plumber: "Plumber"
 };
 

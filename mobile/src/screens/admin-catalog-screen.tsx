@@ -14,7 +14,7 @@ function slugify(value: string) {
 }
 
 export function AdminCatalogScreen() {
-  const { profile } = useAuth();
+  const { profile, activeTenant } = useAuth();
   const categoryMutation = useMutationAction();
   const brandMutation = useMutationAction();
   const [categoryName, setCategoryName] = useState("");
@@ -24,17 +24,29 @@ export function AdminCatalogScreen() {
   const [brandCategoryId, setBrandCategoryId] = useState("");
 
   const categories = useRows(async (client) => {
-    const { data, error } = await client.from("product_categories").select("id, name, slug").order("name");
+    let query = client.from("product_categories").select("id, name, slug");
+    if (activeTenant?.id) {
+      query = query.eq("tenant_id", activeTenant.id);
+    }
+    const { data, error } = await query.order("name");
     return { data: (data ?? []) as any[], error: error?.message ?? null };
-  }, []);
+  }, [activeTenant?.id]);
   const brands = useRows(async (client) => {
-    const { data, error } = await client.from("product_brands").select("id, name, slug, category_id").order("name");
+    let query = client.from("product_brands").select("id, name, slug, category_id");
+    if (activeTenant?.id) {
+      query = query.eq("tenant_id", activeTenant.id);
+    }
+    const { data, error } = await query.order("name");
     return { data: (data ?? []) as any[], error: error?.message ?? null };
-  }, []);
+  }, [activeTenant?.id]);
   const products = useRows(async (client) => {
-    const { data, error } = await client.from("products").select("id, brand_id, category_id");
+    let query = client.from("products").select("id, brand_id, category_id");
+    if (activeTenant?.id) {
+      query = query.eq("tenant_id", activeTenant.id);
+    }
+    const { data, error } = await query;
     return { data: (data ?? []) as any[], error: error?.message ?? null };
-  }, []);
+  }, [activeTenant?.id]);
 
   const categoryProductCount = useMemo(() => {
     const counts = new Map<string, number>();
@@ -52,7 +64,11 @@ export function AdminCatalogScreen() {
     if (!supabase) return;
     const client = supabase;
     const ok = await categoryMutation.run(
-      async () => client.from("product_categories").insert({ name: categoryName, slug: categorySlug || slugify(categoryName) }),
+      async () => client.from("product_categories").insert({
+        name: categoryName,
+        slug: categorySlug || slugify(categoryName),
+        tenant_id: activeTenant?.id
+      }),
       "Category created."
     );
     if (ok) {
@@ -66,7 +82,12 @@ export function AdminCatalogScreen() {
     if (!supabase) return;
     const client = supabase;
     const ok = await brandMutation.run(
-      async () => client.from("product_brands").insert({ category_id: brandCategoryId, name: brandName, slug: brandSlug || slugify(brandName) }),
+      async () => client.from("product_brands").insert({
+        category_id: brandCategoryId,
+        name: brandName,
+        slug: brandSlug || slugify(brandName),
+        tenant_id: activeTenant?.id
+      }),
       "Brand created."
     );
     if (ok) {

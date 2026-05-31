@@ -1108,8 +1108,55 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  current_required NUMERIC;
+  current_supplied NUMERIC;
+  new_total NUMERIC;
+  next_status public.order_item_status;
+  item_product_id UUID;
+  current_available NUMERIC;
+  current_reserved NUMERIC;
+  reserved_deduction NUMERIC;
+  available_deduction NUMERIC;
 BEGIN
-  RETURN public.mark_order_supply_progress(target_order_item_id, supplied_qty, note_text);
+  IF NOT public.is_admin_user() AND public.current_profile_role() != 'supplier'::public.user_role THEN
+    RAISE EXCEPTION 'Only admin or supplier can mark supply';
+  END IF;
+
+  SELECT quantity_required, quantity_supplied, product_id
+  INTO current_required, current_supplied, item_product_id
+  FROM public.order_items
+  WHERE id = target_order_item_id;
+
+  new_total := COALESCE(current_supplied, 0) + COALESCE(supplied_qty, 0);
+  next_status := CASE WHEN new_total >= current_required THEN 'supplied' ELSE 'partially_supplied' END;
+  
+  UPDATE public.order_items
+  SET quantity_supplied = LEAST(new_total, current_required),
+      supplied_by = public.current_profile_id(),
+      supplied_at = NOW(),
+      admin_notes = COALESCE(note_text, admin_notes),
+      shop_confirmed_by = COALESCE(shop_confirmed_by, public.current_profile_id()),
+      shop_confirmed_at = COALESCE(shop_confirmed_at, NOW())
+  WHERE id = target_order_item_id;
+
+  -- Query current product_inventory values
+  SELECT COALESCE(available_qty, 0), COALESCE(reserved_qty, 0)
+  INTO current_available, current_reserved
+  FROM public.product_inventory
+  WHERE product_id = item_product_id;
+
+  -- Calculate how much can be deducted from reserved_qty and available_qty
+  reserved_deduction := LEAST(current_reserved, COALESCE(supplied_qty, 0));
+  available_deduction := COALESCE(supplied_qty, 0) - reserved_deduction;
+
+  -- Deduct from inventory
+  UPDATE public.product_inventory
+  SET available_qty = GREATEST(available_qty - available_deduction, 0),
+      reserved_qty = GREATEST(reserved_qty - reserved_deduction, 0)
+  WHERE product_id = item_product_id;
+
+  RETURN public.record_order_item_status(target_order_item_id, next_status, note_text);
 END;
 $$;
 

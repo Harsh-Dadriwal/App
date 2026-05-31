@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useState, useEffect, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
@@ -8,7 +8,7 @@ import { authRoleOptions } from "@/lib/navigation";
 import type { AppRole } from "@mahalaxmi/core/types/domain";
 
 type AuthMethod = "email" | "phone";
-type AuthMode = "login" | "signup";
+type AuthMode = "login" | "signup" | "forgot_password" | "reset_password";
 
 type EmailFormState = {
   fullName: string;
@@ -92,6 +92,71 @@ export function AuthScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const isReset = searchParams.get("reset") === "true";
+      const hash = window.location.hash;
+      const isRecovery = hash.includes("type=recovery") || hash.includes("access_token=");
+      
+      if (isReset || isRecovery) {
+        setAuthMode("reset_password");
+        setNotice("Reset session active. Please enter your new secure password.");
+      }
+    }
+  }, []);
+
+  async function handleForgotPasswordSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const supabase = await getSupabaseBrowserClient();
+    if (!supabase) return;
+
+    setIsSubmitting(true);
+    setErrorMessage("");
+    setNotice("");
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(emailForm.email, {
+        redirectTo: `${window.location.origin}/auth?reset=true`,
+      });
+
+      if (error) throw error;
+
+      setNotice("A password reset link has been sent to your email.");
+    } catch (error) {
+      setErrorMessage(mapAuthErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleResetPasswordSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const supabase = await getSupabaseBrowserClient();
+    if (!supabase) return;
+
+    setIsSubmitting(true);
+    setErrorMessage("");
+    setNotice("");
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: emailForm.password,
+      });
+
+      if (error) throw error;
+
+      setNotice("Your password has been updated successfully. Redirecting...");
+      setTimeout(() => {
+        router.replace("/");
+      }, 1500);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Password update failed.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   async function completeLoginRedirect(expectedRole?: AppRole) {
     const supabase = await getSupabaseBrowserClient();
@@ -394,54 +459,121 @@ export function AuthScreen() {
       <section className="auth-panel">
         <div className="auth-panel-inner">
           <div className="auth-panel-header" style={{ marginBottom: '2.5rem' }}>
-            <span className="eyebrow">{authMode === "login" ? "Welcome Back" : "Create Account"}</span>
-            <h2>{authMode === "login" ? "Access your workspace" : "Set up your role-based account"}</h2>
+            <span className="eyebrow">
+              {authMode === "login"
+                ? "Welcome Back"
+                : authMode === "signup"
+                  ? "Create Account"
+                  : authMode === "forgot_password"
+                    ? "Reset Password Request"
+                    : "Set New Password"}
+            </span>
+            <h2>
+              {authMode === "login"
+                ? "Access your workspace"
+                : authMode === "signup"
+                  ? "Set up your role-based account"
+                  : authMode === "forgot_password"
+                    ? "Recover your account password"
+                    : "Secure your account"}
+            </h2>
             <p>
-              {authMethod === "email"
-                ? "Use your email securely. No fuss."
-                : "Use SMS OTP for mobile-first rapid access."}
+              {authMode === "forgot_password"
+                ? "Enter your email to receive a secure recovery link."
+                : authMode === "reset_password"
+                  ? "Enter your new strong password below."
+                  : authMethod === "email"
+                    ? "Use your email securely. No fuss."
+                    : "Use SMS OTP for mobile-first rapid access."}
             </p>
           </div>
 
-          <div className="toggle-row">
-            <div className="segmented-control">
-              <button
-                type="button"
-                className={authMode === "login" ? "is-active" : ""}
-                onClick={() => setAuthMode("login")}
-              >
-                Login
-              </button>
-              <button
-                type="button"
-                className={authMode === "signup" ? "is-active" : ""}
-                onClick={() => setAuthMode("signup")}
-              >
-                Sign Up
-              </button>
+          {authMode !== "forgot_password" && authMode !== "reset_password" ? (
+            <div className="toggle-row">
+              <div className="segmented-control">
+                <button
+                  type="button"
+                  className={authMode === "login" ? "is-active" : ""}
+                  onClick={() => setAuthMode("login")}
+                >
+                  Login
+                </button>
+                <button
+                  type="button"
+                  className={authMode === "signup" ? "is-active" : ""}
+                  onClick={() => setAuthMode("signup")}
+                >
+                  Sign Up
+                </button>
+              </div>
+              <div className="segmented-control">
+                <button
+                  type="button"
+                  className={authMethod === "email" ? "is-active" : ""}
+                  onClick={() => {
+                    setAuthMethod("email");
+                    setOtpSent(false);
+                  }}
+                >
+                  Email
+                </button>
+                <button
+                  type="button"
+                  className={authMethod === "phone" ? "is-active" : ""}
+                  onClick={() => setAuthMethod("phone")}
+                >
+                  Phone
+                </button>
+              </div>
             </div>
-            <div className="segmented-control">
-              <button
-                type="button"
-                className={authMethod === "email" ? "is-active" : ""}
-                onClick={() => {
-                  setAuthMethod("email");
-                  setOtpSent(false);
-                }}
-              >
-                Email
-              </button>
-              <button
-                type="button"
-                className={authMethod === "phone" ? "is-active" : ""}
-                onClick={() => setAuthMethod("phone")}
-              >
-                Phone
-              </button>
-            </div>
-          </div>
+          ) : null}
 
-          {authMethod === "email" ? (
+          {authMode === "forgot_password" ? (
+            <form className="auth-form fade-in" onSubmit={handleForgotPasswordSubmit}>
+              <label>
+                Email address
+                <input
+                  className="input"
+                  type="email"
+                  name="email"
+                  value={emailForm.email}
+                  onChange={onEmailChange}
+                  placeholder="name@example.com"
+                  required
+                />
+              </label>
+              <button type="submit" className="primary-button" disabled={isSubmitting} style={{ marginTop: '1rem' }}>
+                {isSubmitting ? "Sending reset link..." : "Send Reset Link"}
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setAuthMode("login")}
+                style={{ marginTop: '0.5rem', background: 'transparent', border: 'none', color: '#60a5fa', cursor: 'pointer' }}
+              >
+                Back to Login
+              </button>
+            </form>
+          ) : authMode === "reset_password" ? (
+            <form className="auth-form fade-in" onSubmit={handleResetPasswordSubmit}>
+              <label>
+                New Password
+                <input
+                  className="input"
+                  type="password"
+                  name="password"
+                  value={emailForm.password}
+                  onChange={onEmailChange}
+                  placeholder="Enter your new password"
+                  required
+                  minLength={6}
+                />
+              </label>
+              <button type="submit" className="primary-button" disabled={isSubmitting} style={{ marginTop: '1rem' }}>
+                {isSubmitting ? "Updating password..." : "Update Password"}
+              </button>
+            </form>
+          ) : authMethod === "email" ? (
             <form className="auth-form fade-in" onSubmit={handleEmailSubmit}>
               {authMode === "signup" ? (
                 <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -525,7 +657,18 @@ export function AuthScreen() {
                   minLength={6}
                 />
               </label>
-              <button type="submit" className="primary-button" disabled={isSubmitting} style={{ marginTop: '1rem' }}>
+              {authMode === "login" ? (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-0.5rem', marginBottom: '1.25rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode("forgot_password")}
+                    style={{ background: 'transparent', border: 'none', color: '#60a5fa', fontSize: '0.85rem', cursor: 'pointer', padding: 0 }}
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              ) : null}
+              <button type="submit" className="primary-button" disabled={isSubmitting} style={{ marginTop: '0.5rem' }}>
                 {isSubmitting
                   ? "Please wait..."
                   : authMode === "login"

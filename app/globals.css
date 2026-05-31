@@ -511,8 +511,7 @@ textarea::placeholder {
 }
 
 .lighting-bottom-sheet {
-  position: sticky;
-  bottom: 1rem;
+  position: relative;
   border: 1px solid var(--border-color);
   border-radius: 1.4rem;
   background: var(--card-bg);
@@ -520,6 +519,13 @@ textarea::placeholder {
   padding: 1.15rem;
   display: grid;
   gap: 0.95rem;
+}
+
+@media (min-width: 1080px) and (min-height: 800px) {
+  .lighting-bottom-sheet {
+    position: sticky;
+    bottom: 1rem;
+  }
 }
 
 .lighting-bottom-sheet h3 {

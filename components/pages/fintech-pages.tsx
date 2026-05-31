@@ -22,6 +22,10 @@ import {
   postWalletEntry,
   resolveReferralReward
 } from "@/lib/backend/modules/fintech-gateway";
+import {
+  reviewCreditRequest,
+  releaseEscrowAccount
+} from "@/lib/backend/modules/monetization-gateway";
 
 declare global {
   interface Window {
@@ -868,6 +872,95 @@ export function AdminFintechPage() {
   const referralMutation = useMutationAction();
   const walletMutation = useMutationAction();
   const rewardMutation = useMutationAction();
+  const creditMutation = useMutationAction();
+  const escrowMutation = useMutationAction();
+  const riskMutation = useMutationAction();
+
+  const creditRequests = useRows(
+    async (client) => {
+      const { data, error } = await client
+        .from("credit_requests")
+        .select("id, requested_amount, status, purpose, contractor_id, site_id, contractor:users!credit_requests_contractor_id_fkey(full_name, email), site:sites(site_name)")
+        .eq("tenant_id", tenantId)
+        .order("created_at", { ascending: false });
+      return { data: (data ?? []) as any[], error: error?.message ?? null };
+    },
+    [tenantId]
+  );
+
+  const escrows = useRows(
+    async (client) => {
+      const { data, error } = await client
+        .from("escrow_accounts")
+        .select("id, total_escrow_amount, locked_amount, released_amount, disputed_amount, status, customer_id, customer:users!escrow_accounts_customer_id_fkey(full_name), order:site_orders!escrow_accounts_site_order_id_fkey(order_number)")
+        .eq("tenant_id", tenantId)
+        .order("created_at", { ascending: false });
+      return { data: (data ?? []) as any[], error: error?.message ?? null };
+    },
+    [tenantId]
+  );
+
+  const riskProfiles = useRows(
+    async (client) => {
+      const { data, error } = await client
+        .from("contractor_risk_profiles")
+        .select("id, trust_score, credit_limit, outstanding_credit, payment_history_score, repayment_consistency, dispute_count, risk_band, user_id, user:users!contractor_risk_profiles_user_id_fkey(full_name, email)")
+        .eq("tenant_id", tenantId)
+        .order("created_at", { ascending: false });
+      return { data: (data ?? []) as any[], error: error?.message ?? null };
+    },
+    [tenantId]
+  );
+
+  async function handleReviewCredit(requestId: string, status: "approved" | "rejected", approvedAmount?: number, notes?: string) {
+    const ok = await creditMutation.run(
+      async () => reviewCreditRequest(requestId, {
+        status,
+        approvedAmount: approvedAmount ?? 0,
+        notes: notes || `Credit request reviewed and ${status} from admin panel.`
+      }),
+      `Credit request ${status} successfully.`
+    );
+    if (ok) {
+      creditRequests.refetch?.();
+      riskProfiles.refetch?.();
+    }
+  }
+
+  async function handleReleaseEscrow(escrowId: string) {
+    const ok = await escrowMutation.run(
+      async () => releaseEscrowAccount(escrowId, { notes: "Manually released from admin console." }),
+      "Escrow funds successfully released to supplier."
+    );
+    if (ok) {
+      escrows.refetch?.();
+    }
+  }
+
+  async function handleRecalculateRisk(contractorId: string) {
+    const supabase = await getSupabaseBrowserClient();
+    if (!supabase) return;
+    const ok = await riskMutation.run(
+      async () => {
+        const sessionResult = await supabase.auth.getSession();
+        const accessToken = sessionResult.data.session?.access_token;
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/risk/profile/recalculate`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({ tenantId, contractorId })
+        });
+        if (!response.ok) throw new Error(await response.text());
+        return { data: await response.json(), error: null };
+      },
+      "Risk profile recalculated."
+    );
+    if (ok) {
+      riskProfiles.refetch?.();
+    }
+  }
 
   const [planForm, setPlanForm] = useState({
     code: "",
@@ -1411,6 +1504,155 @@ export function AdminFintechPage() {
               row.status
             ])}
           />
+        </QueryState>
+      </PageSection>
+
+      <PageSection
+        title="Finance Review Queue"
+        description="Review and approve outstanding contractor credit requests. Manual review prevents default risks."
+      >
+        <QueryState
+          loading={creditRequests.loading}
+          error={creditRequests.error}
+          hasData={creditRequests.data.length > 0}
+          empty={{
+            title: "No credit requests pending",
+            description: "Contractor credit request entries will appear here for underwriting."
+          }}
+        >
+          <CardGrid>
+            {creditRequests.data.map((req: any) => (
+              <DataCard
+                key={req.id}
+                title={req.contractor?.full_name ?? "Contractor"}
+                subtitle={req.site?.site_name ?? "Project Site"}
+                meta={req.status}
+              >
+                <p className="text-xl font-semibold mb-2">₹{Number(req.requested_amount).toLocaleString("en-IN")}</p>
+                <p className="text-gray-600 dark:text-gray-300 text-sm mb-4">Purpose: {req.purpose ?? "No purpose specified."}</p>
+                {req.status === "draft" || req.status === "submitted" ? (
+                  <div className="inline-actions">
+                    <button
+                      type="button"
+                      className="primary-button text-xs py-1"
+                      onClick={() => void handleReviewCredit(req.id, "approved", req.requested_amount)}
+                      disabled={creditMutation.isSubmitting}
+                    >
+                      Approve Credit
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button text-xs py-1"
+                      onClick={() => void handleReviewCredit(req.id, "rejected")}
+                      disabled={creditMutation.isSubmitting}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500 font-medium">Reviewed & final state</p>
+                )}
+              </DataCard>
+            ))}
+          </CardGrid>
+          <FormNotice error={creditMutation.error} success={creditMutation.success} />
+        </QueryState>
+      </PageSection>
+
+      <PageSection
+        title="Active Escrows Payouts"
+        description="Monitor funds locked in project escrows. Payout once delivery is verified."
+      >
+        <QueryState
+          loading={escrows.loading}
+          error={escrows.error}
+          hasData={escrows.data.length > 0}
+          empty={{
+            title: "No active escrows",
+            description: "Funds locked by customers for supplier orders will be monitored here."
+          }}
+        >
+          <CardGrid>
+            {escrows.data.map((esc: any) => (
+              <DataCard
+                key={esc.id}
+                title={`Order: ${esc.order?.order_number ?? "Order"}`}
+                subtitle={`Customer: ${esc.customer?.full_name ?? "Customer"}`}
+                meta={esc.status}
+              >
+                <div className="text-sm space-y-1 mb-4">
+                  <p>Locked: <span className="font-semibold text-amber-600">₹{Number(esc.locked_amount).toLocaleString("en-IN")}</span></p>
+                  <p>Released: <span className="font-semibold text-emerald-600">₹{Number(esc.released_amount).toLocaleString("en-IN")}</span></p>
+                  <p>Disputed: <span className="font-semibold text-rose-600">₹{Number(esc.disputed_amount).toLocaleString("en-IN")}</span></p>
+                </div>
+                {Number(esc.locked_amount) > 0 ? (
+                  <div className="inline-actions">
+                    <button
+                      type="button"
+                      className="primary-button text-xs py-1"
+                      onClick={() => void handleReleaseEscrow(esc.id)}
+                      disabled={escrowMutation.isSubmitting}
+                    >
+                      Verify & Release
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500 font-medium">Fully settled</p>
+                )}
+              </DataCard>
+            ))}
+          </CardGrid>
+          <FormNotice error={escrowMutation.error} success={escrowMutation.success} />
+        </QueryState>
+      </PageSection>
+
+      <PageSection
+        title="Contractor Trust scoring & Risk Bands"
+        description="Real-time risk scoring, outstanding credit monitoring, and automated banding thresholds."
+      >
+        <QueryState
+          loading={riskProfiles.loading}
+          error={riskProfiles.error}
+          hasData={riskProfiles.data.length > 0}
+          empty={{
+            title: "No risk profiles scored",
+            description: "Contractors will be scored based on payment, dispute, and completion behaviors."
+          }}
+        >
+          <DataTable
+            columns={["Contractor", "Trust Score", "Credit Limit", "Outstanding AR", "Disputes", "Risk Band", "Recalculate"]}
+            rows={riskProfiles.data.map((row: any) => [
+              row.user?.full_name ?? "-",
+              <span key={`ts-${row.id}`} className="font-semibold">{Number(row.trust_score).toFixed(0)}/100</span>,
+              `₹${Number(row.credit_limit).toLocaleString("en-IN")}`,
+              `₹${Number(row.outstanding_credit).toLocaleString("en-IN")}`,
+              row.dispute_count,
+              <span
+                key={`rb-${row.id}`}
+                className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                  row.risk_band === "LOW"
+                    ? "bg-emerald-100 text-emerald-800"
+                    : row.risk_band === "MODERATE"
+                    ? "bg-blue-100 text-blue-800"
+                    : row.risk_band === "HIGH"
+                    ? "bg-amber-100 text-amber-800"
+                    : "bg-rose-100 text-rose-800"
+                }`}
+              >
+                {row.risk_band}
+              </span>,
+              <button
+                key={`act-${row.id}`}
+                type="button"
+                className="secondary-button text-xs py-0.5 px-2"
+                onClick={() => void handleRecalculateRisk(row.user_id)}
+                disabled={riskMutation.isSubmitting}
+              >
+                Score
+              </button>
+            ])}
+          />
+          <FormNotice error={riskMutation.error} success={riskMutation.success} />
         </QueryState>
       </PageSection>
     </div>

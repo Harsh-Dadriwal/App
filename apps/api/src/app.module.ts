@@ -15,6 +15,8 @@ import { TenancyModule } from "./common/tenancy/tenancy.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
 import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
 import { RequirementsModule } from "./modules/requirements/requirements.module";
+import { RiskModule } from "./modules/risk/risk.module";
+import { MonetizationModule } from "./modules/monetization/monetization.module";
 
 @Module({
   imports: [
@@ -36,7 +38,9 @@ import { RequirementsModule } from "./modules/requirements/requirements.module";
     InventoryModule,
     PaymentsModule,
     MaintenanceModule,
-    RequirementsModule
+    RequirementsModule,
+    RiskModule,
+    MonetizationModule
   ],
   controllers: [HealthController]
 })

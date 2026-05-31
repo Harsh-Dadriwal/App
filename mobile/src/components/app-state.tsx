@@ -5,7 +5,7 @@ import { useSharedMutationAction } from "@mahalaxmi/core/hooks/use-mutation-acti
 export function useRows<T>(
   fetcher: (client: NonNullable<typeof supabase>) => Promise<{ data: T[]; error: string | null }>,
   deps: any[],
-  options?: { realtimeTable?: string; clientType?: "primary" | "read" }
+  options?: { realtimeTable?: string; clientType?: "primary" | "read"; enabled?: boolean }
 ) {
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +18,14 @@ export function useRows<T>(
     let currentClient: typeof supabase | null = null;
     
     void (async () => {
+      if (options?.enabled === false) {
+        if (active) {
+          setLoading(false);
+          setError(null);
+        }
+        return;
+      }
+
       const resolvedClientType =
         options?.clientType ?? (options?.realtimeTable ? "primary" : "read");
       const client = resolvedClientType === "read" ? supabaseRead : supabase;
@@ -58,7 +66,7 @@ export function useRows<T>(
         }, 100);
       }
     };
-  }, [...deps, reloadKey]);
+  }, [...deps, reloadKey, options?.enabled]);
 
   return { data, loading, error, refetch: () => setReloadKey((value) => value + 1) };
 }

@@ -33,6 +33,8 @@ type BrowserSupabaseClient = {
     signInWithPassword: (params: unknown) => Promise<any>;
     signInWithOtp: (params: unknown) => Promise<any>;
     verifyOtp: (params: unknown) => Promise<any>;
+    resetPasswordForEmail: (email: string, options?: any) => Promise<any>;
+    updateUser: (attributes: any) => Promise<any>;
   };
   from: (table: string) => any;
   rpc: (fn: string, args?: Record<string, unknown>) => Promise<any>;

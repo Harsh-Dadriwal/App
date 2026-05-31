@@ -931,6 +931,7 @@ export function AdminProductRequestsPage() {
 }
 
 export function AdminCatalogPage() {
+  const { activeTenant } = useAuth();
   const categoryMutation = useMutationAction();
   const brandMutation = useMutationAction();
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -944,26 +945,43 @@ export function AdminCatalogPage() {
   const [categoryForm, setCategoryForm] = useState({ name: "", slug: "", sort_order: "0" });
   const [brandForm, setBrandForm] = useState({ category_id: "", name: "", slug: "", sort_order: "0" });
 
-  const categories = useRows(async (client) => {
-    const { data, error } = await client
-      .from("product_categories")
-      .select("id, name, slug, sort_order")
-      .order("sort_order")
-      .order("name");
-    return { data: (data ?? []) as any[], error: error?.message ?? null };
-  }, []);
-  const brands = useRows(async (client) => {
-    const { data, error } = await client
-      .from("product_brands")
-      .select("id, category_id, name, slug, sort_order")
-      .order("sort_order")
-      .order("name");
-    return { data: (data ?? []) as any[], error: error?.message ?? null };
-  }, []);
-  const products = useRows(async (client) => {
-    const { data, error } = await client.from("products").select("id, category_id, brand_id");
-    return { data: (data ?? []) as any[], error: error?.message ?? null };
-  }, []);
+  const categories = useRows(
+    async (client) => {
+      let query = client
+        .from("product_categories")
+        .select("id, name, slug, sort_order");
+      if (activeTenant?.id) {
+        query = query.eq("tenant_id", activeTenant.id);
+      }
+      const { data, error } = await query.order("sort_order").order("name");
+      return { data: (data ?? []) as any[], error: error?.message ?? null };
+    },
+    [activeTenant?.id]
+  );
+  const brands = useRows(
+    async (client) => {
+      let query = client
+        .from("product_brands")
+        .select("id, category_id, name, slug, sort_order");
+      if (activeTenant?.id) {
+        query = query.eq("tenant_id", activeTenant.id);
+      }
+      const { data, error } = await query.order("sort_order").order("name");
+      return { data: (data ?? []) as any[], error: error?.message ?? null };
+    },
+    [activeTenant?.id]
+  );
+  const products = useRows(
+    async (client) => {
+      let query = client.from("products").select("id, category_id, brand_id");
+      if (activeTenant?.id) {
+        query = query.eq("tenant_id", activeTenant.id);
+      }
+      const { data, error } = await query;
+      return { data: (data ?? []) as any[], error: error?.message ?? null };
+    },
+    [activeTenant?.id]
+  );
   const categoryLookup = useMemo(
     () => new Map(categories.data.map((category: any) => [category.id, category.name])),
     [categories.data]
@@ -1061,7 +1079,8 @@ export function AdminCatalogPage() {
     const payload = {
       name: categoryForm.name,
       slug: categoryForm.slug,
-      sort_order: Number(categoryForm.sort_order || 0)
+      sort_order: Number(categoryForm.sort_order || 0),
+      tenant_id: activeTenant?.id
     };
     const ok = await categoryMutation.run(async () => {
       if (editingCategoryId) {
@@ -1107,7 +1126,8 @@ export function AdminCatalogPage() {
       category_id: brandForm.category_id,
       name: brandForm.name,
       slug: brandForm.slug,
-      sort_order: Number(brandForm.sort_order || 0)
+      sort_order: Number(brandForm.sort_order || 0),
+      tenant_id: activeTenant?.id
     };
     const ok = await brandMutation.run(async () => {
       if (editingBrandId) {

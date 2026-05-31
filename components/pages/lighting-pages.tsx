@@ -151,7 +151,7 @@ export function LightingVisualizerPage({ role }: { role: "customer" | "architect
       return { data: (data ?? []) as LightingProduct[], error: error?.message ?? null };
     },
     [tenantId],
-    { realtimeTable: "lighting_products" },
+    { realtimeTable: "lighting_products", enabled: !!tenantId },
   );
 
   const leads = useRows(
@@ -167,7 +167,7 @@ export function LightingVisualizerPage({ role }: { role: "customer" | "architect
       return { data: (data ?? []) as any[], error: error?.message ?? null };
     },
     [role, tenantId],
-    { realtimeTable: "leads" },
+    { realtimeTable: "leads", enabled: !!tenantId && role === "admin" },
   );
 
   const selectedProduct = useMemo(

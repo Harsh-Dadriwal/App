@@ -1347,7 +1347,7 @@ export class RequirementsService {
           category_name_snapshot: item.extracted_category ?? null,
           brand_name_snapshot: item.extracted_brand ?? null,
           sku_snapshot: productResult.data.sku ?? null,
-          unit_snapshot: item.extracted_unit ?? productResult.data.unit,
+          unit_snapshot: productResult.data.unit,
           quantity_required: quantity,
           unit_price: unitPrice,
           line_subtotal: lineTotal,
