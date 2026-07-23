@@ -128,7 +128,7 @@ const OCR_NOISE_PATTERNS = [
 
 /** Strip numbered-list prefixes like "14)", "15.", "(16)" from the start of a line */
 function stripListPrefix(text: string): string {
-  return text.replace(/^[\s]*(?:\d{1,3}[.)\]:\s]+)/, "").trim();
+  return text.replace(/^\s*(?:\(?\d{1,3}\)?[.):-]\s+)/, "").trim();
 }
 
 function normalizeText(value: string) {
