@@ -17,6 +17,7 @@ import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
 import { RequirementsModule } from "./modules/requirements/requirements.module";
 import { RiskModule } from "./modules/risk/risk.module";
 import { MonetizationModule } from "./modules/monetization/monetization.module";
+import { ProjectsModule } from "./modules/projects/projects.module";
 
 @Module({
   imports: [
@@ -40,7 +41,8 @@ import { MonetizationModule } from "./modules/monetization/monetization.module";
     MaintenanceModule,
     RequirementsModule,
     RiskModule,
-    MonetizationModule
+    MonetizationModule,
+    ProjectsModule
   ],
   controllers: [HealthController]
 })

@@ -6,6 +6,10 @@ import {
   useState,
   type ReactNode
 } from "react";
+import {
+  fetchProfileWithRetry,
+  isRecoverableAuthSessionError
+} from "@mahalaxmi/core/auth";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import type { ActiveTenant, TenantMembership, UserProfile } from "@mahalaxmi/core/types/domain";
 import {
@@ -30,32 +34,6 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-function isRecoverableAuthSessionError(error: unknown) {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-
-  const message = error.message.toLowerCase();
-  return (
-    message.includes("invalid refresh token") ||
-    message.includes("refresh token not found") ||
-    message.includes("invalid_grant")
-  );
-}
-
-async function fetchProfileWithRetry(userId: string, attempts = 8) {
-  let lastError: string | null = null;
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const result = await fetchAppProfile(userId);
-    if (result.data && !result.error) {
-      return result;
-    }
-    lastError = result.error;
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  return { data: null, error: lastError };
-}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -110,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return null;
     }
 
-    const result = await fetchProfileWithRetry(userId);
+    const result = await fetchProfileWithRetry(() => fetchAppProfile(userId));
     if (result.error) {
       setProfile(null);
       setErrorMessage("Signed in, but the mobile app profile could not be loaded.");

@@ -171,3 +171,47 @@ export type ReviewRequirementBatchItemRequestDto = {
 export type GenerateRequirementProcurementRequestDto = {
   site_order_id?: string | null;
 };
+
+export type CreateProjectRequestDto = {
+  tenant_id: string;
+  project_code: string;
+  name: string;
+  customer_id?: string | null;
+  legacy_site_id?: string | null;
+  project_type?: string | null;
+  description?: string | null;
+  address_line1?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+  start_date?: string | null;
+  target_end_date?: string | null;
+  estimated_budget?: number | null;
+};
+
+export type CreateProjectMemberRequestDto = {
+  user_id: string;
+  role_key: string;
+  permission_overrides?: string[];
+};
+
+export type CreateProjectRoomRequestDto = {
+  name: string;
+  room_type?: string | null;
+  floor_label?: string | null;
+  parent_room_id?: string | null;
+  sort_order?: number;
+};
+
+export type CreateProjectTaskRequestDto = {
+  title: string;
+  description?: string | null;
+  room_id?: string | null;
+  parent_task_id?: string | null;
+  priority?: "low" | "medium" | "high" | "critical";
+  category?: string | null;
+  start_date?: string | null;
+  deadline?: string | null;
+  estimated_hours?: number | null;
+  assignee_ids?: string[];
+};

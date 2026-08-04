@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode
 } from "react";
+import { fetchProfileWithRetry } from "@mahalaxmi/core/auth";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@mahalaxmi/core/supabase/client";
 import type { ActiveTenant, TenantMembership, UserProfile } from "@mahalaxmi/core/types/domain";
 import {
@@ -37,23 +38,6 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-async function fetchProfileWithRetry(userId: string, attempts = 8) {
-  let lastError: string | null = null;
-
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const result = await fetchAppProfile(userId);
-
-    if (result.data && !result.error) {
-      return result;
-    }
-
-    lastError = result.error;
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-
-  return { data: null, error: lastError };
-}
 
 function AuthProvider({ children }: { children: ReactNode }) {
   const configured = isSupabaseConfigured();
@@ -93,7 +77,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
       return null;
     }
 
-    const { data, error } = await fetchProfileWithRetry(userId);
+    const { data, error } = await fetchProfileWithRetry(() => fetchAppProfile(userId));
 
     if (error) {
       setErrorMessage(
@@ -138,9 +122,10 @@ function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       setSession(data.session);
+      const sessionUserId = data.session?.user?.id;
 
-      if (data.session?.user?.id) {
-        const profileResult = await fetchProfileWithRetry(data.session.user.id);
+      if (sessionUserId) {
+        const profileResult = await fetchProfileWithRetry(() => fetchAppProfile(sessionUserId));
 
         if (profileResult.error) {
           setErrorMessage(
@@ -161,7 +146,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
         setSession(nextSession);
 
         if (nextSession?.user?.id) {
-          const profileResult = await fetchProfileWithRetry(nextSession.user.id);
+          const profileResult = await fetchProfileWithRetry(() => fetchAppProfile(nextSession.user.id));
           const nextProfile = (profileResult.data ?? null) as UserProfile | null;
           setProfile(nextProfile);
           await fetchTenantContext(nextProfile);
