@@ -9,10 +9,9 @@ export class HealthController {
       service: "mahalaxmi-electricals-api",
       type: "backend-api",
       message:
-        "Backend is running. Open the web app on http://localhost:3000 and use /health for API health.",
+        "Backend is running. Use /health for API health and configure the web app to call this deployment URL in production.",
       routes: {
-        health: "/health",
-        webApp: "http://localhost:3000"
+        health: "/health"
       }
     };
   }

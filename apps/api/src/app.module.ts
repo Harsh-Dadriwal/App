@@ -1,5 +1,5 @@
 import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config"; // 1. Import ConfigModule
+import { ConfigModule } from "@nestjs/config";
 import { IdentityModule } from "./modules/identity/identity.module";
 import { TenantsModule } from "./modules/tenants/tenants.module";
 import { WorkflowsModule } from "./modules/workflows/workflows.module";
@@ -23,10 +23,9 @@ import { PartnerIncentivesModule } from "./modules/partner-incentives/partner-in
 
 @Module({
   imports: [
-    // 2. Add ConfigModule here at the top
     ConfigModule.forRoot({
-      isGlobal: true, // Makes variables available across all modules
-      envFilePath: '.env', // Points to the .env file in apps/api/
+      isGlobal: true,
+      envFilePath: [".env.local", ".env"]
     }),
     SupabaseModule,
     AuthModule,
