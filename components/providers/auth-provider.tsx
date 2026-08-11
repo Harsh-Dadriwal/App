@@ -181,12 +181,17 @@ function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    await supabase.auth.signOut();
-    setSession(null);
-    setProfile(null);
-    setTenantMemberships([]);
-    setActiveTenant(null);
-    setErrorMessage("");
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error("Supabase signOut error:", e);
+    } finally {
+      setSession(null);
+      setProfile(null);
+      setTenantMemberships([]);
+      setActiveTenant(null);
+      setErrorMessage("");
+    }
   }
 
   async function switchTenant(tenantId: string) {

@@ -18,6 +18,8 @@ import { RequirementsModule } from "./modules/requirements/requirements.module";
 import { RiskModule } from "./modules/risk/risk.module";
 import { MonetizationModule } from "./modules/monetization/monetization.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
+import { ProjectMediaModule } from "./modules/project-media/project-media.module";
+import { PartnerIncentivesModule } from "./modules/partner-incentives/partner-incentives.module";
 
 @Module({
   imports: [
@@ -42,7 +44,9 @@ import { ProjectsModule } from "./modules/projects/projects.module";
     RequirementsModule,
     RiskModule,
     MonetizationModule,
-    ProjectsModule
+    ProjectsModule,
+    ProjectMediaModule,
+    PartnerIncentivesModule
   ],
   controllers: [HealthController]
 })

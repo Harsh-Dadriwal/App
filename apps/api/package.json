@@ -6,10 +6,12 @@
     "build": "nest build",
     "start": "node dist/apps/api/src/main.js",
     "start:prod": "node dist/apps/api/src/main.js",
-    "start:dev": "node --watch -r ts-node/register -r tsconfig-paths/register src/main.ts",
+    "start:dev": "node --watch --watch-path=src --watch-path=../../packages/core/src -r ts-node/register -r tsconfig-paths/register src/main.ts",
     "test": "node --test -r ts-node/register -r tsconfig-paths/register src/**/*.test.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1024.0",
+    "@aws-sdk/s3-request-presigner": "^3.1032.0",
     "@mahalaxmi/core": "*",
     "@nestjs/common": "^10.4.8",
     "@nestjs/config": "^4.0.4",
@@ -17,7 +19,9 @@
     "@nestjs/platform-express": "^10.4.8",
     "@supabase/supabase-js": "^2.49.4",
     "bullmq": "^5.12.12",
+    "firebase-admin": "^14.2.0",
     "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.3",
     "pdf-parse": "^2.4.5",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
@@ -29,6 +33,7 @@
   "devDependencies": {
     "@nestjs/cli": "^10.4.8",
     "@types/express": "^5.0.1",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.14.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"

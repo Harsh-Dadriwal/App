@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { SupabaseAdminService } from "../../common/supabase/supabase-admin.service";
 import { DomainEventsService } from "../../common/events/domain-events.service";
 import { TenantAccessService } from "../../common/tenancy/tenant-access.service";
@@ -25,6 +25,15 @@ export class WalletService {
 
   async postWalletEntry(actor: RequestActor, accessToken: string, args: Record<string, unknown>) {
     await this.tenantAccess.assertTenantAccess(actor, String(args.target_tenant_id));
+
+    if (
+      actor.role === "customer" &&
+      args.target_direction === "credit" &&
+      Number(args.target_amount ?? 0) < 500
+    ) {
+      throw new BadRequestException("Minimum deposit amount is ₹500.");
+    }
+
     const data = await this.rpc(accessToken, "post_wallet_entry", args);
     const accountId = String((data as any)?.wallet_account_id ?? args.target_wallet_account_id ?? "");
     if (accountId) {

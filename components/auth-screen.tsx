@@ -17,6 +17,7 @@ type EmailFormState = {
   phone: string;
   password: string;
   role: AppRole;
+  referralCode: string;
 };
 
 type PhoneFormState = {
@@ -25,6 +26,7 @@ type PhoneFormState = {
   phone: string;
   otp: string;
   role: AppRole;
+  referralCode: string;
 };
 
 const defaultEmailForm: EmailFormState = {
@@ -33,7 +35,8 @@ const defaultEmailForm: EmailFormState = {
   email: "",
   phone: "",
   password: "",
-  role: "customer"
+  role: "customer",
+  referralCode: ""
 };
 
 const defaultPhoneForm: PhoneFormState = {
@@ -41,7 +44,8 @@ const defaultPhoneForm: PhoneFormState = {
   username: "",
   phone: "",
   otp: "",
-  role: "customer"
+  role: "customer",
+  referralCode: ""
 };
 
 function normalizeUsername(value: string) {
@@ -79,6 +83,32 @@ function mapAuthErrorMessage(error: unknown) {
   }
 
   return message;
+}
+
+let firebaseScriptPromise: Promise<void> | null = null;
+
+function loadFirebaseScripts() {
+  if (typeof window === "undefined") return Promise.resolve();
+  if ((window as any).firebase) return Promise.resolve();
+  if (firebaseScriptPromise) return firebaseScriptPromise;
+
+  firebaseScriptPromise = new Promise((resolve, reject) => {
+    const appScript = document.createElement("script");
+    appScript.src = "https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js";
+    appScript.async = true;
+    appScript.onload = () => {
+      const authScript = document.createElement("script");
+      authScript.src = "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js";
+      authScript.async = true;
+      authScript.onload = () => resolve();
+      authScript.onerror = () => reject(new Error("Failed to load Firebase Auth Script"));
+      document.body.appendChild(authScript);
+    };
+    appScript.onerror = () => reject(new Error("Failed to load Firebase App Script"));
+    document.body.appendChild(appScript);
+  });
+
+  return firebaseScriptPromise;
 }
 
 export function AuthScreen() {
@@ -285,7 +315,8 @@ export function AuthScreen() {
               full_name: emailForm.fullName,
               username: emailForm.username,
               role: emailForm.role,
-              phone: emailForm.phone
+              phone: emailForm.phone,
+              referral_code: emailForm.referralCode
             }
           }
         });
@@ -353,6 +384,38 @@ export function AuthScreen() {
         });
       }
 
+      const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+
+      if (firebaseApiKey) {
+        await loadFirebaseScripts();
+        const fb = (window as any).firebase;
+
+        if (fb.apps.length === 0) {
+          fb.initializeApp({
+            apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+            authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+            projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+            appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+          });
+        }
+
+        let verifier = (window as any).recaptchaVerifier;
+        if (!verifier) {
+          verifier = new fb.auth.RecaptchaVerifier("recaptcha-container", {
+            size: "invisible",
+            callback: () => {}
+          });
+          (window as any).recaptchaVerifier = verifier;
+        }
+
+        const confirmationResult = await fb.auth().signInWithPhoneNumber(phoneForm.phone, verifier);
+        (window as any).firebaseConfirmationResult = confirmationResult;
+
+        setOtpSent(true);
+        setNotice("OTP sent via Firebase. Enter the code to continue.");
+        return;
+      }
+
       const { error } = await supabase.auth.signInWithOtp({
         phone: phoneForm.phone,
         options: {
@@ -363,7 +426,8 @@ export function AuthScreen() {
                 full_name: phoneForm.fullName,
                 username: phoneForm.username,
                 role: phoneForm.role,
-                phone: phoneForm.phone
+                phone: phoneForm.phone,
+                referral_code: phoneForm.referralCode
               }
               : undefined
         }
@@ -395,6 +459,42 @@ export function AuthScreen() {
     setNotice("");
 
     try {
+      const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+
+      if (firebaseApiKey) {
+        const confirmationResult = (window as any).firebaseConfirmationResult;
+        if (!confirmationResult) {
+          throw new Error("No pending Firebase verification found. Try resending the code.");
+        }
+
+        const result = await confirmationResult.confirm(phoneForm.otp);
+        const idToken = await result.user.getIdToken();
+
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || ""}/api/v1/auth/firebase-login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken })
+        });
+
+        const payload = await response.json();
+        if (!response.ok || !payload?.session?.access_token) {
+          throw new Error(payload?.message || "Exchange session exchange failed.");
+        }
+
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: payload.session.access_token,
+          refresh_token: payload.session.access_token
+        });
+
+        if (sessionError) {
+          throw sessionError;
+        }
+
+        setNotice("Phone verified successfully via Firebase.");
+        await completeLoginRedirect(phoneForm.role);
+        return;
+      }
+
       const { error } = await supabase.auth.verifyOtp({
         phone: phoneForm.phone,
         token: phoneForm.otp,
@@ -629,6 +729,16 @@ export function AuthScreen() {
                       <span style={{ fontSize: '0.75rem', color: '#6ee7b7', background: 'rgba(110, 231, 183, 0.1)', padding: '2px 6px', borderRadius: 4 }}>Default</span>
                     </div>
                   </label>
+                  <label style={{ gridColumn: '1 / -1' }}>
+                    Referral Code (Optional)
+                    <input
+                      className="input"
+                      name="referralCode"
+                      value={emailForm.referralCode}
+                      onChange={onEmailChange}
+                      placeholder="ME-XXXXXX"
+                    />
+                  </label>
                 </div>
               ) : null}
 
@@ -760,6 +870,16 @@ export function AuthScreen() {
                       <span style={{ fontSize: '0.75rem', color: '#6ee7b7', background: 'rgba(110, 231, 183, 0.1)', padding: '2px 6px', borderRadius: 4 }}>Default</span>
                     </div>
                   </label>
+                  <label style={{ gridColumn: '1 / -1' }}>
+                    Referral Code (Optional)
+                    <input
+                      className="input"
+                      name="referralCode"
+                      value={phoneForm.referralCode}
+                      onChange={onPhoneChange}
+                      placeholder="ME-XXXXXX"
+                    />
+                  </label>
                 </div>
               ) : null}
 
@@ -785,6 +905,7 @@ export function AuthScreen() {
 
           {notice ? <div className="notice success fade-in">{notice}</div> : null}
           {errorMessage ? <div className="notice error fade-in">{errorMessage}</div> : null}
+          <div id="recaptcha-container"></div>
         </div>
       </section>
     </main>

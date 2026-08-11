@@ -287,7 +287,7 @@ export function DataTable({
   rows
 }: {
   columns: string[];
-  rows: Array<Array<string | number | null | undefined>>;
+  rows: Array<Array<ReactNode>>;
 }) {
   return (
     <div className="table-shell">

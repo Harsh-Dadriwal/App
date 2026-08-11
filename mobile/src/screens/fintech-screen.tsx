@@ -15,6 +15,7 @@ export function FintechScreen() {
   const customerId = profile?.id ?? "";
   const tenantId = activeTenant?.id ?? "";
 
+  // 1. Fetch Core Wallet Account
   const wallet = useRows(async (client) => {
     const { data, error } = await client
       .from("wallet_accounts")
@@ -25,6 +26,38 @@ export function FintechScreen() {
     return { data: data ? [data as any] : [], error: error?.message ?? null };
   }, [customerId, tenantId], { realtimeTable: "wallet_accounts" });
 
+  // 2. Fetch Contractor Credit Facility details
+  const contractorCredit = useRows(async (client) => {
+    const { data, error } = await client
+      .from("contractors")
+      .select("*")
+      .eq("id", customerId)
+      .maybeSingle();
+    return { data: data ? [data as any] : [], error: error?.message ?? null };
+  }, [customerId], { realtimeTable: "contractors" });
+
+  // 3. Fetch Contractor Detailed Credit Profile
+  const creditProfile = useRows(async (client) => {
+    const { data, error } = await client
+      .from("credit_profiles")
+      .select("*")
+      .eq("contractor_id", customerId)
+      .maybeSingle();
+    return { data: data ? [data as any] : [], error: error?.message ?? null };
+  }, [customerId], { realtimeTable: "credit_profiles" });
+
+  // 4. Fetch Outstanding Invoices
+  const dueInvoices = useRows(async (client) => {
+    const { data, error } = await client
+      .from("invoices")
+      .select("*, project:projects(name)")
+      .eq("contractor_id", customerId)
+      .not("payment_status", "eq", "paid")
+      .order("due_date", { ascending: true });
+    return { data: (data ?? []) as any[], error: error?.message ?? null };
+  }, [customerId], { realtimeTable: "invoices" });
+
+  // 5. Fetch Savings Plan Subscriptions
   const subscriptions = useRows(async (client) => {
     const { data, error } = await client
       .from("savings_plan_subscriptions")
@@ -35,6 +68,7 @@ export function FintechScreen() {
     return { data: (data ?? []) as any[], error: error?.message ?? null };
   }, [customerId, tenantId], { realtimeTable: "savings_plan_subscriptions" });
 
+  // 6. Fetch Savings Plan Installments
   const installments = useRows(async (client) => {
     const subscriptionIds = subscriptions.data.map((sub: any) => sub.id);
     if (!subscriptionIds.length) return { data: [] as any[], error: null };
@@ -68,13 +102,163 @@ export function FintechScreen() {
   }
 
   const walletData = wallet.data[0];
+  const creditData = contractorCredit.data[0];
+  const profileData = creditProfile.data[0];
+
+  // Dynamic status styling
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "green":
+        return palette.success ?? "#16a34a";
+      case "yellow":
+        return "#ca8a04";
+      case "orange":
+        return "#ea580c";
+      case "red":
+      default:
+        return palette.danger ?? "#dc2626";
+    }
+  };
+
+  // Credit utilization percentage
+  const creditLimit = Number(creditData?.credit_limit || 0);
+  const availableCredit = Number(creditData?.available_credit || 0);
+  const outstandingAmount = Number(profileData?.outstanding_amount || 0);
+  const utilizationPercent = creditLimit > 0 ? Math.round((outstandingAmount / creditLimit) * 100) : 0;
 
   return (
     <ScreenShell
       title="Fintech Hub"
-      subtitle="Manage your wallet, savings, and installments directly."
+      subtitle="Manage your wallet, savings, and active credit facilities."
       currentScreen="fintech"
     >
+      
+      {/* SECTION A: CONTRACTOR CREDIT LINE (IF EXISTS) */}
+      {creditData ? (
+        <View style={{ marginBottom: 10 }}>
+          <SectionTitle title="Contractor Credit Line" />
+          <Card tone="default">
+            
+            {/* Frozen warning banner */}
+            {creditData.is_frozen ? (
+              <View style={{ backgroundColor: "#fee2e2", borderLeftWidth: 4, borderColor: "#ef4444", padding: 12, borderRadius: 8, marginBottom: 16 }}>
+                <Text style={{ color: "#991b1b", fontWeight: "800", fontSize: 13, textTransform: "uppercase" }}>
+                  Facility Frozen
+                </Text>
+                <Text style={{ color: "#7f1d1d", fontSize: 12, marginTop: 2, fontWeight: "500" }}>
+                  Your credit limit is frozen. Settle outstanding overdue invoices to reactivate.
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Score & Status Header */}
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <View>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: palette.muted, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  Credit Status
+                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4, gap: 6 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: getStatusColor(creditData.credit_status) }} />
+                  <Text style={{ fontSize: 16, fontWeight: "800", color: getStatusColor(creditData.credit_status), textTransform: "uppercase" }}>
+                    {creditData.credit_status}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: palette.muted, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  Risk Score
+                </Text>
+                <Text style={{ fontSize: 18, fontWeight: "900", color: palette.ink, marginTop: 2 }}>
+                  {creditData.risk_score} <Text style={{ fontSize: 13, color: palette.muted, fontWeight: "500" }}>/100</Text>
+                </Text>
+              </View>
+            </View>
+
+            {/* Balances */}
+            <View style={{ marginTop: 20, flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderColor: palette.line, paddingTop: 16 }}>
+              <View>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: palette.muted, textTransform: "uppercase" }}>Available Credit</Text>
+                <Text style={{ fontSize: 24, fontWeight: "900", color: "#16a34a", marginTop: 2 }}>
+                  ₹{availableCredit.toLocaleString("en-IN")}
+                </Text>
+              </View>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: palette.muted, textTransform: "uppercase" }}>Credit Limit</Text>
+                <Text style={{ fontSize: 24, fontWeight: "900", color: palette.ink, marginTop: 2 }}>
+                  ₹{creditLimit.toLocaleString("en-IN")}
+                </Text>
+              </View>
+            </View>
+
+            {/* Utilization progress bar */}
+            <View style={{ marginTop: 16 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+                <Text style={{ fontSize: 12, fontWeight: "600", color: palette.muted }}>Limit Utilization</Text>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: palette.ink }}>{utilizationPercent}% Used</Text>
+              </View>
+              <View style={{ height: 6, backgroundColor: palette.line, borderRadius: 3, overflow: "hidden" }}>
+                <View style={{ height: "100%", width: `${Math.min(100, utilizationPercent)}%`, backgroundColor: palette.brand }} />
+              </View>
+            </View>
+
+            <View style={{ marginTop: 16, flexDirection: "row", justifyContent: "space-between", fontSize: 12, gap: 10 }}>
+              <Text style={{ fontSize: 12, color: palette.muted, fontWeight: "600" }}>Outstanding: ₹{outstandingAmount.toLocaleString("en-IN")}</Text>
+              <Text style={{ fontSize: 12, color: palette.muted, fontWeight: "600" }}>Term: {creditData.credit_status === "green" ? "30 Days" : creditData.credit_status === "yellow" ? "15 Days" : "Project Linked"}</Text>
+            </View>
+          </Card>
+        </View>
+      ) : null}
+
+      {/* SECTION B: OUTSTANDING INVOICES */}
+      {creditData && dueInvoices.data.length > 0 ? (
+        <View style={{ marginBottom: 10 }}>
+          <SectionTitle title="Outstanding Invoices" />
+          <QueryState
+            loading={dueInvoices.loading}
+            error={dueInvoices.error}
+            hasData={dueInvoices.data.length > 0}
+            empty="No unpaid invoices."
+          >
+            {dueInvoices.data.map((inv: any) => {
+              const isOverdue = new Date(inv.due_date) < now;
+              return (
+                <Card key={inv.id} tone={isOverdue ? "danger" : "default"}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: "800", color: palette.ink }}>
+                        Invoice #{inv.id.slice(0, 8).toUpperCase()}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: palette.muted, marginTop: 2, fontWeight: "600" }}>
+                        Project: {inv.project?.name ?? "Linked project"}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 16, fontWeight: "900", color: isOverdue ? palette.danger : palette.ink }}>
+                      ₹{Number(inv.invoice_amount).toLocaleString("en-IN")}
+                    </Text>
+                  </View>
+
+                  <View style={{ marginTop: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <Text style={{ fontSize: 12, color: isOverdue ? palette.danger : palette.muted, fontWeight: "700" }}>
+                      {isOverdue ? "OVERDUE SINCE:" : "DUE DATE:"} {new Date(inv.due_date).toLocaleDateString("en-IN")}
+                    </Text>
+                    {inv.days_late > 0 ? (
+                      <Text style={{ fontSize: 12, color: palette.danger, fontWeight: "800" }}>
+                        {inv.days_late} days late
+                      </Text>
+                    ) : (
+                      <Text style={{ fontSize: 12, color: "#16a34a", fontWeight: "700" }}>
+                        Within Terms
+                      </Text>
+                    )}
+                  </View>
+                </Card>
+              );
+            })}
+          </QueryState>
+        </View>
+      ) : null}
+
+      {/* SECTION C: CORE WALLET */}
       <SectionTitle title="Core Wallet" />
       <QueryState
         loading={wallet.loading}

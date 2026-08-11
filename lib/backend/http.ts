@@ -1,5 +1,5 @@
 import { createBackendRequester } from "@mahalaxmi/core/gateway/http";
-import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
+import { getActiveAccessToken, getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
 import { getBackendApiBaseUrl, isBackendApiConfigured } from "@/lib/backend/config";
 import type { BackendResult } from "@mahalaxmi/core/types/contracts";
 export type { BackendResult } from "@mahalaxmi/core/types/contracts";
@@ -12,10 +12,14 @@ async function buildAuthHeaders() {
     throw new Error("Supabase auth client is not configured.");
   }
 
-  const sessionResult = await supabase.auth.getSession();
-  const accessToken = sessionResult.data.session && "access_token" in sessionResult.data.session
-    ? (sessionResult.data.session as { access_token?: string | null }).access_token
-    : null;
+  let accessToken = getActiveAccessToken();
+
+  if (!accessToken) {
+    const sessionResult = await supabase.auth.getSession();
+    accessToken = sessionResult.data.session && "access_token" in sessionResult.data.session
+      ? (sessionResult.data.session as { access_token?: string | null }).access_token
+      : null;
+  }
 
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;

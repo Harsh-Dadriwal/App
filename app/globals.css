@@ -1730,3 +1730,33 @@ textarea::placeholder {
     width: 100%;
   }
 }
+
+.progress-track {
+  height: 0.65rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-muted, rgba(31, 26, 20, 0.08));
+  margin-top: 0.9rem;
+}
+
+.progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary), #f59e0b);
+}
+
+.table-action-row {
+  display: inline-flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.table-action-row button {
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  padding: 0.35rem 0.7rem;
+}

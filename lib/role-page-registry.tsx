@@ -39,12 +39,17 @@ import {
   CustomerReferralsPage,
   AdminFintechPage
 } from "@/components/pages/fintech-pages";
+import { AdminCreditPage } from "@/components/pages/credit-pages";
 import { LightingVisualizerPage } from "@/components/pages/lighting-pages";
 import { AdminWorkflowHubPage } from "@/components/order-workflow";
 import {
   AdminRequirementsPage,
   RequirementIntakePage
 } from "@/components/pages/requirements-pages";
+import {
+  AdminPartnerIncentivesPage,
+  PartnerIncentivesPage
+} from "@/components/pages/partner-incentives-pages";
 
 type RolePageEntry = {
   title: string;
@@ -112,6 +117,7 @@ export const rolePageRegistry: RolePageRegistry = {
       component: <ElectricianProjectsPage mode="ongoing" />
     },
     materials: { title: "Material Tracker", component: <ElectricianMaterialsPage /> },
+    incentives: { title: "Partner Incentives", component: <PartnerIncentivesPage /> },
     notes: { title: "Project Notes", component: <ProjectNotesPage role="electrician" /> }
   },
   architect: {
@@ -124,6 +130,7 @@ export const rolePageRegistry: RolePageRegistry = {
       component: <ArchitectProjectsPage mode="ongoing" />
     },
     materials: { title: "Material Tracker", component: <ArchitectMaterialsPage /> },
+    incentives: { title: "Partner Incentives", component: <PartnerIncentivesPage /> },
     requests: { title: "Product Requests", component: <ArchitectProductRequestsPage /> },
     notes: { title: "Project Notes", component: <ProjectNotesPage role="architect" /> }
   },
@@ -138,6 +145,8 @@ export const rolePageRegistry: RolePageRegistry = {
     products: { title: "Products & Inventory", component: <AdminProductsPage /> },
     catalog: { title: "Categories & Brands", component: <AdminCatalogPage /> },
     fintech: { title: "Wallets, Savings & Referrals", component: <AdminFintechPage /> },
+    credit: { title: "Contractor Credit Engine", component: <AdminCreditPage /> },
+    incentives: { title: "Partner Incentives", component: <AdminPartnerIncentivesPage /> },
     requests: { title: "Product Requests", component: <AdminProductRequestsPage /> },
     substitutions: { title: "Substitutions", component: <AdminSubstitutionsPage /> },
     content: { title: "Tips Content", component: <AdminContentPage /> },

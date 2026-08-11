@@ -13,11 +13,13 @@ const roleActions: Record<AppRole, Array<{ label: string; route: MobileScreen }>
   ],
   electrician: [
     { label: "Material tracker", route: "materials" },
+    { label: "Partner incentives", route: "incentives" },
     { label: "Fast order builder", route: "order-builder" },
     { label: "Project notes", route: "notes" }
   ],
   architect: [
     { label: "Lighting visualizer", route: "lighting" },
+    { label: "Partner incentives", route: "incentives" },
     { label: "Create material order", route: "order-builder" },
     { label: "Material reviews", route: "materials" },
     { label: "Project notes", route: "notes" }

@@ -170,6 +170,7 @@ CREATE POLICY project_task_assignees_access ON public.project_task_assignees FOR
 USING (EXISTS (SELECT 1 FROM public.project_tasks pt WHERE pt.id = task_id AND public.can_access_project(pt.project_id)))
 WITH CHECK (EXISTS (SELECT 1 FROM public.project_tasks pt WHERE pt.id = task_id AND public.can_access_project(pt.project_id)));
 
+REVOKE EXECUTE ON FUNCTION public.can_access_project(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.can_access_project(UUID) TO authenticated;
 
 -- Seed the construction roles for every tenant. Administrators may add custom roles without code changes.

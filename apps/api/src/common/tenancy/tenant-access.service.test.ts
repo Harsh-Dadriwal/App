@@ -98,6 +98,30 @@ test("assertTenantAccess rejects users outside the tenant", async () => {
   );
 });
 
+test("assertTenantAdmin grants access immediately for platform admin role", async () => {
+  // No mock results needed — the shortcut returns before any DB call
+  const service = createService({});
+  // Should resolve without throwing
+  await assert.doesNotReject(() =>
+    service.assertTenantAdmin(createActor({ role: "admin" }), "tenant-1")
+  );
+});
+
+test("assertTenantAdmin rejects non-admin membership role", async () => {
+  const service = createService({
+    "tenant_memberships:user_id=app-user-1|tenant_id=tenant-1|is_active=true:maybeSingle": {
+      data: { tenant_id: "tenant-1", role: "member" }
+    }
+  });
+
+  await assert.rejects(
+    () => service.assertTenantAdmin(createActor({ role: "customer" }), "tenant-1"),
+    (error: unknown) =>
+      error instanceof ForbiddenException &&
+      error.message === "Admin tenant access required."
+  );
+});
+
 test("assertOrderItemAccess returns scoped row after validating tenant membership", async () => {
   const service = createService({
     "order_items:id=item-7:maybeSingle": {

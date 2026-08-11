@@ -29,14 +29,14 @@ const tabConfig: Record<string, Array<{ key: MobileScreen; label: string; icon: 
     { key: "dashboard", label: "Home", icon: "home" },
     { key: "order-builder", label: "Order", icon: "shopping-bag" },
     { key: "materials", label: "Tracker", icon: "layers" },
-    { key: "fintech", label: "Fintech", icon: "dollar-sign" }
+    { key: "incentives", label: "Rewards", icon: "award" }
   ],
   architect: [
     { key: "dashboard", label: "Home", icon: "home" },
     { key: "lighting", label: "Lighting", icon: "sun" },
     { key: "order-builder", label: "Order", icon: "shopping-bag" },
     { key: "materials", label: "Tracker", icon: "layers" },
-    { key: "notes", label: "Notes", icon: "message-square" }
+    { key: "incentives", label: "Rewards", icon: "award" }
   ],
   admin: [
     { key: "dashboard", label: "Home", icon: "home" },
@@ -905,4 +905,3 @@ const slideStyles = StyleSheet.create({
     elevation: 2,
   },
 });
-

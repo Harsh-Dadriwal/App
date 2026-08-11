@@ -45,6 +45,13 @@ export class TenantAccessService {
 
   async assertTenantAdmin(actor: RequestActor, tenantId: string) {
     this.requireActorProfile(actor);
+
+    // Platform-level admins are always treated as tenant admins.
+    // This avoids requiring a separate tenant_memberships row with role='admin'.
+    if (actor.role === "admin") {
+      return;
+    }
+
     const result = await this.supabaseAdmin
       .getClient()
       .from("tenant_memberships")

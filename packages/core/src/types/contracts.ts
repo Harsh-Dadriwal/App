@@ -215,3 +215,14 @@ export type CreateProjectTaskRequestDto = {
   estimated_hours?: number | null;
   assignee_ids?: string[];
 };
+
+export type CreateProjectMediaUploadRequestDto = {
+  file_name: string;
+  mime_type: "image/jpeg" | "image/png" | "image/webp" | "image/heic";
+  size_bytes: number;
+  visibility?: "project" | "recipients";
+  recipient_user_ids?: string[];
+  context_type?: "project" | "site" | "room" | "task" | "issue" | "chat";
+  context_id?: string | null;
+  caption?: string | null;
+};

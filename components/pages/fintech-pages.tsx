@@ -327,7 +327,18 @@ export function CustomerWalletPage() {
         <FormGrid>
           <label>
             Amount (₹)
-            <input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="500" />
+            <input
+              type="number"
+              value={depositAmount}
+              onChange={(e) => setDepositAmount(e.target.value)}
+              placeholder="500"
+              min={500}
+            />
+            {depositAmount && Number(depositAmount) < 500 && (
+              <span style={{ fontSize: "0.75rem", color: "#f87171", marginTop: "0.25rem", display: "block" }}>
+                Minimum deposit amount is ₹500.
+              </span>
+            )}
           </label>
         </FormGrid>
         <div className="form-actions">
@@ -336,7 +347,7 @@ export function CustomerWalletPage() {
             buttonLabel={`Deposit ₹${Number(depositAmount || 0).toLocaleString("en-IN")}`}
             merchantName={activeTenant?.app_name ?? "Mahalaxmi Electricals"}
             description="Wallet top-up"
-            disabled={!wallet.data[0]?.id || Number(depositAmount) <= 0}
+            disabled={!wallet.data[0]?.id || Number(depositAmount) < 500}
             receipt={`wallet_${customerId.slice(0, 8)}_${Date.now()}`}
             notes={{
               feature: "wallet_topup",

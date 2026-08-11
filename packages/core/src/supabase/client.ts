@@ -63,6 +63,11 @@ if (typeof window === "undefined") {
 
 let browserClientPromise: Promise<BrowserSupabaseClient | null> | null = null;
 let readBrowserClientPromise: Promise<BrowserSupabaseClient | null> | null = null;
+let activeAccessToken: string | null = null;
+
+export function getActiveAccessToken() {
+  return activeAccessToken;
+}
 
 function resolveEnvValue(keys: string[]) {
   const envMap: Record<string, string | undefined> = {
@@ -109,15 +114,23 @@ export async function getSupabaseBrowserClient() {
   }
 
   if (!browserClientPromise) {
-    browserClientPromise = Promise.resolve(
-      createClient(url, anonKey, {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true
-        }
-      }) as unknown as BrowserSupabaseClient
-    );
+    const client = createClient(url, anonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    });
+
+    client.auth.onAuthStateChange((_event, session) => {
+      activeAccessToken = session?.access_token ?? null;
+    });
+
+    void client.auth.getSession().then(({ data }) => {
+      activeAccessToken = data.session?.access_token ?? null;
+    });
+
+    browserClientPromise = Promise.resolve(client as unknown as BrowserSupabaseClient);
   }
 
   return browserClientPromise;
@@ -153,15 +166,23 @@ export async function getSupabaseReadBrowserClient() {
   }
 
   if (!readBrowserClientPromise) {
-    readBrowserClientPromise = Promise.resolve(
-      createClient(url, anonKey, {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true
-        }
-      }) as unknown as BrowserSupabaseClient
-    );
+    const client = createClient(url, anonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    });
+
+    client.auth.onAuthStateChange((_event, session) => {
+      activeAccessToken = session?.access_token ?? null;
+    });
+
+    void client.auth.getSession().then(({ data }) => {
+      activeAccessToken = data.session?.access_token ?? null;
+    });
+
+    readBrowserClientPromise = Promise.resolve(client as unknown as BrowserSupabaseClient);
   }
 
   return readBrowserClientPromise;
@@ -184,7 +205,7 @@ export function createNativeSupabaseClient(
     return null;
   }
 
-  return createClient(url, anonKey, {
+  const client = createClient(url, anonKey, {
     auth: {
       storage,
       autoRefreshToken: true,
@@ -192,6 +213,16 @@ export function createNativeSupabaseClient(
       detectSessionInUrl: false
     }
   });
+
+  client.auth.onAuthStateChange((_event, session) => {
+    activeAccessToken = session?.access_token ?? null;
+  });
+
+  void client.auth.getSession().then(({ data }) => {
+    activeAccessToken = data.session?.access_token ?? null;
+  });
+
+  return client;
 }
 
 export function createNativeReadSupabaseClient(
@@ -218,7 +249,7 @@ export function createNativeReadSupabaseClient(
     return null;
   }
 
-  return createClient(url, anonKey, {
+  const client = createClient(url, anonKey, {
     auth: {
       storage,
       autoRefreshToken: true,
@@ -226,4 +257,14 @@ export function createNativeReadSupabaseClient(
       detectSessionInUrl: false
     }
   });
+
+  client.auth.onAuthStateChange((_event, session) => {
+    activeAccessToken = session?.access_token ?? null;
+  });
+
+  void client.auth.getSession().then(({ data }) => {
+    activeAccessToken = data.session?.access_token ?? null;
+  });
+
+  return client;
 }

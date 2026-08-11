@@ -7,6 +7,7 @@ export type MobileScreen =
   | "order-builder"
   | "approvals"
   | "materials"
+  | "incentives"
   | "notes"
   | "admin-catalog"
   | "fintech";

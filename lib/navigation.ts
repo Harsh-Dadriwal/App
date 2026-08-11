@@ -70,6 +70,7 @@ export const roleNav: Record<
     { href: "/electrician/projects/market", label: "Assigned to Others", shortLabel: "Market" },
     { href: "/electrician/projects/ongoing", label: "Ongoing Projects", shortLabel: "Ongoing" },
     { href: "/electrician/materials", label: "Material Tracker", shortLabel: "Materials" },
+    { href: "/electrician/incentives", label: "Partner Incentives", shortLabel: "Incentives" },
     { href: "/electrician/notes", label: "Project Notes", shortLabel: "Notes" }
   ],
   architect: [
@@ -79,6 +80,7 @@ export const roleNav: Record<
     { href: "/architect/projects/new", label: "New Projects" },
     { href: "/architect/projects/ongoing", label: "Ongoing Projects", shortLabel: "Ongoing" },
     { href: "/architect/materials", label: "Material Tracker", shortLabel: "Materials" },
+    { href: "/architect/incentives", label: "Partner Incentives", shortLabel: "Incentives" },
     { href: "/architect/requests", label: "Product Requests", shortLabel: "Requests" },
     { href: "/architect/notes", label: "Project Notes", shortLabel: "Notes" }
   ],
@@ -111,6 +113,8 @@ export const roleNav: Record<
     { href: "/admin/products", label: "Products & Inventory", shortLabel: "Products" },
     { href: "/admin/catalog", label: "Categories & Brands", shortLabel: "Catalog" },
     { href: "/admin/fintech", label: "Wallets, Savings & Referrals", shortLabel: "Fintech" },
+    { href: "/admin/credit", label: "Contractor Credit", shortLabel: "Credit" },
+    { href: "/admin/incentives", label: "Partner Incentives", shortLabel: "Incentives" },
     { href: "/admin/requests", label: "Product Requests", shortLabel: "Requests" },
     { href: "/admin/substitutions", label: "Substitutions" },
     { href: "/admin/content", label: "Tips Content", shortLabel: "Content" },
