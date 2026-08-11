@@ -1,8 +1,9 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 @Injectable()
 export class SupabaseAdminService {
+  private readonly logger = new Logger(SupabaseAdminService.name);
   private readonly client: SupabaseClient;
   private readonly readClient: SupabaseClient;
   private readonly url: string;
@@ -11,23 +12,28 @@ export class SupabaseAdminService {
   private readonly readAnonKey: string;
 
   constructor() {
-    const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const readUrl = process.env.SUPABASE_READ_URL || process.env.NEXT_PUBLIC_SUPABASE_READ_URL || url;
+    const rawUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const rawAnonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const anonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!rawUrl || !rawAnonKey) {
+      this.logger.warn(
+        "SUPABASE_URL or SUPABASE_ANON_KEY not set. Operating with fallback placeholder client."
+      );
+    }
+
+    const url = rawUrl || "https://placeholder.supabase.co";
+    const anonKey = rawAnonKey || "placeholder-anon-key";
+    const readUrl = process.env.SUPABASE_READ_URL || process.env.NEXT_PUBLIC_SUPABASE_READ_URL || url;
     const readAnonKey =
       process.env.SUPABASE_READ_ANON_KEY ||
       process.env.NEXT_PUBLIC_SUPABASE_READ_ANON_KEY ||
       anonKey;
 
-    if (!url || !anonKey) {
-      throw new Error("SUPABASE_URL and SUPABASE_ANON_KEY must be configured for the NestJS API.");
-    }
-
     this.url = url;
     this.anonKey = anonKey;
-    this.readUrl = readUrl || url;
-    this.readAnonKey = readAnonKey || anonKey;
+    this.readUrl = readUrl;
+    this.readAnonKey = readAnonKey;
 
     this.client = createClient(url, serviceRoleKey || anonKey, {
       auth: {
@@ -36,7 +42,7 @@ export class SupabaseAdminService {
       }
     });
 
-    this.readClient = createClient(this.readUrl, serviceRoleKey || this.readAnonKey, {
+    this.readClient = createClient(readUrl, serviceRoleKey || readAnonKey, {
       auth: {
         persistSession: false,
         autoRefreshToken: false
