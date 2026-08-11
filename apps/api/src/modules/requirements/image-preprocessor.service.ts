@@ -1,5 +1,4 @@
-import { Injectable } from "@nestjs/common";
-import sharp from "sharp";
+import { Injectable, Logger } from "@nestjs/common";
 
 export type PreprocessedImageResult = {
   buffer: Buffer;
@@ -31,10 +30,43 @@ function clampTargetWidth(width: number) {
   return width;
 }
 
+function loadSharp(): any {
+  try {
+    // Dynamic require so native C++ binary absence does not crash app bootstrap
+    return require("sharp");
+  } catch (err) {
+    return null;
+  }
+}
+
 @Injectable()
 export class ImagePreprocessorService {
+  private readonly logger = new Logger(ImagePreprocessorService.name);
+
   async preprocessForTesseract(rawBuffer: Buffer): Promise<PreprocessedImageResult> {
-    const input = sharp(rawBuffer, { failOn: "none" });
+    const sharpModule = loadSharp();
+    if (!sharpModule) {
+      this.logger.warn("Sharp native module unavailable. Returning raw image buffer without preprocessing.");
+      return {
+        buffer: rawBuffer,
+        width: 1000,
+        height: 1000,
+        density: TARGET_DENSITY,
+        format: "png",
+        variants: [
+          {
+            name: "primary",
+            buffer: rawBuffer,
+            width: 1000,
+            height: 1000,
+            density: TARGET_DENSITY,
+            format: "png"
+          }
+        ]
+      };
+    }
+
+    const input = sharpModule(rawBuffer, { failOn: "none" });
     const metadata = await input.metadata();
     const originalWidth = metadata.width ?? 0;
     const originalHeight = metadata.height ?? 0;
@@ -43,7 +75,6 @@ export class ImagePreprocessorService {
       throw new Error("Could not determine source image dimensions for OCR preprocessing.");
     }
 
-    // Tesseract requires a minimum image size to function — reject tiny images early
     if (originalWidth < MIN_SOURCE_WIDTH || originalHeight < MIN_SOURCE_HEIGHT) {
       throw new Error(
         `Image too small for OCR (${originalWidth}×${originalHeight}px). ` +
