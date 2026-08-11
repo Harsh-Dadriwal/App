@@ -91,7 +91,7 @@ export class FirebaseAuthService {
     }
 
     try {
-      const decodedToken = await verifyFirebaseIdToken(idToken, projectId);
+      const decodedToken = await firebaseAdminWrapper.verifyIdToken(idToken);
       if (!decodedToken.phone_number) {
         throw new Error("Token verification succeeded, but no phone number was found in the token.");
       }

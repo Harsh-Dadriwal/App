@@ -5,7 +5,7 @@ import type {
   RazorpayCreateOrderResponseDto,
   RazorpayVerifyPaymentRequestDto,
   RazorpayVerifyPaymentResponseDto
-} from "@mahalaxmi/core/types/contracts";
+} from "@mahalaxmi/core";
 import type { RequestActor } from "../../common/auth/auth.types";
 
 function getBasicAuthHeader(keyId: string, keySecret: string) {

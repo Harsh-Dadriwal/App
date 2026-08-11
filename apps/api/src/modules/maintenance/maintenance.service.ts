@@ -10,9 +10,10 @@ import {
   HANDYMAN_SERVICE_ROLES,
   MAINTENANCE_TASK_STATUS,
   type AppRole,
-  type HandymanServiceRole
-} from "@mahalaxmi/core/types/domain";
-import type { AcceptTaskBidRequestDto, SubmitTaskBidRequestDto } from "@mahalaxmi/core/types/contracts";
+  type HandymanServiceRole,
+  type AcceptTaskBidRequestDto,
+  type SubmitTaskBidRequestDto
+} from "@mahalaxmi/core";
 import type { RequestActor } from "../../common/auth/auth.types";
 import { QUEUE_NAMES } from "../../common/queue/queue.constants";
 import { QueueService } from "../../common/queue/queue.service";

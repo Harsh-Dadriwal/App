@@ -6,7 +6,7 @@ import {
   REQUIREMENT_REVIEW_STATUS,
   REQUIREMENT_SOURCE_TYPE,
   type RequirementReviewStatus
-} from "@mahalaxmi/core/types/domain";
+} from "@mahalaxmi/core";
 import { SupabaseAdminService } from "../../common/supabase/supabase-admin.service";
 import { ImagePreprocessorService } from "./image-preprocessor.service";
 

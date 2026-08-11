@@ -1,7 +1,7 @@
 import { Body, Controller, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { SupabaseAuthGuard } from "../../common/auth/supabase-auth.guard";
 import type { AuthenticatedRequest } from "../../common/auth/authenticated-request";
-import type { AcceptTaskBidRequestDto, SubmitTaskBidRequestDto } from "@mahalaxmi/core/types/contracts";
+import type { AcceptTaskBidRequestDto, SubmitTaskBidRequestDto } from "@mahalaxmi/core";
 import { MaintenanceService } from "./maintenance.service";
 
 @Controller("/api/v1")

@@ -7,7 +7,7 @@ import type {
   PaySavingsInstallmentRequestDto,
   PostWalletEntryRequestDto,
   ResolveReferralRewardRequestDto
-} from "@mahalaxmi/core/types/contracts";
+} from "@mahalaxmi/core";
 
 @Controller("/api/v1")
 @UseGuards(SupabaseAuthGuard)

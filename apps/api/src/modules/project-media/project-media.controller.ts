@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from "@nestjs/common";
-import type { CreateProjectMediaUploadRequestDto } from "@mahalaxmi/core/types/contracts";
+import type { CreateProjectMediaUploadRequestDto } from "@mahalaxmi/core";
 import type { AuthenticatedRequest } from "../../common/auth/authenticated-request";
 import { SupabaseAuthGuard } from "../../common/auth/supabase-auth.guard";
 import { ProjectMediaService } from "./project-media.service";

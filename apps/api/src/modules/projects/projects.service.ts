@@ -4,7 +4,7 @@ import type {
   CreateProjectRequestDto,
   CreateProjectRoomRequestDto,
   CreateProjectTaskRequestDto
-} from "@mahalaxmi/core/types/contracts";
+} from "@mahalaxmi/core";
 import type { RequestActor } from "../../common/auth/auth.types";
 import { SupabaseAdminService } from "../../common/supabase/supabase-admin.service";
 import { TenantAccessService } from "../../common/tenancy/tenant-access.service";

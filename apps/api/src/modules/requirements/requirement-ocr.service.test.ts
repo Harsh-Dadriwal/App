@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { REQUIREMENT_REVIEW_STATUS } from "@mahalaxmi/core/types/domain";
+import { REQUIREMENT_REVIEW_STATUS } from "@mahalaxmi/core";
 import { RequirementOcrService } from "./requirement-ocr.service";
 
 function createService() {

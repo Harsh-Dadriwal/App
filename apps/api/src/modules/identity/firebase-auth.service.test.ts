@@ -3,19 +3,18 @@ import { describe, it } from "node:test";
 import { FirebaseAuthService, firebaseAdminWrapper } from "./firebase-auth.service";
 import * as jwt from "jsonwebtoken";
 
-// Override wrapper functions for testing
-firebaseAdminWrapper.getApps = () => [];
-firebaseAdminWrapper.initializeApp = () => ({} as any);
-firebaseAdminWrapper.cert = () => ({} as any);
+// Override wrapper function for testing
 firebaseAdminWrapper.verifyIdToken = async (token: string) => {
   if (token === "valid-token") {
-    return { phone_number: "+919876543210" } as any;
+    return { uid: "auth-123", phone_number: "+919876543210" };
   }
   throw new Error("Invalid token mock error");
 };
 
 describe("FirebaseAuthService", () => {
   it("exchanges valid firebase token for signed Supabase JWT", async () => {
+    process.env.FIREBASE_PROJECT_ID = "test-project";
+
     const mockSupabase = {
       getClient: () => ({
         from: () => ({
@@ -38,7 +37,6 @@ describe("FirebaseAuthService", () => {
     };
 
     const service = new FirebaseAuthService(mockSupabase as any);
-    (service as any).initialized = true; // prevent actual init
 
     const result = await service.exchangeFirebaseTokenForSupabaseSession("valid-token");
     assert.ok(result.session.access_token);

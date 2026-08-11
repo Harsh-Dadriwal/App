@@ -4,7 +4,7 @@ import type {
   CreateProjectRequestDto,
   CreateProjectRoomRequestDto,
   CreateProjectTaskRequestDto
-} from "@mahalaxmi/core/types/contracts";
+} from "@mahalaxmi/core";
 import type { AuthenticatedRequest } from "../../common/auth/authenticated-request";
 import { SupabaseAuthGuard } from "../../common/auth/supabase-auth.guard";
 import { ProjectsService } from "./projects.service";

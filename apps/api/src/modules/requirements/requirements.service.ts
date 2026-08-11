@@ -13,13 +13,11 @@ import {
   REQUIREMENT_SOURCE_TYPE,
   type RequirementBatchStatus,
   type RequirementReviewStatus,
-  type RequirementSourceType
-} from "@mahalaxmi/core/types/domain";
-import type {
-  CreateRequirementTextBatchRequestDto,
-  GenerateRequirementProcurementRequestDto,
-  ReviewRequirementBatchItemRequestDto
-} from "@mahalaxmi/core/types/contracts";
+  type RequirementSourceType,
+  type CreateRequirementTextBatchRequestDto,
+  type GenerateRequirementProcurementRequestDto,
+  type ReviewRequirementBatchItemRequestDto
+} from "@mahalaxmi/core";
 import type { RequestActor } from "../../common/auth/auth.types";
 import { DomainEventsService } from "../../common/events/domain-events.service";
 import { QUEUE_NAMES } from "../../common/queue/queue.constants";

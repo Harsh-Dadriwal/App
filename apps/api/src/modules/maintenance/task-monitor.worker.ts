@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
 import { Job, Worker } from "bullmq";
-import { BID_STATUS, MAINTENANCE_TASK_STATUS } from "@mahalaxmi/core/types/domain";
+import { BID_STATUS, MAINTENANCE_TASK_STATUS } from "@mahalaxmi/core";
 import { QUEUE_NAMES } from "../../common/queue/queue.constants";
 import { SupabaseAdminService } from "../../common/supabase/supabase-admin.service";
 import { NotificationsService } from "../notifications/notifications.service";
