@@ -1,0 +1,228 @@
+export type BackendEnvelope<T> = {
+  data: T;
+};
+
+export type BackendResult<T> = {
+  data: T | null;
+  error: string | null;
+};
+
+export type AuthProfileDto = {
+  id: string;
+  auth_user_id?: string | null;
+  default_tenant_id?: string | null;
+  username?: string | null;
+  full_name: string | null;
+  email: string | null;
+  phone: string | null;
+  role: string;
+  city: string | null;
+  state: string | null;
+  company_name: string | null;
+  verification_status: string;
+  is_admin_verified: boolean;
+};
+
+export type TenantBrandingDto = {
+  app_name?: string | null;
+  logo_url?: string | null;
+  primary_color?: string | null;
+  secondary_color?: string | null;
+  accent_color?: string | null;
+};
+
+export type TenantMembershipDto = {
+  id: string;
+  tenant_id: string;
+  role: string;
+  is_default: boolean;
+  is_active: boolean;
+  tenant?: {
+    id: string;
+    slug: string;
+    display_name: string;
+    status: string;
+  } | null;
+  branding?: TenantBrandingDto | null;
+};
+
+export type SwitchTenantRequestDto = {
+  tenantId: string;
+};
+
+export type CustomerDecisionRequestDto = {
+  target_order_item_id: string;
+  approve: boolean;
+  note_text?: string | null;
+};
+
+export type SubstituteResponseRequestDto = {
+  suggestion_id: string;
+  accept_choice: boolean;
+};
+
+export type ArchitectReviewRequestDto = {
+  target_order_item_id: string;
+  approve: boolean;
+  note_text?: string | null;
+};
+
+export type SiteOrderTransitionRequestDto = {
+  target_site_order_id: string;
+  target_transition_key: string;
+  note_text?: string | null;
+  event_payload?: Record<string, unknown> | null;
+  target_source_module?: string | null;
+};
+
+export type MarkSuppliedRequestDto = {
+  target_order_item_id: string;
+  supplied_qty: number;
+  note_text?: string | null;
+};
+
+export type SuggestSubstituteRequestDto = {
+  original_item_id: string;
+  suggested_product: string;
+  reason_text?: string | null;
+};
+
+export type VerifyProfessionalRequestDto = {
+  target_user_id: string;
+  approve: boolean;
+  admin_note?: string | null;
+};
+
+export type SubmitTaskBidRequestDto = {
+  amount: number;
+  estimated_days: number;
+};
+
+export type AcceptTaskBidRequestDto = {
+  bid_id: string;
+};
+
+export type PostWalletEntryRequestDto = Record<string, unknown>;
+export type EnsureWalletAccountRequestDto = Record<string, unknown>;
+export type PaySavingsInstallmentRequestDto = Record<string, unknown>;
+export type ResolveReferralRewardRequestDto = Record<string, unknown>;
+
+export type RazorpayCreateOrderRequestDto = {
+  amount: number | string;
+  receipt?: string;
+  notes?: Record<string, string>;
+};
+
+export type RazorpayCreateOrderResponseDto = {
+  id: string;
+  amount: number;
+  currency: string;
+  keyId: string;
+};
+
+export type RazorpayVerifyPaymentRequestDto = {
+  orderId: string;
+  paymentId: string;
+  signature: string;
+};
+
+export type RazorpayVerifyPaymentResponseDto = {
+  isValid: boolean;
+};
+
+export type WalletReconciliationRowDto = {
+  wallet_account_id: string;
+  tenant_id: string;
+  wallet_user_id: string;
+  wallet_balance: number;
+  snapshot_balance: number;
+  ledger_balance: number;
+  ledger_snapshot_drift: number;
+  wallet_snapshot_drift: number;
+  last_ledger_entry_id?: string | null;
+};
+
+export type CreateRequirementTextBatchRequestDto = {
+  site_id?: string | null;
+  source_channel?: string | null;
+  input_language?: string | null;
+  raw_text: string;
+};
+
+export type CreateRequirementUploadBatchRequestDto = {
+  site_id?: string | null;
+  source_channel?: string | null;
+  input_language?: string | null;
+};
+
+export type ReviewRequirementBatchItemRequestDto = {
+  review_status: string;
+  normalized_text?: string | null;
+  extracted_quantity?: number | null;
+  extracted_unit?: string | null;
+  extracted_brand?: string | null;
+  extracted_specifications?: string | null;
+  extracted_dimensions?: string | null;
+  extracted_category?: string | null;
+  matched_product_id?: string | null;
+  review_notes?: string | null;
+};
+
+export type GenerateRequirementProcurementRequestDto = {
+  site_order_id?: string | null;
+};
+
+export type CreateProjectRequestDto = {
+  tenant_id: string;
+  project_code: string;
+  name: string;
+  customer_id?: string | null;
+  legacy_site_id?: string | null;
+  project_type?: string | null;
+  description?: string | null;
+  address_line1?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+  start_date?: string | null;
+  target_end_date?: string | null;
+  estimated_budget?: number | null;
+};
+
+export type CreateProjectMemberRequestDto = {
+  user_id: string;
+  role_key: string;
+  permission_overrides?: string[];
+};
+
+export type CreateProjectRoomRequestDto = {
+  name: string;
+  room_type?: string | null;
+  floor_label?: string | null;
+  parent_room_id?: string | null;
+  sort_order?: number;
+};
+
+export type CreateProjectTaskRequestDto = {
+  title: string;
+  description?: string | null;
+  room_id?: string | null;
+  parent_task_id?: string | null;
+  priority?: "low" | "medium" | "high" | "critical";
+  category?: string | null;
+  start_date?: string | null;
+  deadline?: string | null;
+  estimated_hours?: number | null;
+  assignee_ids?: string[];
+};
+
+export type CreateProjectMediaUploadRequestDto = {
+  file_name: string;
+  mime_type: "image/jpeg" | "image/png" | "image/webp" | "image/heic";
+  size_bytes: number;
+  visibility?: "project" | "recipients";
+  recipient_user_ids?: string[];
+  context_type?: "project" | "site" | "room" | "task" | "issue" | "chat";
+  context_id?: string | null;
+  caption?: string | null;
+};

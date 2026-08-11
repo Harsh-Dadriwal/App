@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prebuild": "node scripts/sync-core.js",
     "build": "nest build",
     "start": "node dist/apps/api/src/main.js",
     "start:prod": "node dist/apps/api/src/main.js",

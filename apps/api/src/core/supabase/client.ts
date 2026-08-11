@@ -1,0 +1,271 @@
+import { createClient } from "@supabase/supabase-js";
+
+type BrowserSupabaseClient = {
+  auth: {
+    getSession: () => Promise<{
+      data: {
+        session: {
+          user: {
+            id: string;
+          };
+          access_token?: string | null;
+        } | null;
+      };
+    }>;
+    onAuthStateChange: (
+      callback: (
+        event: string,
+        session: {
+          user: {
+            id: string;
+          };
+        } | null
+      ) => void
+    ) => {
+      data: {
+        subscription: {
+          unsubscribe: () => void;
+        };
+      };
+    };
+    signOut: (options?: unknown) => Promise<any>;
+    signUp: (params: unknown) => Promise<any>;
+    signInWithPassword: (params: unknown) => Promise<any>;
+    signInWithOtp: (params: unknown) => Promise<any>;
+    verifyOtp: (params: unknown) => Promise<any>;
+    resetPasswordForEmail: (email: string, options?: any) => Promise<any>;
+    updateUser: (attributes: any) => Promise<any>;
+    setSession: (params: { access_token: string; refresh_token: string }) => Promise<{ error: any }>;
+  };
+  from: (table: string) => any;
+  rpc: (fn: string, args?: Record<string, unknown>) => Promise<any>;
+  channel: (name: string) => any;
+  removeChannel: (channel: any) => Promise<any>;
+};
+
+if (typeof window === "undefined") {
+  const safeStorage = {
+    getItem: (_key: string) => null,
+    setItem: (_key: string, _value: string) => undefined,
+    removeItem: (_key: string) => undefined
+  };
+
+  const maybeStorage = (globalThis as { localStorage?: unknown }).localStorage as
+    | { getItem?: unknown }
+    | undefined;
+
+  if (!maybeStorage || typeof maybeStorage.getItem !== "function") {
+    Object.defineProperty(globalThis, "localStorage", {
+      value: safeStorage,
+      configurable: true
+    });
+  }
+}
+
+let browserClientPromise: Promise<BrowserSupabaseClient | null> | null = null;
+let readBrowserClientPromise: Promise<BrowserSupabaseClient | null> | null = null;
+let activeAccessToken: string | null = null;
+
+export function getActiveAccessToken() {
+  return activeAccessToken;
+}
+
+function resolveEnvValue(keys: string[]) {
+  const envMap: Record<string, string | undefined> = {
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_SUPABASE_READ_URL: process.env.NEXT_PUBLIC_SUPABASE_READ_URL,
+    NEXT_PUBLIC_SUPABASE_READ_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_READ_ANON_KEY,
+    EXPO_PUBLIC_SUPABASE_READ_URL: process.env.EXPO_PUBLIC_SUPABASE_READ_URL,
+    EXPO_PUBLIC_SUPABASE_READ_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_READ_ANON_KEY,
+  };
+
+  for (const key of keys) {
+    const value = envMap[key]?.trim();
+    if (value) {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+export function isSupabaseConfigured() {
+  return Boolean(
+    resolveEnvValue(["NEXT_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_URL"]) &&
+      resolveEnvValue(["NEXT_PUBLIC_SUPABASE_ANON_KEY", "EXPO_PUBLIC_SUPABASE_ANON_KEY"])
+  );
+}
+
+export async function getSupabaseBrowserClient() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const url = resolveEnvValue(["NEXT_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_URL"]);
+  const anonKey = resolveEnvValue([
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "EXPO_PUBLIC_SUPABASE_ANON_KEY"
+  ]);
+
+  if (!url || !anonKey) {
+    return null;
+  }
+
+  if (!browserClientPromise) {
+    const client = createClient(url, anonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    });
+
+    client.auth.onAuthStateChange((_event, session) => {
+      activeAccessToken = session?.access_token ?? null;
+    });
+
+    void client.auth.getSession().then(({ data }) => {
+      activeAccessToken = data.session?.access_token ?? null;
+    });
+
+    browserClientPromise = Promise.resolve(client as unknown as BrowserSupabaseClient);
+  }
+
+  return browserClientPromise;
+}
+
+export async function getSupabaseReadBrowserClient() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  // Reuse the primary browser client if no separate read URL is configured,
+  // preventing localStorage conflicts and auth promise hangs on first load!
+  const hasSeparateRead = resolveEnvValue([
+    "NEXT_PUBLIC_SUPABASE_READ_URL",
+    "EXPO_PUBLIC_SUPABASE_READ_URL"
+  ]);
+  
+  if (!hasSeparateRead) {
+    return getSupabaseBrowserClient();
+  }
+
+  const url = resolveEnvValue([
+    "NEXT_PUBLIC_SUPABASE_READ_URL",
+    "EXPO_PUBLIC_SUPABASE_READ_URL"
+  ]);
+  const anonKey = resolveEnvValue([
+    "NEXT_PUBLIC_SUPABASE_READ_ANON_KEY",
+    "EXPO_PUBLIC_SUPABASE_READ_ANON_KEY"
+  ]);
+
+  if (!url || !anonKey) {
+    return getSupabaseBrowserClient();
+  }
+
+  if (!readBrowserClientPromise) {
+    const client = createClient(url, anonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    });
+
+    client.auth.onAuthStateChange((_event, session) => {
+      activeAccessToken = session?.access_token ?? null;
+    });
+
+    void client.auth.getSession().then(({ data }) => {
+      activeAccessToken = data.session?.access_token ?? null;
+    });
+
+    readBrowserClientPromise = Promise.resolve(client as unknown as BrowserSupabaseClient);
+  }
+
+  return readBrowserClientPromise;
+}
+
+export function createNativeSupabaseClient(
+  storage: {
+    getItem: (key: string) => Promise<string | null> | string | null;
+    setItem: (key: string, value: string) => Promise<void> | void;
+    removeItem: (key: string) => Promise<void> | void;
+  }
+) {
+  const url = resolveEnvValue(["EXPO_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL"]);
+  const anonKey = resolveEnvValue([
+    "EXPO_PUBLIC_SUPABASE_ANON_KEY",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+  ]);
+
+  if (!url || !anonKey) {
+    return null;
+  }
+
+  const client = createClient(url, anonKey, {
+    auth: {
+      storage,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false
+    }
+  });
+
+  client.auth.onAuthStateChange((_event, session) => {
+    activeAccessToken = session?.access_token ?? null;
+  });
+
+  void client.auth.getSession().then(({ data }) => {
+    activeAccessToken = data.session?.access_token ?? null;
+  });
+
+  return client;
+}
+
+export function createNativeReadSupabaseClient(
+  storage: {
+    getItem: (key: string) => Promise<string | null> | string | null;
+    setItem: (key: string, value: string) => Promise<void> | void;
+    removeItem: (key: string) => Promise<void> | void;
+  }
+) {
+  const url = resolveEnvValue([
+    "EXPO_PUBLIC_SUPABASE_READ_URL",
+    "EXPO_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_READ_URL",
+    "NEXT_PUBLIC_SUPABASE_URL"
+  ]);
+  const anonKey = resolveEnvValue([
+    "EXPO_PUBLIC_SUPABASE_READ_ANON_KEY",
+    "EXPO_PUBLIC_SUPABASE_ANON_KEY",
+    "NEXT_PUBLIC_SUPABASE_READ_ANON_KEY",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+  ]);
+
+  if (!url || !anonKey) {
+    return null;
+  }
+
+  const client = createClient(url, anonKey, {
+    auth: {
+      storage,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false
+    }
+  });
+
+  client.auth.onAuthStateChange((_event, session) => {
+    activeAccessToken = session?.access_token ?? null;
+  });
+
+  void client.auth.getSession().then(({ data }) => {
+    activeAccessToken = data.session?.access_token ?? null;
+  });
+
+  return client;
+}

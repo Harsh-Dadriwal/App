@@ -15,8 +15,8 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "paths": {
-      "@mahalaxmi/core": ["../../packages/core/src/index.ts"],
-      "@mahalaxmi/core/*": ["../../packages/core/src/*"],
+      "@mahalaxmi/core": ["src/core/index.ts", "../../packages/core/src/index.ts"],
+      "@mahalaxmi/core/*": ["src/core/*", "../../packages/core/src/*"],
       "@api/*": ["src/*"]
     }
   },
