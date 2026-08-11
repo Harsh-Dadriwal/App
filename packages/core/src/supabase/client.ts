@@ -35,6 +35,7 @@ type BrowserSupabaseClient = {
     verifyOtp: (params: unknown) => Promise<any>;
     resetPasswordForEmail: (email: string, options?: any) => Promise<any>;
     updateUser: (attributes: any) => Promise<any>;
+    setSession: (params: { access_token: string; refresh_token: string }) => Promise<{ error: any }>;
   };
   from: (table: string) => any;
   rpc: (fn: string, args?: Record<string, unknown>) => Promise<any>;

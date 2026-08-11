@@ -483,7 +483,7 @@ export function AuthScreen() {
 
         const { error: sessionError } = await supabase.auth.setSession({
           access_token: payload.session.access_token,
-          refresh_token: payload.session.access_token
+          refresh_token: payload.session.refresh_token ?? payload.session.access_token
         });
 
         if (sessionError) {
