@@ -1,68 +1,97 @@
 import { Injectable, UnauthorizedException, BadRequestException } from "@nestjs/common";
 import { SupabaseAdminService } from "../../common/supabase/supabase-admin.service";
-import { getApps, initializeApp, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
+import * as https from "https";
 import * as jwt from "jsonwebtoken";
+
+const GOOGLE_CERT_URL =
+  "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com";
+
+// Simple in-memory cache so we don't fetch keys on every request
+let cachedKeys: Record<string, string> | null = null;
+let cacheExpiry = 0;
+
+async function fetchGooglePublicKeys(): Promise<Record<string, string>> {
+  if (cachedKeys && Date.now() < cacheExpiry) {
+    return cachedKeys;
+  }
+
+  return new Promise((resolve, reject) => {
+    https
+      .get(GOOGLE_CERT_URL, (res) => {
+        let data = "";
+        res.on("data", (chunk: string) => (data += chunk));
+        res.on("end", () => {
+          try {
+            cachedKeys = JSON.parse(data) as Record<string, string>;
+            // Cache for 1 hour
+            cacheExpiry = Date.now() + 60 * 60 * 1000;
+            resolve(cachedKeys);
+          } catch (e) {
+            reject(e);
+          }
+        });
+      })
+      .on("error", reject);
+  });
+}
+
+async function verifyFirebaseIdToken(
+  idToken: string,
+  projectId: string
+): Promise<{ phone_number?: string; uid: string }> {
+  // Decode the header to get the key ID (kid)
+  const parts = idToken.split(".");
+  if (parts.length !== 3) {
+    throw new Error("Invalid JWT format.");
+  }
+
+  let header: { kid?: string; alg?: string };
+  try {
+    header = JSON.parse(Buffer.from(parts[0], "base64url").toString("utf8"));
+  } catch {
+    throw new Error("Could not decode JWT header.");
+  }
+
+  if (!header.kid) {
+    throw new Error("No 'kid' field in Firebase JWT header.");
+  }
+
+  const keys = await fetchGooglePublicKeys();
+  const publicKey = keys[header.kid];
+
+  if (!publicKey) {
+    throw new Error(`No matching public key for kid: ${header.kid}. Try again after a short delay.`);
+  }
+
+  const decoded = jwt.verify(idToken, publicKey, {
+    algorithms: ["RS256"],
+    audience: projectId,
+    issuer: `https://securetoken.google.com/${projectId}`
+  }) as { sub: string; phone_number?: string };
+
+  return { uid: decoded.sub, phone_number: decoded.phone_number };
+}
 
 // Wrapper helper to allow clean unit test mocking without complex module overriding
 export const firebaseAdminWrapper = {
-  getApps: () => getApps(),
-  initializeApp: (options?: any) => initializeApp(options),
-  cert: (serviceAccount: any) => cert(serviceAccount),
-  verifyIdToken: (idToken: string) => getAuth().verifyIdToken(idToken)
+  verifyIdToken: (idToken: string) => {
+    const projectId = process.env.FIREBASE_PROJECT_ID || "";
+    return verifyFirebaseIdToken(idToken, projectId);
+  }
 };
 
 @Injectable()
 export class FirebaseAuthService {
-  private initialized = false;
-
-  constructor(private readonly supabaseAdmin: SupabaseAdminService) {
-    this.initializeFirebase();
-  }
-
-  private initializeFirebase() {
-    if (this.initialized || firebaseAdminWrapper.getApps().length > 0) {
-      this.initialized = true;
-      return;
-    }
-
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
-
-    if (projectId && clientEmail && privateKey) {
-      try {
-        firebaseAdminWrapper.initializeApp({
-          credential: firebaseAdminWrapper.cert({
-            projectId,
-            clientEmail,
-            privateKey
-          })
-        });
-        this.initialized = true;
-      } catch (err) {
-        console.error("Failed to initialize Firebase Admin SDK with cert:", err);
-      }
-    } else {
-      try {
-        firebaseAdminWrapper.initializeApp();
-        this.initialized = true;
-      } catch (err) {
-        console.warn(
-          "Firebase environment variables not set. Firebase Admin SDK initialized with default credentials if available.",
-          err
-        );
-      }
-    }
-  }
+  constructor(private readonly supabaseAdmin: SupabaseAdminService) {}
 
   async verifyFirebaseToken(idToken: string): Promise<string> {
-    if (!this.initialized) {
-      this.initializeFirebase();
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    if (!projectId) {
+      throw new UnauthorizedException("FIREBASE_PROJECT_ID environment variable is not set.");
     }
 
     try {
-      const decodedToken = await firebaseAdminWrapper.verifyIdToken(idToken);
+      const decodedToken = await verifyFirebaseIdToken(idToken, projectId);
       if (!decodedToken.phone_number) {
         throw new Error("Token verification succeeded, but no phone number was found in the token.");
       }
@@ -76,7 +105,7 @@ export class FirebaseAuthService {
 
   async exchangeFirebaseTokenForSupabaseSession(idToken: string) {
     const rawPhoneNumber = await this.verifyFirebaseToken(idToken);
-    
+
     // Normalize phone number to match how it is stored in database
     const normalizedPhone = rawPhoneNumber.trim();
 
@@ -106,18 +135,18 @@ export class FirebaseAuthService {
         throw new BadRequestException(`Failed to retrieve auth users: ${listError.message}`);
       }
 
-      const existingAuthUser = authUsers.users.find(u => u.phone === normalizedPhone);
+      const existingAuthUser = authUsers.users.find((u) => u.phone === normalizedPhone);
 
       if (existingAuthUser) {
         authUserId = existingAuthUser.id;
-        
+
         // Link the auth_user_id in public.users if not already linked
         if (userProfile) {
           const { error: linkError } = await supabase
             .from("users")
             .update({ auth_user_id: authUserId })
             .eq("id", userProfile.id);
-          
+
           if (linkError) {
             throw new BadRequestException(`Failed to link auth user: ${linkError.message}`);
           }
