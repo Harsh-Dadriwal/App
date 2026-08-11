@@ -1,13 +1,12 @@
 {
   "version": 2,
-  "installCommand": "cd ../.. && npm install",
-  "buildCommand": "cd ../.. && npm run build:api",
   "builds": [
     {
       "src": "src/vercel.ts",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["../../node_modules/**"]
+        "installCommand": "cd ../.. && npm install",
+        "buildCommand": "cd ../.. && npm run build:api"
       }
     }
   ],
