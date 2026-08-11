@@ -4,7 +4,7 @@ import {
   REQUIREMENT_BATCH_STATUS,
   REQUIREMENT_REVIEW_STATUS,
   REQUIREMENT_SOURCE_TYPE
-} from "@mahalaxmi/core";
+} from "../../core";
 import { RequirementsService } from "./requirements.service";
 
 function createService() {

@@ -17,7 +17,7 @@ import {
   type CreateRequirementTextBatchRequestDto,
   type GenerateRequirementProcurementRequestDto,
   type ReviewRequirementBatchItemRequestDto
-} from "@mahalaxmi/core";
+} from "../../core";
 import type { RequestActor } from "../../common/auth/auth.types";
 import { DomainEventsService } from "../../common/events/domain-events.service";
 import { QUEUE_NAMES } from "../../common/queue/queue.constants";

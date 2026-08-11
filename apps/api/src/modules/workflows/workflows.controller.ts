@@ -10,7 +10,7 @@ import type {
   SubstituteResponseRequestDto,
   SuggestSubstituteRequestDto,
   VerifyProfessionalRequestDto
-} from "@mahalaxmi/core";
+} from "../../core";
 
 @Controller("/api/v1")
 @UseGuards(SupabaseAuthGuard)

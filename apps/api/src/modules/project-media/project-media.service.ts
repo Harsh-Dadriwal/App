@@ -2,7 +2,7 @@ import { HeadObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from 
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { randomUUID } from "crypto";
-import type { CreateProjectMediaUploadRequestDto } from "@mahalaxmi/core";
+import type { CreateProjectMediaUploadRequestDto } from "../../core";
 import type { RequestActor } from "../../common/auth/auth.types";
 import { SupabaseAdminService } from "../../common/supabase/supabase-admin.service";
 import { TenantAccessService } from "../../common/tenancy/tenant-access.service";

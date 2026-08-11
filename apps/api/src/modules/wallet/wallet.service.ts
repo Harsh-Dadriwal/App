@@ -3,7 +3,7 @@ import { SupabaseAdminService } from "../../common/supabase/supabase-admin.servi
 import { DomainEventsService } from "../../common/events/domain-events.service";
 import { TenantAccessService } from "../../common/tenancy/tenant-access.service";
 import type { RequestActor } from "../../common/auth/auth.types";
-import type { WalletReconciliationRowDto } from "@mahalaxmi/core";
+import type { WalletReconciliationRowDto } from "../../core";
 
 @Injectable()
 export class WalletService {

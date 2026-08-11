@@ -13,7 +13,7 @@ import {
   type HandymanServiceRole,
   type AcceptTaskBidRequestDto,
   type SubmitTaskBidRequestDto
-} from "@mahalaxmi/core";
+} from "../../core";
 import type { RequestActor } from "../../common/auth/auth.types";
 import { QUEUE_NAMES } from "../../common/queue/queue.constants";
 import { QueueService } from "../../common/queue/queue.service";

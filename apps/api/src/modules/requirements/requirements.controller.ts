@@ -16,7 +16,7 @@ import type {
   CreateRequirementTextBatchRequestDto,
   GenerateRequirementProcurementRequestDto,
   ReviewRequirementBatchItemRequestDto
-} from "@mahalaxmi/core";
+} from "../../core";
 import { SupabaseAuthGuard } from "../../common/auth/supabase-auth.guard";
 import type { AuthenticatedRequest } from "../../common/auth/authenticated-request";
 import { RequirementsService } from "./requirements.service";
