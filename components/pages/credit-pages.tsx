@@ -1,5 +1,6 @@
 "use client";
 
+import type { FormEvent } from "react";
 import { useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import {
@@ -117,15 +118,14 @@ function AdminCreditDashboard({ onSelectContractor }: DashboardProps) {
         description="Dynamic constructing metrics tracking total exposure, risk ratings, and collection forecast."
       >
         <StatsGrid
-          stats={[
+          items={[
             {
               label: "Total Credit Exposure",
               value: `₹${Number(stats.totalExposure).toLocaleString("en-IN")}`
             },
             {
               label: "Overdue Exposure",
-              value: `₹${Number(stats.overdueExposure).toLocaleString("en-IN")}`,
-              tone: stats.overdueExposure > 0 ? "critical" : "neutral"
+              value: `₹${Number(stats.overdueExposure).toLocaleString("en-IN")}`
             },
             {
               label: "Portfolio Utilization",
@@ -137,8 +137,7 @@ function AdminCreditDashboard({ onSelectContractor }: DashboardProps) {
             },
             {
               label: "Frozen Accounts",
-              value: stats.frozenAccounts,
-              tone: stats.frozenAccounts > 0 ? "critical" : "neutral"
+              value: stats.frozenAccounts
             }
           ]}
         />
@@ -428,7 +427,15 @@ function ContractorCreditDetail({ contractorId, onBack }: DetailProps) {
         </div>
       </div>
 
-      <QueryState loading={creditProfile.loading} error={creditProfile.error} hasData={!!contractor}>
+      <QueryState
+        loading={creditProfile.loading}
+        error={creditProfile.error}
+        empty={{
+          title: "No contractor found",
+          description: "We couldn't load a credit profile for this contractor."
+        }}
+        hasData={!!contractor}
+      >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           
           {/* Main Scoring Card */}
@@ -625,57 +632,59 @@ function ContractorCreditDetail({ contractorId, onBack }: DetailProps) {
           <div className="space-y-6">
             
             {/* Manual Override Card */}
-            <FormCard title="Manual Credit Override" onSubmit={(e) => void handleOverride(e)}>
-              <FormGrid>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Override Action</label>
-                  <select
-                    className="w-full p-2.5 rounded-lg border text-sm font-medium focus:ring-2 focus:ring-brand focus:border-brand"
-                    value={overrideAction}
-                    onChange={(e: any) => setOverrideAction(e.target.value)}
-                  >
-                    <option value="increase_limit">Increase Limit</option>
-                    <option value="decrease_limit">Decrease Limit</option>
-                    <option value="freeze_credit">Freeze Credit Line</option>
-                    <option value="unfreeze_credit">Unfreeze Credit Line</option>
-                  </select>
-                </div>
-
-                {["increase_limit", "decrease_limit"].includes(overrideAction) && (
+            <FormCard title="Manual Credit Override">
+              <form onSubmit={(e) => void handleOverride(e)}>
+                <FormGrid>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Amount (₹)</label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 50000"
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Override Action</label>
+                    <select
+                      className="w-full p-2.5 rounded-lg border text-sm font-medium focus:ring-2 focus:ring-brand focus:border-brand"
+                      value={overrideAction}
+                      onChange={(e: any) => setOverrideAction(e.target.value)}
+                    >
+                      <option value="increase_limit">Increase Limit</option>
+                      <option value="decrease_limit">Decrease Limit</option>
+                      <option value="freeze_credit">Freeze Credit Line</option>
+                      <option value="unfreeze_credit">Unfreeze Credit Line</option>
+                    </select>
+                  </div>
+
+                  {["increase_limit", "decrease_limit"].includes(overrideAction) && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Amount (₹)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 50000"
+                        className="w-full p-2.5 rounded-lg border text-sm focus:ring-2 focus:ring-brand focus:border-brand"
+                        value={overrideAmount}
+                        onChange={(e) => setOverrideAmount(e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Audit Notes / Reason</label>
+                    <textarea
+                      rows={3}
+                      placeholder="Enter review explanation..."
                       className="w-full p-2.5 rounded-lg border text-sm focus:ring-2 focus:ring-brand focus:border-brand"
-                      value={overrideAmount}
-                      onChange={(e) => setOverrideAmount(e.target.value)}
+                      value={overrideNotes}
+                      onChange={(e) => setOverrideNotes(e.target.value)}
+                      required
                     />
                   </div>
-                )}
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Audit Notes / Reason</label>
-                  <textarea
-                    rows={3}
-                    placeholder="Enter review explanation..."
-                    className="w-full p-2.5 rounded-lg border text-sm focus:ring-2 focus:ring-brand focus:border-brand"
-                    value={overrideNotes}
-                    onChange={(e) => setOverrideNotes(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    className="primary-button w-full text-center"
-                    disabled={mutation.isSubmitting}
-                  >
-                    Apply Override Decision
-                  </button>
-                </div>
-              </FormGrid>
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      className="primary-button w-full text-center"
+                      disabled={mutation.isSubmitting}
+                    >
+                      Apply Override Decision
+                    </button>
+                  </div>
+                </FormGrid>
+              </form>
               <FormNotice error={mutation.error} success={mutation.success} />
             </FormCard>
 

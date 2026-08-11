@@ -12,12 +12,12 @@ async function buildAuthHeaders() {
     throw new Error("Supabase auth client is not configured.");
   }
 
-  let accessToken = getActiveAccessToken();
+  let accessToken: string | null = getActiveAccessToken() ?? null;
 
   if (!accessToken) {
     const sessionResult = await supabase.auth.getSession();
     accessToken = sessionResult.data.session && "access_token" in sessionResult.data.session
-      ? (sessionResult.data.session as { access_token?: string | null }).access_token
+      ? ((sessionResult.data.session as { access_token?: string | null }).access_token ?? null)
       : null;
   }
 
