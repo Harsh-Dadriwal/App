@@ -28,7 +28,7 @@ export class PaymentsController {
     @Body() body: RazorpayVerifyPaymentRequestDto
   ) {
     return {
-      data: this.paymentsService.verifyRazorpayPayment(request.actor!, body)
+      data: await this.paymentsService.verifyRazorpayPayment(request.actor!, body)
     };
   }
 }

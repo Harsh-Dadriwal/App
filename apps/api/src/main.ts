@@ -4,8 +4,10 @@ import { randomUUID } from "crypto";
 import { ValidationPipe } from "@nestjs/common";
 import { AppModule } from "./app.module";
 
+import { getCorsOptions } from "./common/cors.config";
+
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: true });
+  const app = await NestFactory.create(AppModule, { cors: getCorsOptions() });
   app.setGlobalPrefix("");
   app.useGlobalPipes(
     new ValidationPipe({

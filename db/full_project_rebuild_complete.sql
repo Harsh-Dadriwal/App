@@ -755,6 +755,32 @@ CREATE TABLE public.payment_guarantees (
   CONSTRAINT payment_guarantees_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
 );
 
+DROP TABLE IF EXISTS public.payment_records CASCADE;
+CREATE TABLE public.payment_records (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  tenant_id UUID,
+  user_id UUID NOT NULL,
+  razorpay_order_id VARCHAR(100) NOT NULL,
+  razorpay_payment_id VARCHAR(100),
+  amount NUMERIC(14, 2) NOT NULL,
+  currency VARCHAR(10) NOT NULL DEFAULT 'INR',
+  purpose VARCHAR(50) NOT NULL,
+  reference_id VARCHAR(100),
+  status VARCHAR(20) NOT NULL DEFAULT 'created',
+  verified_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  CONSTRAINT payment_records_pkey PRIMARY KEY (id),
+  CONSTRAINT payment_records_razorpay_order_id_key UNIQUE (razorpay_order_id),
+  CONSTRAINT payment_records_amount_check CHECK (amount > 0::numeric),
+  CONSTRAINT payment_records_status_check CHECK (status IN ('created', 'captured', 'failed')),
+  CONSTRAINT payment_records_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT payment_records_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS payment_records_razorpay_payment_id_key ON public.payment_records (razorpay_payment_id) WHERE razorpay_payment_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS payment_records_tenant_id_user_id_idx ON public.payment_records (tenant_id, user_id);
+
 DROP TABLE IF EXISTS public.platform_event_outbox CASCADE;
 CREATE TABLE public.platform_event_outbox (
   id UUID NOT NULL,
