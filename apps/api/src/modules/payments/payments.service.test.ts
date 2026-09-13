@@ -55,7 +55,7 @@ function createMockSupabaseAdmin(mockDataMap: Record<string, any[]> = {}): Supab
   } as any;
 }
 
-describe("PaymentsService Hardening & Security Controls", () => {
+describe("PaymentsService Fail-Closed Security & Integrity Controls", () => {
   process.env.RAZORPAY_KEY_ID = "rzp_test_key";
   process.env.RAZORPAY_KEY_SECRET = "secret_123";
 
@@ -132,6 +132,31 @@ describe("PaymentsService Hardening & Security Controls", () => {
       },
       (err: any) => {
         assert.match(err.message, /does not belong to your tenant/);
+        return true;
+      }
+    );
+  });
+
+  test("fails closed with InternalServerErrorException when database lookup fails", async () => {
+    const failingDb = {
+      getClient: () => ({
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: null, error: { message: "DB connection failure" } })
+            })
+          })
+        })
+      })
+    } as any;
+    const service = new PaymentsService(failingDb);
+
+    await assert.rejects(
+      async () => {
+        await service.getPaymentRecord("order_fail_1");
+      },
+      (err: any) => {
+        assert.match(err.message, /Database payment lookup failed/);
         return true;
       }
     );

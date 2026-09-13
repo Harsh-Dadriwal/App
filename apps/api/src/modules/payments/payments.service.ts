@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, UnauthorizedException, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  UnauthorizedException,
+  Logger
+} from "@nestjs/common";
 import crypto from "node:crypto";
 import type {
   RazorpayCreateOrderRequestDto,
@@ -32,9 +38,6 @@ function getBasicAuthHeader(keyId: string, keySecret: string) {
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
-
-  // In-memory fallback map for unit tests / offline environments where DB is unavailable
-  private readonly fallbackStore = new Map<string, PaymentRecord>();
 
   constructor(private readonly supabaseAdmin: SupabaseAdminService) {}
 
@@ -201,6 +204,7 @@ export class PaymentsService {
       createdAt: new Date().toISOString()
     };
 
+    // Strictly fail closed if database insertion fails
     await this.persistPaymentRecord(record);
 
     return {
@@ -255,6 +259,7 @@ export class PaymentsService {
       record.verifiedAt = new Date().toISOString();
       record.updatedAt = new Date().toISOString();
 
+      // Strictly fail closed if database update fails
       await this.updatePaymentRecord(record);
     }
 
@@ -266,118 +271,111 @@ export class PaymentsService {
   }
 
   public async getPaymentRecord(orderId: string): Promise<PaymentRecord | undefined> {
-    try {
-      const client = this.supabaseAdmin.getClient();
-      const { data, error } = await client
-        .from("payment_records")
-        .select("*")
-        .eq("razorpay_order_id", orderId)
-        .maybeSingle();
+    const client = this.supabaseAdmin.getClient();
+    const { data, error } = await client
+      .from("payment_records")
+      .select("*")
+      .eq("razorpay_order_id", orderId)
+      .maybeSingle();
 
-      if (!error && data) {
-        return {
-          id: data.id,
-          tenantId: data.tenant_id ?? undefined,
-          userId: data.user_id,
-          orderId: data.razorpay_order_id,
-          paymentId: data.razorpay_payment_id ?? undefined,
-          amount: Number(data.amount),
-          currency: data.currency,
-          purpose: data.purpose,
-          referenceId: data.reference_id ?? undefined,
-          status: data.status,
-          createdAt: data.created_at,
-          verifiedAt: data.verified_at ?? undefined,
-          updatedAt: data.updated_at ?? undefined
-        };
-      }
-    } catch {
-      // Fall back to memory store if DB is offline or mock client
+    if (error) {
+      this.logger.error(`Database error fetching payment record for order ${orderId}: ${error.message}`);
+      throw new InternalServerErrorException(`Database payment lookup failed: ${error.message}`);
     }
 
-    return this.fallbackStore.get(orderId);
+    if (!data) {
+      return undefined;
+    }
+
+    return {
+      id: data.id,
+      tenantId: data.tenant_id ?? undefined,
+      userId: data.user_id,
+      orderId: data.razorpay_order_id,
+      paymentId: data.razorpay_payment_id ?? undefined,
+      amount: Number(data.amount),
+      currency: data.currency,
+      purpose: data.purpose,
+      referenceId: data.reference_id ?? undefined,
+      status: data.status,
+      createdAt: data.created_at,
+      verifiedAt: data.verified_at ?? undefined,
+      updatedAt: data.updated_at ?? undefined
+    };
   }
 
   private async persistPaymentRecord(record: PaymentRecord): Promise<void> {
-    this.fallbackStore.set(record.orderId, record);
+    const client = this.supabaseAdmin.getClient();
+    const { error } = await client.from("payment_records").insert({
+      id: record.id.startsWith("pay_rec_") ? undefined : record.id,
+      tenant_id: record.tenantId ?? null,
+      user_id: record.userId,
+      razorpay_order_id: record.orderId,
+      razorpay_payment_id: record.paymentId ?? null,
+      amount: record.amount,
+      currency: record.currency,
+      purpose: record.purpose,
+      reference_id: record.referenceId ?? null,
+      status: record.status,
+      created_at: record.createdAt
+    });
 
-    try {
-      const client = this.supabaseAdmin.getClient();
-      await client.from("payment_records").insert({
-        id: record.id.startsWith("pay_rec_") ? undefined : record.id,
-        tenant_id: record.tenantId ?? null,
-        user_id: record.userId,
-        razorpay_order_id: record.orderId,
-        razorpay_payment_id: record.paymentId ?? null,
-        amount: record.amount,
-        currency: record.currency,
-        purpose: record.purpose,
-        reference_id: record.referenceId ?? null,
-        status: record.status,
-        created_at: record.createdAt
-      });
-    } catch {
-      // Memory fallback retains state when DB is unreachable
+    if (error) {
+      this.logger.error(`Database error inserting payment record for order ${record.orderId}: ${error.message}`);
+      throw new InternalServerErrorException(`Payment persistence failed: ${error.message}`);
     }
   }
 
   private async updatePaymentRecord(record: PaymentRecord): Promise<void> {
-    this.fallbackStore.set(record.orderId, record);
+    const client = this.supabaseAdmin.getClient();
+    const { error } = await client
+      .from("payment_records")
+      .update({
+        status: record.status,
+        razorpay_payment_id: record.paymentId ?? null,
+        verified_at: record.verifiedAt ?? new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq("razorpay_order_id", record.orderId);
 
-    try {
-      const client = this.supabaseAdmin.getClient();
-      await client
-        .from("payment_records")
-        .update({
-          status: record.status,
-          razorpay_payment_id: record.paymentId ?? null,
-          verified_at: record.verifiedAt ?? new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq("razorpay_order_id", record.orderId);
-    } catch {
-      // Memory fallback retains state when DB is unreachable
+    if (error) {
+      this.logger.error(`Database error updating payment record for order ${record.orderId}: ${error.message}`);
+      throw new InternalServerErrorException(`Payment record update failed: ${error.message}`);
     }
   }
 
   private async fetchSiteOrder(orderId: string): Promise<any> {
-    try {
-      const client = this.supabaseAdmin.getClient();
-      const { data } = await client.from("site_orders").select("*").eq("id", orderId).maybeSingle();
-      if (data) return data;
-    } catch {
-      // DB lookup catch
+    const client = this.supabaseAdmin.getClient();
+    const { data, error } = await client.from("site_orders").select("*").eq("id", orderId).maybeSingle();
+    if (error) {
+      throw new InternalServerErrorException(`Database error looking up site order: ${error.message}`);
     }
-    return undefined;
+    return data ?? undefined;
   }
 
   private async fetchSavingsInstallment(installmentId: string): Promise<any> {
-    try {
-      const client = this.supabaseAdmin.getClient();
-      const { data } = await client
-        .from("savings_installments")
-        .select("*")
-        .eq("id", installmentId)
-        .maybeSingle();
-      if (data) return data;
-    } catch {
-      // DB lookup catch
+    const client = this.supabaseAdmin.getClient();
+    const { data, error } = await client
+      .from("savings_installments")
+      .select("*")
+      .eq("id", installmentId)
+      .maybeSingle();
+    if (error) {
+      throw new InternalServerErrorException(`Database error looking up savings installment: ${error.message}`);
     }
-    return undefined;
+    return data ?? undefined;
   }
 
   private async fetchRepaymentSchedule(scheduleId: string): Promise<any> {
-    try {
-      const client = this.supabaseAdmin.getClient();
-      const { data } = await client
-        .from("repayment_schedules")
-        .select("*")
-        .eq("id", scheduleId)
-        .maybeSingle();
-      if (data) return data;
-    } catch {
-      // DB lookup catch
+    const client = this.supabaseAdmin.getClient();
+    const { data, error } = await client
+      .from("repayment_schedules")
+      .select("*")
+      .eq("id", scheduleId)
+      .maybeSingle();
+    if (error) {
+      throw new InternalServerErrorException(`Database error looking up repayment schedule: ${error.message}`);
     }
-    return undefined;
+    return data ?? undefined;
   }
 }
