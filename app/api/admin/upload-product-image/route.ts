@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getS3BucketName, getS3Client, getS3PublicBaseUrl } from "@/lib/s3";
 
+const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic"]);
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+
 function sanitizeSegment(value: string) {
   return value.replace(/[^a-zA-Z0-9._-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
 }
@@ -16,6 +19,17 @@ export async function POST(request: NextRequest) {
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "Image file is required." }, { status: 400 });
+    }
+
+    if (file.type && !ALLOWED_MIME_TYPES.has(file.type)) {
+      return NextResponse.json(
+        { error: "Invalid product image type. Only JPEG, PNG, WebP, and HEIC images are allowed." },
+        { status: 400 }
+      );
+    }
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      return NextResponse.json({ error: "Product image exceeds the 10 MB size limit." }, { status: 400 });
     }
 
     if (!productId && !productSku) {

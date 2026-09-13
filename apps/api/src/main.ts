@@ -1,11 +1,20 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { randomUUID } from "crypto";
+import { ValidationPipe } from "@nestjs/common";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: true });
   app.setGlobalPrefix("");
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true }
+    })
+  );
   app.use((req: any, res: any, next: () => void) => {
     const startedAt = Date.now();
     const requestId = String(req.headers["x-request-id"] || randomUUID());

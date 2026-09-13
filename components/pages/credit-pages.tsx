@@ -724,7 +724,7 @@ function ContractorCreditDetail({ contractorId, onBack }: DetailProps) {
                       </div>
 
                       <p className="text-xs text-slate-600 dark:text-slate-400 italic mt-1 bg-white dark:bg-slate-950 p-2 border rounded">
-                        "{log.notes || "No log notes recorded."}"
+                        &quot;{log.notes || "No log notes recorded."}&quot;
                       </p>
                       
                       <p className="text-[10px] text-slate-400 font-bold text-right pt-0.5">

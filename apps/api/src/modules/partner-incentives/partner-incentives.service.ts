@@ -303,7 +303,7 @@ export class PartnerIncentivesService {
       throw new BadRequestException(`Invalid status. Must be one of: ${ALLOWED_STATUSES.join(", ")}.`);
     }
 
-    await this.requireAdminTenant(actor);
+    const tenantId = await this.requireAdminTenant(actor);
     const supabase = this.supabaseAdmin.createUserClient(accessToken);
 
     const result = await supabase
@@ -315,6 +315,7 @@ export class PartnerIncentivesService {
         resolved_by: actor.appUserId
       })
       .eq("id", redemptionId)
+      .eq("tenant_id", tenantId)
       .select("*")
       .single();
 

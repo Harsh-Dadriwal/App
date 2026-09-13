@@ -91,6 +91,17 @@ export function AdminDashboardPage() {
     },
     []
   );
+  const pendingVerifications = users.data.filter(
+    (user: any) => user.verification_status === "pending"
+  ).length;
+  const ordersNeedingAttention = orders.data.filter((order: any) =>
+    ["draft", "awaiting_approval", "processing"].includes(order.status)
+  ).length;
+  const suggestedSubstitutions = substitutions.data.filter(
+    (item: any) => item.status === "suggested"
+  ).length;
+  const hasOperationalWork =
+    pendingVerifications > 0 || ordersNeedingAttention > 0 || suggestedSubstitutions > 0;
 
   return (
     <div className="page-stack">
@@ -106,8 +117,39 @@ export function AdminDashboardPage() {
         ]}
       />
       <PageSection
+        title={hasOperationalWork ? "Needs your attention" : "Start setting up your workspace"}
+        description={
+          hasOperationalWork
+            ? "Open the most important queue to keep people, orders, and supply decisions moving."
+            : "There is no pending work yet. Add products first so customers and professionals can begin planning and ordering."
+        }
+      >
+        <div className="inline-actions" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
+          {pendingVerifications > 0 ? (
+            <Link className="primary-button" href="/admin/users">
+              Review {pendingVerifications} pending verification{pendingVerifications === 1 ? "" : "s"}
+            </Link>
+          ) : ordersNeedingAttention > 0 ? (
+            <Link className="primary-button" href="/admin/orders">
+              Review {ordersNeedingAttention} order{ordersNeedingAttention === 1 ? "" : "s"}
+            </Link>
+          ) : suggestedSubstitutions > 0 ? (
+            <Link className="primary-button" href="/admin/substitutions">
+              Review {suggestedSubstitutions} substitution{suggestedSubstitutions === 1 ? "" : "s"}
+            </Link>
+          ) : (
+            <Link className="primary-button" href="/admin/products">
+              Add your first product
+            </Link>
+          )}
+          <Link className="secondary-button" href="/admin/users">
+            Review users
+          </Link>
+        </div>
+      </PageSection>
+      <PageSection
         title="Admin operations overview"
-        description="This dashboard is sourced from core admin tables in the database."
+        description="A live summary of the people, orders, inventory, and requests you manage."
       >
         <CardGrid>
           <DataCard
@@ -115,39 +157,25 @@ export function AdminDashboardPage() {
             meta="users"
             subtitle="Professionals waiting to be approved"
           >
-            <p>
-              {
-                users.data.filter((user: any) => user.verification_status === "pending").length
-              } records
-            </p>
+            <p>{pendingVerifications} awaiting review</p>
           </DataCard>
           <DataCard title="Orders awaiting work" meta="orders">
-            <p>
-              {
-                orders.data.filter((order: any) =>
-                  ["draft", "awaiting_approval", "processing"].includes(order.status)
-                ).length
-              } records
-            </p>
+            <p>{ordersNeedingAttention} awaiting action</p>
           </DataCard>
           <DataCard title="Substitute actions" meta="substitutions">
-            <p>
-              {
-                substitutions.data.filter((item: any) => item.status === "suggested").length
-              } pending decisions
-            </p>
+            <p>{suggestedSubstitutions} pending decision{suggestedSubstitutions === 1 ? "" : "s"}</p>
           </DataCard>
-          <DataCard title="Assignment coverage" meta="site_assignments">
+          <DataCard title="Assignment coverage" meta="assignments">
             <p>
               {assignments.data.filter((item: any) => item.status === "active").length} active assignments
             </p>
           </DataCard>
-          <DataCard title="Custom product requests" meta="product_requests">
+          <DataCard title="Custom product requests" meta="requests">
             <p>
               {requests.data.filter((item: any) => ["submitted", "reviewing", "matched"].includes(item.status)).length} open requests
             </p>
           </DataCard>
-          <DataCard title="Collaboration notes" meta="site_notes">
+          <DataCard title="Collaboration notes" meta="notes">
             <p>{notes.data.length} notes logged across projects</p>
           </DataCard>
         </CardGrid>
@@ -268,23 +296,27 @@ export function AdminUsersPage() {
                   <p>Credit: ₹{Number(user.credit_limit).toLocaleString("en-IN")}</p>
                 )}
                 <div className="inline-actions" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <label style={{ minWidth: 180 }}>
-                    <span style={{ display: "block", fontSize: "0.75rem", marginBottom: "0.25rem" }}>
-                      Promote or change role
-                    </span>
-                    <select
-                      className="input"
-                      value={user.role}
-                      disabled={mutation.isSubmitting}
-                      onChange={(event) => void promoteUserRole(user.id, event.target.value as AppRole)}
-                    >
-                      {ADMIN_MANAGED_USER_ROLES.map((role) => (
-                        <option key={role} value={role}>
-                          {roleLabels[role]}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  {user.role === "admin" ? (
+                    <p className="role-protection-note">Admin role is protected and cannot be changed here.</p>
+                  ) : (
+                    <label style={{ minWidth: 180 }}>
+                      <span style={{ display: "block", fontSize: "0.75rem", marginBottom: "0.25rem" }}>
+                        Promote or change role
+                      </span>
+                      <select
+                        className="input"
+                        value={user.role}
+                        disabled={mutation.isSubmitting}
+                        onChange={(event) => void promoteUserRole(user.id, event.target.value as AppRole)}
+                      >
+                        {ADMIN_MANAGED_USER_ROLES.map((role) => (
+                          <option key={role} value={role}>
+                            {roleLabels[role]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                   {["electrician", "architect", "customer"].includes(user.role) && (
                     <button 
                       type="button" 

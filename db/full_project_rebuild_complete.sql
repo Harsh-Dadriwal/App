@@ -3268,6 +3268,16 @@ BEGIN
     RAISE EXCEPTION 'Wallet entry amount must be greater than zero.';
   END IF;
 
+  IF target_external_reference IS NOT NULL THEN
+    SELECT * INTO ledger_row
+    FROM public.wallet_ledger_entries
+    WHERE wallet_account_id = target_wallet_account_id
+      AND external_reference = target_external_reference;
+    IF ledger_row.id IS NOT NULL THEN
+      RETURN ledger_row;
+    END IF;
+  END IF;
+
   SELECT *
   INTO wallet_row
   FROM public.wallet_accounts

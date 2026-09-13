@@ -1,9 +1,19 @@
-import { Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable } from "@nestjs/common";
 import { SupabaseAdminService } from "../../common/supabase/supabase-admin.service";
 import { QUEUE_NAMES } from "../../common/queue/queue.constants";
 import { QueueService } from "../../common/queue/queue.service";
 import { TenantAccessService } from "../../common/tenancy/tenant-access.service";
 import type { RequestActor } from "../../common/auth/auth.types";
+
+export type InventoryAction =
+  | "view_products"
+  | "create_product"
+  | "edit_product"
+  | "change_price"
+  | "change_stock"
+  | "delete_product"
+  | "import_products"
+  | "export_products";
 
 @Injectable()
 export class InventoryService {
@@ -23,7 +33,23 @@ export class InventoryService {
     return tenantId;
   }
 
+  public assertInventoryPermission(actor: RequestActor, action: InventoryAction) {
+    const role = (actor.role || "").toLowerCase();
+    const isAllowed =
+      role === "admin" ||
+      role === "tenant_admin" ||
+      role === "inventory_manager" ||
+      (action === "view_products") ||
+      (action === "change_stock" && role === "warehouse_manager") ||
+      (action === "change_price" && role === "pricing_manager");
+
+    if (!isAllowed) {
+      throw new ForbiddenException(`Permission denied for inventory action: ${action}`);
+    }
+  }
+
   async listCategories(actor: RequestActor, accessToken: string) {
+    this.assertInventoryPermission(actor, "view_products");
     const tenantId = await this.requireTenantId(actor);
     const result = await this.supabaseAdmin.createUserClient(accessToken)
       .from("product_categories")
@@ -39,6 +65,7 @@ export class InventoryService {
   }
 
   async listBrands(actor: RequestActor, accessToken: string) {
+    this.assertInventoryPermission(actor, "view_products");
     const tenantId = await this.requireTenantId(actor);
     const result = await this.supabaseAdmin.createUserClient(accessToken)
       .from("product_brands")
@@ -54,6 +81,7 @@ export class InventoryService {
   }
 
   async listProducts(actor: RequestActor, accessToken: string) {
+    this.assertInventoryPermission(actor, "view_products");
     const tenantId = await this.requireTenantId(actor);
     const result = await this.supabaseAdmin.createUserClient(accessToken)
       .from("products")
@@ -69,6 +97,18 @@ export class InventoryService {
   }
 
   async saveProduct(actor: RequestActor, accessToken: string, productId: string | null, payload: Record<string, unknown>) {
+    if (productId) {
+      if ("base_price" in payload && Object.keys(payload).length === 1) {
+        this.assertInventoryPermission(actor, "change_price");
+      } else if (("available_qty" in payload || "stock_status" in payload) && Object.keys(payload).length <= 2) {
+        this.assertInventoryPermission(actor, "change_stock");
+      } else {
+        this.assertInventoryPermission(actor, "edit_product");
+      }
+    } else {
+      this.assertInventoryPermission(actor, "create_product");
+    }
+
     const tenantId = await this.requireTenantId(actor);
     const supabase = this.supabaseAdmin.createUserClient(accessToken);
     const writePayload = {

@@ -50,15 +50,24 @@ export function createBackendRequester({ getBaseUrl, isConfigured, getAuthHeader
       } else {
         requestBody = JSON.stringify(options.body);
       }
-      const response = await fetch(`${baseUrl}${path}`, {
-        method: options.method ?? "GET",
-        headers: {
-          ...authHeaders,
-          ...(isFormData ? {} : { "Content-Type": "application/json" }),
-          ...(options.headers ?? {})
-        },
-        body: requestBody
-      });
+      const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+      const timeoutId = controller ? setTimeout(() => controller.abort(), 2500) : null;
+
+      let response: Response;
+      try {
+        response = await fetch(`${baseUrl}${path}`, {
+          method: options.method ?? "GET",
+          headers: {
+            ...authHeaders,
+            ...(isFormData ? {} : { "Content-Type": "application/json" }),
+            ...(options.headers ?? {})
+          },
+          body: requestBody,
+          ...(controller ? { signal: controller.signal } : {})
+        });
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+      }
 
       const payload = await response.json().catch(() => null);
 

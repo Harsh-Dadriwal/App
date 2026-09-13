@@ -52,60 +52,76 @@ export function createAuthGateway({
   backendRequest,
   getSupabaseClient
 }: AuthGatewayDependencies) {
+  const pendingProfileRequests = new Map<string, Promise<BackendResult<UserProfile>>>();
+
   async function fetchAppProfile(authUserId: string): Promise<BackendResult<UserProfile>> {
-    if (isBackendApiConfigured()) {
-      const result = await backendRequest<UserProfile>(
-        `/api/v1/me/profile?authUserId=${encodeURIComponent(authUserId)}`
-      );
+    const existing = pendingProfileRequests.get(authUserId);
+    if (existing) {
+      return existing;
+    }
 
-      if (result.data || !result.error) {
-        return result;
+    const promise = (async () => {
+      try {
+        if (isBackendApiConfigured()) {
+          const result = await backendRequest<UserProfile>(
+            `/api/v1/me/profile?authUserId=${encodeURIComponent(authUserId)}`
+          );
+
+          if (result.data) {
+            return result;
+          }
+        }
+
+        const supabase = await getSupabaseClient();
+
+        if (!supabase) {
+          return { data: null, error: "Supabase is not configured." };
+        }
+
+        const authLinkedResult = await supabase
+          .from("users")
+          .select(profileSelect)
+          .eq("auth_user_id", authUserId)
+          .maybeSingle();
+
+        if (authLinkedResult.data && !authLinkedResult.error) {
+          return { data: authLinkedResult.data as UserProfile, error: null };
+        }
+
+        const directIdResult = await supabase
+          .from("users")
+          .select(profileSelect)
+          .eq("id", authUserId)
+          .maybeSingle();
+
+        if (directIdResult.data && !directIdResult.error) {
+          return { data: directIdResult.data as UserProfile, error: null };
+        }
+
+        const rpcResult = await (supabase as any).rpc("get_my_profile");
+        const rpcData = Array.isArray(rpcResult?.data)
+          ? rpcResult.data[0] ?? null
+          : rpcResult?.data ?? null;
+
+        if (rpcData && !rpcResult?.error) {
+          return { data: rpcData as UserProfile, error: null };
+        }
+
+        return {
+          data: null,
+          error:
+            authLinkedResult.error?.message ??
+            directIdResult.error?.message ??
+            rpcResult?.error?.message ??
+            "No app profile row is visible for this account."
+        };
+      } finally {
+        pendingProfileRequests.delete(authUserId);
       }
-    }
+    })();
 
-    const supabase = await getSupabaseClient();
-
-    if (!supabase) {
-      return { data: null, error: "Supabase is not configured." };
-    }
-
-    const authLinkedResult = await supabase
-      .from("users")
-      .select(profileSelect)
-      .eq("auth_user_id", authUserId)
-      .maybeSingle();
-
-    if (authLinkedResult.data && !authLinkedResult.error) {
-      return { data: authLinkedResult.data as UserProfile, error: null };
-    }
-
-    const rpcResult = await (supabase as any).rpc("get_my_profile");
-    const rpcData = Array.isArray(rpcResult?.data)
-      ? rpcResult.data[0] ?? null
-      : rpcResult?.data ?? null;
-
-    if (rpcData && !rpcResult?.error) {
-      return { data: rpcData as UserProfile, error: null };
-    }
-
-    const directIdResult = await supabase
-      .from("users")
-      .select(profileSelect)
-      .eq("id", authUserId)
-      .maybeSingle();
-
-    if (directIdResult.data && !directIdResult.error) {
-      return { data: directIdResult.data as UserProfile, error: null };
-    }
-
-    return {
-      data: null,
-      error:
-        authLinkedResult.error?.message ??
-        rpcResult?.error?.message ??
-        directIdResult.error?.message ??
-        "No app profile row is visible for this account."
-    };
+    pendingProfileRequests.set(authUserId, promise);
+    return promise;
   }
 
   async function fetchTenantMemberships(

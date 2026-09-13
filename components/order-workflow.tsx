@@ -42,15 +42,15 @@ export function AdminWorkflowMonitor() {
 
   return (
     <PageSection
-      title="Workflow visibility"
-      description="This is the new system backbone layer: recent order events, stuck workflows, and actor history pulled from system tables instead of hidden UI logic."
+      title="Order activity"
+      description="Track recent order updates, items waiting too long, and the people who made changes."
     >
       <div className="workflow-monitor-grid">
         <QueryState
           loading={recentEvents.loading}
           error={recentEvents.error}
           hasData={recentEvents.data.length > 0}
-          empty={{ title: "No workflow events yet", description: "Run order approvals or supply actions to populate the event stream." }}
+          empty={{ title: "No order updates yet", description: "Order approvals and supply updates will appear here." }}
         >
           <div className="workflow-panel">
             <h3>Recent order events</h3>
@@ -74,7 +74,7 @@ export function AdminWorkflowMonitor() {
           loading={stuck.loading}
           error={stuck.error}
           hasData={stuck.data.length > 0}
-          empty={{ title: "No stuck workflows", description: "Pending order items and orders will show here if they sit too long without movement." }}
+          empty={{ title: "Nothing is waiting too long", description: "Orders and items that need attention will appear here." }}
         >
           <div className="workflow-panel">
             <h3>Stuck workflows</h3>
@@ -96,7 +96,7 @@ export function AdminWorkflowMonitor() {
           loading={actors.loading}
           error={actors.error}
           hasData={actors.data.length > 0}
-          empty={{ title: "No actor history yet", description: "Once approvals and supply updates happen, the actor history table will populate here." }}
+          empty={{ title: "No activity history yet", description: "Changes to orders and supply will appear here." }}
         >
           <div className="workflow-panel">
             <h3>Actor history</h3>

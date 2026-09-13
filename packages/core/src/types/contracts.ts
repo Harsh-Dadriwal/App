@@ -108,7 +108,10 @@ export type PaySavingsInstallmentRequestDto = Record<string, unknown>;
 export type ResolveReferralRewardRequestDto = Record<string, unknown>;
 
 export type RazorpayCreateOrderRequestDto = {
-  amount: number | string;
+  amount?: number | string;
+  purpose?: string;
+  referenceId?: string;
+  referenceType?: string;
   receipt?: string;
   notes?: Record<string, string>;
 };
@@ -118,16 +121,23 @@ export type RazorpayCreateOrderResponseDto = {
   amount: number;
   currency: string;
   keyId: string;
+  paymentRecordId?: string;
 };
 
 export type RazorpayVerifyPaymentRequestDto = {
   orderId: string;
   paymentId: string;
   signature: string;
+  expectedAmount?: number;
+  currency?: string;
+  paymentState?: string;
 };
 
 export type RazorpayVerifyPaymentResponseDto = {
   isValid: boolean;
+  paymentRecordId?: string;
+  status?: string;
+  reason?: string;
 };
 
 export type WalletReconciliationRowDto = {

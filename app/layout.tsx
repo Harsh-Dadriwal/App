@@ -5,6 +5,9 @@ import { Providers } from './providers';
 export const metadata: Metadata = {
   title: 'Mahalaxmi Electricals',
   description: 'Role-based application for Mahalaxmi Electricals',
+  icons: {
+    icon: '/icon.svg',
+  },
 };
 
 export default function RootLayout({

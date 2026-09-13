@@ -188,14 +188,21 @@ export function AuthScreen() {
     }
   }
 
-  async function completeLoginRedirect(expectedRole?: AppRole) {
+  async function completeLoginRedirect(expectedRole?: AppRole, directUserId?: string) {
     const supabase = await getSupabaseBrowserClient();
 
     if (!supabase) {
       return;
     }
 
-    for (let attempt = 0; attempt < 10; attempt += 1) {
+    if (directUserId) {
+      const loadedProfile = await refreshProfile(directUserId);
+      const role = loadedProfile?.role ?? expectedRole;
+      router.replace(role ? `/${role}` : "/");
+      return;
+    }
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
       const {
         data: { session }
       } = await supabase.auth.getSession();
@@ -207,7 +214,13 @@ export function AuthScreen() {
         return;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    if (expectedRole) {
+      router.replace(`/${expectedRole}`);
+    } else {
+      router.replace("/");
     }
   }
 
@@ -332,12 +345,12 @@ export function AuthScreen() {
         );
 
         if (data?.session) {
-          await completeLoginRedirect(emailForm.role);
+          await completeLoginRedirect(emailForm.role, data.session.user.id);
         } else {
           setAuthMode("login");
         }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { error, data } = await supabase.auth.signInWithPassword({
           email: emailForm.email,
           password: emailForm.password
         });
@@ -347,7 +360,7 @@ export function AuthScreen() {
         }
 
         setNotice("Login successful. Opening your workspace...");
-        await completeLoginRedirect();
+        await completeLoginRedirect(undefined, data?.session?.user?.id);
       }
     } catch (error) {
       setErrorMessage(mapAuthErrorMessage(error));
@@ -495,7 +508,7 @@ export function AuthScreen() {
         return;
       }
 
-      const { error } = await supabase.auth.verifyOtp({
+      const { error, data } = await supabase.auth.verifyOtp({
         phone: phoneForm.phone,
         token: phoneForm.otp,
         type: "sms"
@@ -506,7 +519,7 @@ export function AuthScreen() {
       }
 
       setNotice("Phone verified successfully.");
-      await completeLoginRedirect(phoneForm.role);
+      await completeLoginRedirect(phoneForm.role, data?.session?.user?.id);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "OTP verification failed.");
     } finally {
@@ -558,6 +571,13 @@ export function AuthScreen() {
 
       <section className="auth-panel">
         <div className="auth-panel-inner">
+          <aside className="mobile-auth-context" aria-label="About Mahalaxmi Electricals">
+            <span className="eyebrow">Mahalaxmi Electricals</span>
+            <h1>Manage your construction projects in one place.</h1>
+            <p>
+              Create sites, approve materials, track budgets, and manage project purchases. New accounts start as Customers.
+            </p>
+          </aside>
           <div className="auth-panel-header" style={{ marginBottom: '2.5rem' }}>
             <span className="eyebrow">
               {authMode === "login"
@@ -695,7 +715,7 @@ export function AuthScreen() {
                       name="username"
                       value={emailForm.username}
                       onChange={onEmailChange}
-                      placeholder="harshdadriwal"
+                      placeholder="username"
                       pattern="[a-z0-9._]{3,24}"
                       minLength={3}
                       maxLength={24}
@@ -846,7 +866,7 @@ export function AuthScreen() {
                       name="username"
                       value={phoneForm.username}
                       onChange={onPhoneChange}
-                      placeholder="harshdadriwal"
+                      placeholder="username"
                       pattern="[a-z0-9._]{3,24}"
                       minLength={3}
                       maxLength={24}

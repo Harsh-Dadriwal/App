@@ -712,6 +712,32 @@ textarea::placeholder {
   animation: fadeIn 0.5s ease;
 }
 
+.mobile-auth-context {
+  margin-bottom: 2rem;
+}
+
+.mobile-auth-context .eyebrow {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.mobile-auth-context h1 {
+  font-size: 1.5rem;
+  line-height: 1.25;
+  margin-bottom: 0.75rem;
+}
+
+.mobile-auth-context p {
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+@media (min-width: 1024px) {
+  .mobile-auth-context {
+    display: none;
+  }
+}
+
 .toggle-row {
   margin-bottom: 2rem;
   display: flex;
@@ -782,6 +808,13 @@ textarea::placeholder {
 .role-card p { font-size: 0.875rem; margin-bottom: 0.5rem; color: rgba(255,255,255,0.8); }
 .role-card small { font-size: 0.75rem; color: #93c5fd; }
 .role-card--locked { opacity: 0.7; }
+
+.role-protection-note {
+  align-self: end;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
 
 .notice {
   padding: 1rem;

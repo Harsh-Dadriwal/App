@@ -15,8 +15,8 @@ export function isRecoverableAuthSessionError(error: unknown) {
 
 export async function fetchProfileWithRetry<T>(
   loadProfile: () => Promise<BackendResult<T>>,
-  attempts = 8,
-  delayMs = 250
+  attempts = 3,
+  delayMs = 150
 ) {
   let lastError: string | null = null;
   const maxAttempts = Math.max(1, attempts);

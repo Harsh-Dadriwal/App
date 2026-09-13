@@ -26,10 +26,15 @@ export class WalletService {
   async postWalletEntry(actor: RequestActor, accessToken: string, args: Record<string, unknown>) {
     await this.tenantAccess.assertTenantAccess(actor, String(args.target_tenant_id));
 
+    const amount = Number(args.target_amount ?? 0);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException("Wallet entry amount must be greater than zero.");
+    }
+
     if (
       actor.role === "customer" &&
       args.target_direction === "credit" &&
-      Number(args.target_amount ?? 0) < 500
+      amount < 500
     ) {
       throw new BadRequestException("Minimum deposit amount is ₹500.");
     }

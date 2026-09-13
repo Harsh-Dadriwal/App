@@ -169,6 +169,20 @@ export class ProjectsService {
       throw new BadRequestException("A user_id and valid role_key are required.");
     }
 
+    const tenantMembership = await this.supabaseAdmin
+      .getClient()
+      .from("tenant_memberships")
+      .select("id")
+      .eq("tenant_id", project.tenant_id)
+      .eq("user_id", body.user_id)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (tenantMembership.error) throw new Error(tenantMembership.error.message);
+    if (!tenantMembership.data) {
+      throw new BadRequestException("Selected user is not an active member of this tenant.");
+    }
+
     const role = await this.supabaseAdmin
       .getClient()
       .from("platform_roles")

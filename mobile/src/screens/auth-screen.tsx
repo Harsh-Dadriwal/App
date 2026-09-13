@@ -176,7 +176,7 @@ export function AuthScreen() {
               label="Username"
               value={username}
               onChangeText={(value) => setUsername(normalizeUsername(value))}
-              placeholder="harshdadriwal"
+              placeholder="username"
             />
           </>
         ) : null}

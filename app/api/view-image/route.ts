@@ -8,8 +8,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const key = searchParams.get("key");
 
-    if (!key) {
-      return NextResponse.json({ error: "Missing image key." }, { status: 400 });
+    if (!key || key.includes("..") || key.includes("\0")) {
+      return NextResponse.json({ error: "Invalid or missing image key." }, { status: 400 });
     }
 
     const s3Client = getS3Client();
@@ -26,81 +26,9 @@ export async function GET(request: NextRequest) {
       response = await s3Client.send(command);
     } catch (err: any) {
       if (err.name === "NoSuchKey") {
-        console.log(`Key "${key}" not found in R2. Attempting self-healing fallback search...`);
-        
-        // Parse the filename (everything after the last '-' or last '/')
-        const parts = key.split("/");
-        const lastPart = parts[parts.length - 1];
-        const filename = lastPart.split("-").pop() || lastPart;
-        
-        // Determine tenant prefix folder: e.g. "requirements/[tenant-id]/"
-        let prefix: string | undefined = undefined;
-        if (parts[0] === "requirements" && parts[1]) {
-          prefix = `requirements/${parts[1]}/`;
-        }
-
-        console.log(`Searching for file ending with "${filename}" under prefix "${prefix || "root"}"`);
-
-        const listCommand = new ListObjectsV2Command({
-          Bucket: bucketName,
-          Prefix: prefix,
-        });
-
-        const listRes = await s3Client.send(listCommand);
-        const foundItem = listRes.Contents?.find((item) => item.Key && item.Key.endsWith(filename));
-
-        if (foundItem && foundItem.Key) {
-          resolvedKey = foundItem.Key;
-          console.log(`Self-healing fallback matched: "${resolvedKey}"`);
-
-          const command = new GetObjectCommand({
-            Bucket: bucketName,
-            Key: resolvedKey,
-          });
-          response = await s3Client.send(command);
-
-          // Update database row in background so next time we hit it directly
-          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-          const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-          if (supabaseUrl && serviceRoleKey) {
-            try {
-              const supabase = createClient(supabaseUrl, serviceRoleKey, {
-                auth: { persistSession: false, autoRefreshToken: false },
-              });
-
-              const publicBaseUrl = (
-                process.env.R2_PUBLIC_BASE_URL ||
-                process.env.AWS_S3_PUBLIC_BASE_URL ||
-                ""
-              ).replace(/\/$/, "");
-
-              const nextPublicUrl = `${publicBaseUrl}/${resolvedKey}`;
-
-              const { error: dbErr } = await supabase
-                .from("requirement_batch_sources")
-                .update({
-                  storage_key: resolvedKey,
-                  public_url: nextPublicUrl,
-                })
-                .eq("storage_key", key);
-
-              if (dbErr) {
-                console.error("Failed to update self-healed key in Supabase:", dbErr.message);
-              } else {
-                console.log("Successfully updated self-healed storage_key and public_url in Supabase!");
-              }
-            } catch (dbEx) {
-              console.error("Supabase self-healing update exception:", dbEx);
-            }
-          }
-        } else {
-          // No match found, propagate original NoSuchKey error
-          throw err;
-        }
-      } else {
-        throw err;
+        return NextResponse.json({ error: "Image not found." }, { status: 404 });
       }
+      throw err;
     }
 
     if (!response.Body) {
