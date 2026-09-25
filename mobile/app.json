@@ -14,13 +14,20 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mahalaxmi.electricals"
     },
     "android": {
+      "package": "com.mahalaxmi.electricals",
       "adaptiveIcon": {
         "backgroundColor": "#f4efe6"
       }
     },
-    "plugins": []
+    "plugins": [],
+    "extra": {
+      "eas": {
+        "projectId": "c860b6f8-6321-4a08-9721-2d25c67ce3e8"
+      }
+    }
   }
 }
