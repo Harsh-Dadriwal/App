@@ -848,7 +848,11 @@ const styles = StyleSheet.create({
     resizeMode: "cover",
   },
   previewLayer: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   previewGlow: {
     position: "absolute",

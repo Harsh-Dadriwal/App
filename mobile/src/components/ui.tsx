@@ -175,14 +175,15 @@ export function Card({
   tone = "default"
 }: {
   children: React.ReactNode;
-  tone?: "default" | "soft" | "brand";
+  tone?: "default" | "soft" | "brand" | "danger";
 }) {
   return (
     <View
       style={[
         styles.card,
         tone === "soft" && styles.cardSoft,
-        tone === "brand" && styles.cardBrand
+        tone === "brand" && styles.cardBrand,
+        tone === "danger" && styles.cardDanger
       ]}
     >
       {children}
@@ -551,6 +552,10 @@ const styles = StyleSheet.create({
   cardBrand: {
     backgroundColor: palette.brandSoft,
     borderColor: "rgba(180, 83, 9, 0.15)"
+  },
+  cardDanger: {
+    backgroundColor: "rgba(239, 68, 68, 0.08)",
+    borderColor: "rgba(239, 68, 68, 0.25)"
   },
   sectionHead: {
     flexDirection: "row",

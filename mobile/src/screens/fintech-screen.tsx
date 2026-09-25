@@ -201,7 +201,7 @@ export function FintechScreen() {
               </View>
             </View>
 
-            <View style={{ marginTop: 16, flexDirection: "row", justifyContent: "space-between", fontSize: 12, gap: 10 }}>
+            <View style={{ marginTop: 16, flexDirection: "row", justifyContent: "space-between", gap: 10 }}>
               <Text style={{ fontSize: 12, color: palette.muted, fontWeight: "600" }}>Outstanding: ₹{outstandingAmount.toLocaleString("en-IN")}</Text>
               <Text style={{ fontSize: 12, color: palette.muted, fontWeight: "600" }}>Term: {creditData.credit_status === "green" ? "30 Days" : creditData.credit_status === "yellow" ? "15 Days" : "Project Linked"}</Text>
             </View>
@@ -220,7 +220,7 @@ export function FintechScreen() {
             empty="No unpaid invoices."
           >
             {dueInvoices.data.map((inv: any) => {
-              const isOverdue = new Date(inv.due_date) < now;
+              const isOverdue = new Date(inv.due_date) < new Date();
               return (
                 <Card key={inv.id} tone={isOverdue ? "danger" : "default"}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
