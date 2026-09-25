@@ -8,6 +8,7 @@ export type BackendRequestOptions = {
   body?: Record<string, unknown> | FormData | null;
   headers?: Record<string, string>;
   requireAuth?: boolean;
+  timeoutMs?: number;
 };
 
 type BackendHttpConfig = {
@@ -51,7 +52,7 @@ export function createBackendRequester({ getBaseUrl, isConfigured, getAuthHeader
         requestBody = JSON.stringify(options.body);
       }
       const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-      const timeoutId = controller ? setTimeout(() => controller.abort(), 2500) : null;
+      const timeoutId = controller ? setTimeout(() => controller.abort(), options.timeoutMs ?? 2500) : null;
 
       let response: Response;
       try {

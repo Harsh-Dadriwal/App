@@ -33,6 +33,8 @@ import {
   listInventoryProducts,
   listProductBrands,
   listProductCategories,
+  getTallyStatus,
+  listTallyProducts,
   saveInventoryProduct,
   updateProductImage
 } from "@/lib/backend/modules/inventory-gateway";
@@ -1096,8 +1098,85 @@ export function AdminProductsPage() {
         </QueryState>
       </PageSection>
 
+      <TallyProductBrowser />
+
       <InventoryIntelligenceDashboard />
     </div>
+  );
+}
+
+function TallyProductBrowser() {
+  const [search, setSearch] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const status = useRows(async () => {
+    const result = await getTallyStatus();
+    return { data: result.data ? [result.data] : [], error: result.error };
+  }, []);
+  const tallyProducts = useRows(async () => {
+    const result = await listTallyProducts();
+    return { data: result.data ? [result.data] : [], error: result.error };
+  }, [refreshKey, Boolean(status.data[0]?.configured)], { enabled: refreshKey > 0 && Boolean(status.data[0]?.configured) });
+
+  const connector = status.data[0];
+  const source = tallyProducts.data[0];
+  const products = useMemo(() => source?.products ?? [], [source]);
+  const visibleProducts = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return products;
+    return products.filter((product: any) =>
+      [product.name, product.group, product.hsnCode, product.id]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(term))
+    );
+  }, [products, search]);
+
+  return (
+    <PageSection
+      title="Live Tally products"
+      description="A read-only view of stock items from TallyPrime. Refresh reads the current Tally data; it does not change your app catalog."
+    >
+      <div className="inline-actions" style={{ marginBottom: "0.75rem", flexWrap: "wrap" }}>
+        <button
+          type="button"
+          className="primary-button"
+          disabled={!connector?.configured || tallyProducts.loading}
+          onClick={() => setRefreshKey((value) => value + 1)}
+        >
+          {tallyProducts.loading ? "Reading Tally..." : "Refresh from Tally"}
+        </button>
+        {connector?.company ? <span className="form-field-hint">Company: {connector.company}</span> : null}
+      </div>
+      {status.error ? <FormNotice error={status.error} /> : null}
+      {!status.loading && connector ? <p className="form-field-hint">{connector.message}</p> : null}
+      {tallyProducts.error ? <FormNotice error={tallyProducts.error} /> : null}
+      {products.length > 0 ? (
+        <>
+          <ListSearchField
+            value={search}
+            onChange={setSearch}
+            placeholder="Filter live Tally items by name, group, or HSN"
+            ariaLabel="Filter live Tally products"
+          />
+          <p className="form-field-hint" style={{ marginTop: "-0.4rem" }}>
+            Showing {visibleProducts.length} of {source?.total ?? products.length} live item{(source?.total ?? products.length) === 1 ? "" : "s"}.
+          </p>
+          <CardGrid>
+            {visibleProducts.map((product: any) => (
+              <DataCard
+                key={product.id}
+                title={product.name}
+                subtitle={[product.group, product.hsnCode ? `HSN ${product.hsnCode}` : null].filter(Boolean).join(" · ") || "Tally stock item"}
+                meta={product.unit ?? "unit not set"}
+              >
+                <p>Available: {product.closingBalance ?? "Not reported"}</p>
+                <p>Closing rate: {product.closingRate ?? "Not reported"}</p>
+                {product.gstApplicable ? <p>GST: {product.gstApplicable}</p> : null}
+              </DataCard>
+            ))}
+          </CardGrid>
+        </>
+      ) : null}
+    </PageSection>
   );
 }
 

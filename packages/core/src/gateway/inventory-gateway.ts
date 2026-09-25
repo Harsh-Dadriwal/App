@@ -124,11 +124,27 @@ export function createInventoryGateway({
     return { data: result.data ?? null, error: result.error?.message ?? null };
   }
 
+  async function getTallyStatus(): Promise<BackendResult<{ configured: boolean; company: string | null; message: string }>> {
+    if (!isBackendApiConfigured()) {
+      return { data: null, error: "Connect the backend API to use the Tally connector." };
+    }
+    return backendRequest("/api/v1/inventory/tally/status");
+  }
+
+  async function listTallyProducts(query = ""): Promise<BackendResult<{ products: any[]; total: number }>> {
+    if (!isBackendApiConfigured()) {
+      return { data: null, error: "Connect the backend API to use the Tally connector." };
+    }
+    return backendRequest(`/api/v1/inventory/tally/products?query=${encodeURIComponent(query)}&limit=100`, { timeoutMs: 15_000 });
+  }
+
   return {
     listProductCategories,
     listProductBrands,
     listInventoryProducts,
     saveInventoryProduct,
-    updateProductImage
+    updateProductImage,
+    getTallyStatus,
+    listTallyProducts
   };
 }

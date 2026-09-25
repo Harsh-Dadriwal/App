@@ -1,12 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { SupabaseAuthGuard } from "../../common/auth/supabase-auth.guard";
 import { InventoryService } from "./inventory.service";
+import { TallyService } from "./tally.service";
 import type { AuthenticatedRequest } from "../../common/auth/authenticated-request";
 
 @Controller("/api/v1/inventory")
 @UseGuards(SupabaseAuthGuard)
 export class InventoryController {
-  constructor(private readonly inventoryService: InventoryService) {}
+  constructor(private readonly inventoryService: InventoryService, private readonly tallyService: TallyService) {}
 
   private getAccessToken(request: AuthenticatedRequest) {
     const authHeader = request.headers.authorization || "";
@@ -26,6 +27,18 @@ export class InventoryController {
   @Get("/products")
   async listProducts(@Req() request: AuthenticatedRequest) {
     return { data: await this.inventoryService.listProducts(request.actor!, this.getAccessToken(request)) };
+  }
+
+  @Get("/tally/status")
+  async tallyStatus(@Req() request: AuthenticatedRequest) {
+    this.inventoryService.assertInventoryPermission(request.actor!, "view_products");
+    return { data: this.tallyService.status() };
+  }
+
+  @Get("/tally/products")
+  async listTallyProducts(@Req() request: AuthenticatedRequest, @Query("query") query?: string, @Query("limit") limit?: string) {
+    this.inventoryService.assertInventoryPermission(request.actor!, "view_products");
+    return { data: await this.tallyService.listProducts(query, Number(limit) || 100) };
   }
 
   @Get("/alerts/low-stock")
