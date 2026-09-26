@@ -14,5 +14,10 @@ export const palette = {
   teal: "#0f766e",
   shadow: "rgba(63, 42, 18, 0.12)",
   success: "#10b981",
-  danger: "#ef4444"
+  danger: "#ef4444",
+  dangerSoft: "#fee2e2",
+  dangerText: "#991b1b",
+  dangerTextMuted: "#7f1d1d",
+  warning: "#ca8a04",
+  warningStrong: "#ea580c"
 };

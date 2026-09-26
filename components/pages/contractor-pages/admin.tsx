@@ -327,7 +327,7 @@ export function AdminUsersPage() {
                         const limit = prompt("Enter credit limit for this user:", String(user.credit_limit || 0));
                         if (limit !== null) setCreditLimit(user.id, limit);
                       }}
-                      style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                      style={{ fontSize: '0.75rem', padding: '0.5rem 0.875rem' }}
                     >
                       Set Credit
                     </button>
@@ -342,8 +342,8 @@ export function AdminUsersPage() {
                     "plumber"
                   ].includes(user.role) && !user.is_admin_verified && (
                     <>
-                      <button type="button" className="primary-button" disabled={mutation.isSubmitting} onClick={() => void verifyUser(user.id, true)} style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>Verify</button>
-                      <button type="button" className="secondary-button" disabled={mutation.isSubmitting} onClick={() => void verifyUser(user.id, false)} style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>Reject</button>
+                      <button type="button" className="primary-button" disabled={mutation.isSubmitting} onClick={() => void verifyUser(user.id, true)} style={{ fontSize: '0.75rem', padding: '0.5rem 0.875rem' }}>Verify</button>
+                      <button type="button" className="secondary-button" disabled={mutation.isSubmitting} onClick={() => void verifyUser(user.id, false)} style={{ fontSize: '0.75rem', padding: '0.5rem 0.875rem' }}>Reject</button>
                     </>
                   )}
                 </div>

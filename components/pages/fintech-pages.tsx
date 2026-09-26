@@ -141,25 +141,34 @@ function RazorpayCheckoutButton({
         description,
         order_id: order.id,
         handler: async (response: any) => {
-          const verifyRes = await fetch("/api/razorpay", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              action: "verify",
-              orderId: response.razorpay_order_id,
-              paymentId: response.razorpay_payment_id,
-              signature: response.razorpay_signature,
-            }),
-          });
-          const verifyResult = await verifyRes.json();
+          setLoading(true);
+          setError("");
+          try {
+            const verifyRes = await fetch("/api/razorpay", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                action: "verify",
+                orderId: response.razorpay_order_id,
+                paymentId: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+              }),
+            });
+            const verifyResult = await verifyRes.json();
 
-          if (!verifyRes.ok || !verifyResult.isValid) {
-            throw new Error("Payment verification failed.");
+            if (!verifyRes.ok || !verifyResult.isValid) {
+              throw new Error("Payment verification failed.");
+            }
+
+            await onSuccess(response.razorpay_payment_id, response.razorpay_order_id);
+          } catch (err) {
+            console.error(err);
+            setError(err instanceof Error ? err.message : "Payment verification failed.");
+          } finally {
+            setLoading(false);
           }
-
-          await onSuccess(response.razorpay_payment_id, response.razorpay_order_id);
         },
         modal: {
           ondismiss: () => {

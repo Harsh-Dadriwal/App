@@ -109,14 +109,14 @@ export function FintechScreen() {
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case "green":
-        return palette.success ?? "#16a34a";
+        return palette.success;
       case "yellow":
-        return "#ca8a04";
+        return palette.warning;
       case "orange":
-        return "#ea580c";
+        return palette.warningStrong;
       case "red":
       default:
-        return palette.danger ?? "#dc2626";
+        return palette.danger;
     }
   };
 
@@ -141,11 +141,11 @@ export function FintechScreen() {
             
             {/* Frozen warning banner */}
             {creditData.is_frozen ? (
-              <View style={{ backgroundColor: "#fee2e2", borderLeftWidth: 4, borderColor: "#ef4444", padding: 12, borderRadius: 8, marginBottom: 16 }}>
-                <Text style={{ color: "#991b1b", fontWeight: "800", fontSize: 13, textTransform: "uppercase" }}>
+              <View style={{ backgroundColor: palette.dangerSoft, borderLeftWidth: 4, borderColor: palette.danger, padding: 12, borderRadius: 8, marginBottom: 16 }}>
+                <Text style={{ color: palette.dangerText, fontWeight: "800", fontSize: 13, textTransform: "uppercase" }}>
                   Facility Frozen
                 </Text>
-                <Text style={{ color: "#7f1d1d", fontSize: 12, marginTop: 2, fontWeight: "500" }}>
+                <Text style={{ color: palette.dangerTextMuted, fontSize: 12, marginTop: 2, fontWeight: "500" }}>
                   Your credit limit is frozen. Settle outstanding overdue invoices to reactivate.
                 </Text>
               </View>
@@ -178,7 +178,7 @@ export function FintechScreen() {
             <View style={{ marginTop: 20, flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderColor: palette.line, paddingTop: 16 }}>
               <View>
                 <Text style={{ fontSize: 12, fontWeight: "700", color: palette.muted, textTransform: "uppercase" }}>Available Credit</Text>
-                <Text style={{ fontSize: 24, fontWeight: "900", color: "#16a34a", marginTop: 2 }}>
+                <Text style={{ fontSize: 24, fontWeight: "900", color: palette.success, marginTop: 2 }}>
                   ₹{availableCredit.toLocaleString("en-IN")}
                 </Text>
               </View>
@@ -246,7 +246,7 @@ export function FintechScreen() {
                         {inv.days_late} days late
                       </Text>
                     ) : (
-                      <Text style={{ fontSize: 12, color: "#16a34a", fontWeight: "700" }}>
+                      <Text style={{ fontSize: 12, color: palette.success, fontWeight: "700" }}>
                         Within Terms
                       </Text>
                     )}
@@ -308,8 +308,8 @@ export function FintechScreen() {
               ID: {sub.subscription_number}
             </Text>
             <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
-              <Chip label={sub.status} onPress={() => {}} active={sub.status === 'active'} />
-              <Chip label={`${sub.installment_count} Installments`} onPress={() => {}} />
+              <Chip label={sub.status} active={sub.status === 'active'} />
+              <Chip label={`${sub.installment_count} Installments`} />
             </View>
             <View style={{ marginTop: 16, backgroundColor: palette.surface, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: palette.line }}>
                <Text style={{ color: palette.muted, fontSize: 12, fontWeight: "600", textTransform: "uppercase" }}>Commitment</Text>

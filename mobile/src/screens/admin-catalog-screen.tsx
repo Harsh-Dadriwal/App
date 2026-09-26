@@ -3,7 +3,9 @@ import { ScrollView, Text, View } from "react-native";
 import { useMutationAction, useRows } from "@/components/app-state";
 import { AppButton, Card, Chip, Field, Notice, QueryState, ScreenShell, SectionTitle } from "@/components/ui";
 import { useAuth } from "@/providers/auth-provider";
+import { useMobileNavigation } from "@/providers/navigation-provider";
 import { supabase } from "@/lib/supabase";
+import { palette } from "@/lib/theme";
 
 function slugify(value: string) {
   return value
@@ -15,6 +17,7 @@ function slugify(value: string) {
 
 export function AdminCatalogScreen() {
   const { profile, activeTenant } = useAuth();
+  const { replace } = useMobileNavigation();
   const categoryMutation = useMutationAction();
   const brandMutation = useMutationAction();
   const [categoryName, setCategoryName] = useState("");
@@ -100,7 +103,19 @@ export function AdminCatalogScreen() {
 
   if (profile?.role !== "admin") {
     return (
-      <ScreenShell title="Admin only" subtitle="This screen is only available to admin accounts." />
+      <ScreenShell title="Admin only" subtitle="This screen is only available to admin accounts.">
+        <Card tone="soft">
+          <Text style={{ fontSize: 15, fontWeight: "600" }}>
+            You don't have access to catalog management.
+          </Text>
+          <Text style={{ marginTop: 6, color: palette.muted }}>
+            Ask a workspace admin if you need categories or brands added.
+          </Text>
+          <View style={{ marginTop: 16 }}>
+            <AppButton label="Back to dashboard" icon="arrow-left" onPress={() => replace("dashboard")} />
+          </View>
+        </Card>
+      </ScreenShell>
     );
   }
 
