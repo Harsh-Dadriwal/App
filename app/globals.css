@@ -120,6 +120,7 @@ button {
 .setup-shell, .loading-shell {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   align-items: center;
   justify-content: center;
   padding: 1rem;
@@ -647,6 +648,7 @@ textarea::placeholder {
 .auth-shell {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--bg-color);
   flex-direction: column;
 }
@@ -832,6 +834,7 @@ textarea::placeholder {
 .workspace-shell {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   position: relative;
 }
 
@@ -949,6 +952,7 @@ textarea::placeholder {
   flex-direction: column;
   background: var(--workspace-bg);
   height: 100vh;
+  height: 100dvh;
   overflow-y: auto;
   position: relative;
   width: 100%; /* Important for horizontal scrolling of tables inside flex */

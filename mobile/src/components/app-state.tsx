@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase, supabaseRead } from "@/lib/supabase";
 import { useSharedMutationAction } from "@mahalaxmi/core/hooks/use-mutation-action";
 
@@ -11,6 +11,7 @@ export function useRows<T>(
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -49,9 +50,15 @@ export function useRows<T>(
           .subscribe();
       }
 
-      setLoading(true);
+      // Only show the loading state on the first fetch. Refetches (from
+      // mutations, realtime updates, or manual refetch()) keep showing the
+      // previously loaded data instead of blanking the screen.
+      if (!hasLoadedRef.current) {
+        setLoading(true);
+      }
       const result = await fetcher(client);
       if (!active) return;
+      hasLoadedRef.current = true;
       setData(result.data);
       setError(result.error);
       setLoading(false);

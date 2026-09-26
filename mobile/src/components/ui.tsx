@@ -1,6 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -135,16 +137,23 @@ export function ScreenShell({
     <SafeAreaView style={styles.safe}>
       <View style={styles.backgroundTintTop} />
       <View style={styles.backgroundTintBottom} />
-      {scroll ? (
-        <ScrollView
-          contentContainerStyle={[styles.scroll, showTabs && styles.scrollWithTabs]}
-          showsVerticalScrollIndicator={false}
-        >
-          {content}
-        </ScrollView>
-      ) : (
-        <View style={[styles.nonScrollBody, showTabs && styles.scrollWithTabs]}>{content}</View>
-      )}
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoider}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
+      >
+        {scroll ? (
+          <ScrollView
+            contentContainerStyle={[styles.scroll, showTabs && styles.scrollWithTabs]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {content}
+          </ScrollView>
+        ) : (
+          <View style={[styles.nonScrollBody, showTabs && styles.scrollWithTabs]}>{content}</View>
+        )}
+      </KeyboardAvoidingView>
       {showTabs ? (
         <View style={styles.tabBar}>
           {tabs.map((tab) => {
@@ -286,8 +295,15 @@ export function Chip({
 }: {
   label: string;
   active?: boolean;
-  onPress: () => void;
+  onPress?: () => void;
 }) {
+  if (!onPress) {
+    return (
+      <View style={[styles.chip, active && styles.chipActive]}>
+        <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+      </View>
+    );
+  }
   return (
     <Pressable style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
       <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
@@ -370,6 +386,9 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: palette.bg
+  },
+  keyboardAvoider: {
+    flex: 1
   },
   backgroundTintTop: {
     position: "absolute",
@@ -625,6 +644,8 @@ const styles = StyleSheet.create({
     textAlignVertical: "top"
   },
   chip: {
+    minHeight: 44,
+    justifyContent: "center",
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 999,
@@ -739,7 +760,12 @@ export function BottomActionSheet({
           <View style={sheetStyles.handle} />
           <View style={sheetStyles.header}>
             <Text style={sheetStyles.title}>{title}</Text>
-            <Pressable style={sheetStyles.closeBtn} onPress={onClose}>
+            <Pressable
+              style={sheetStyles.closeBtn}
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
               <Feather name="x" size={20} color={palette.ink} />
             </Pressable>
           </View>

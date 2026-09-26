@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type DependencyList, type ReactNode } from "react";
+import { useEffect, useRef, useState, type DependencyList, type ReactNode } from "react";
 import { getSupabaseBrowserClient, getSupabaseReadBrowserClient } from "@mahalaxmi/core/supabase/client";
 import { useSharedMutationAction } from "@mahalaxmi/core/hooks/use-mutation-action";
 
@@ -90,6 +90,7 @@ export function useRows<T>(
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -104,7 +105,12 @@ export function useRows<T>(
         return;
       }
 
-      setLoading(true);
+      // Only show the loading state on the first fetch. Refetches (from
+      // mutations, realtime updates, or manual refetch()) keep showing the
+      // previously loaded data instead of blanking the screen.
+      if (!hasLoadedRef.current) {
+        setLoading(true);
+      }
       const resolvedClientType =
         options?.clientType ?? (options?.realtimeTable ? "primary" : "read");
       const client = resolvedClientType === "read"
@@ -137,6 +143,7 @@ export function useRows<T>(
         return;
       }
 
+      hasLoadedRef.current = true;
       setData(result.data);
       setError(result.error);
       setLoading(false);
