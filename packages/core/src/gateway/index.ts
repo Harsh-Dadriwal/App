@@ -6,5 +6,6 @@ export { createFintechGateway } from "./fintech-gateway";
 export { createInventoryGateway } from "./inventory-gateway";
 export { createNotificationsGateway } from "./notifications-gateway";
 export { createRequirementsGateway } from "./requirements-gateway";
+export { createPaymentsGateway } from "./payments-gateway";
 
 export * from "./partner-incentives-gateway";
