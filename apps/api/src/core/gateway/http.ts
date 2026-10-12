@@ -1,3 +1,18 @@
+const UNAVAILABLE_MESSAGE = "This service is temporarily unavailable. Please try again shortly.";
+const SERVER_ERROR_MESSAGE = "Something went wrong on our side. Please try again.";
+
+/** Keeps raw server/framework text (routes, status codes, stack-like messages) away from end users. */
+function toFriendlyError(message: string | null, status: number): string {
+  if (status === 401) return "Your session has expired. Please log in again.";
+  if (status === 403) return "You do not have permission to do this.";
+  if (status === 404 || (message && /^Cannot (GET|POST|PUT|PATCH|DELETE) /i.test(message))) {
+    return "This feature is not available right now. Please try again later.";
+  }
+  if (status === 429) return "Too many requests. Please wait a moment and try again.";
+  if (status >= 500) return SERVER_ERROR_MESSAGE;
+  return message?.trim() || SERVER_ERROR_MESSAGE;
+}
+
 type BackendResult<T> = {
   data: T | null;
   error: string | null;
@@ -23,7 +38,7 @@ export function createBackendRequester({ getBaseUrl, isConfigured, getAuthHeader
     options: BackendRequestOptions = {}
   ): Promise<BackendResult<T>> {
     if (!isConfigured()) {
-      return { data: null, error: "Backend API is not configured." };
+      return { data: null, error: "This service is temporarily unavailable. Please try again shortly." };
     }
 
     try {
@@ -36,7 +51,7 @@ export function createBackendRequester({ getBaseUrl, isConfigured, getAuthHeader
         return {
           data: null,
           error:
-            "Backend API URL uses http on an https site. Set NEXT_PUBLIC_API_BASE_URL to your public https backend URL and redeploy."
+            UNAVAILABLE_MESSAGE
         };
       }
 
@@ -73,16 +88,18 @@ export function createBackendRequester({ getBaseUrl, isConfigured, getAuthHeader
       const payload = await response.json().catch(() => null);
 
       if (!response.ok) {
-        return {
-          data: null,
-          error:
-            (payload &&
-            typeof payload === "object" &&
-            "message" in payload &&
-            typeof payload.message === "string"
-              ? payload.message
-              : null) ?? `Backend request failed with status ${response.status}.`
-        };
+        const rawMessage =
+          payload && typeof payload === "object" && "message" in payload
+            ? Array.isArray((payload as { message: unknown }).message)
+              ? ((payload as { message: unknown[] }).message as unknown[]).filter((m) => typeof m === "string").join(" ")
+              : typeof (payload as { message: unknown }).message === "string"
+                ? ((payload as { message: string }).message)
+                : null
+            : null;
+        if (response.status >= 400 && typeof console !== "undefined") {
+          console.warn(`Request to ${path} failed with status ${response.status}: ${rawMessage ?? "no message"}`);
+        }
+        return { data: null, error: toFriendlyError(rawMessage, response.status) };
       }
 
       return {
@@ -92,23 +109,17 @@ export function createBackendRequester({ getBaseUrl, isConfigured, getAuthHeader
         error: null
       };
     } catch (error) {
-      const baseUrl = getBaseUrl();
-      const pathLabel = `${baseUrl}${path}`;
       const message = error instanceof Error ? error.message : "Backend request failed.";
+      if (typeof console !== "undefined") console.warn(`Request to ${path} failed: ${message}`);
 
-      if (message === "Load failed" || message === "Failed to fetch") {
-        return {
-          data: null,
-          error:
-            `Could not reach the backend at ${pathLabel}. ` +
-            "Check that NEXT_PUBLIC_API_BASE_URL points to the public https Railway API URL, not localhost, a private Railway domain, or an http endpoint."
-        };
+      if (message === "Load failed" || message === "Failed to fetch" || /network request failed/i.test(message)) {
+        return { data: null, error: "We could not connect right now. Please check your internet connection and try again." };
+      }
+      if (/abort/i.test(message)) {
+        return { data: null, error: "This is taking longer than expected. Please try again." };
       }
 
-      return {
-        data: null,
-        error: message
-      };
+      return { data: null, error: SERVER_ERROR_MESSAGE };
     }
   };
 }

@@ -293,7 +293,7 @@ function OcrDebugCard({ source }: { source: any }) {
 
   return (
     <DataCard
-      title={`${source.original_filename ?? source.source_type} OCR debug`}
+      title={`${source.original_filename ?? source.source_type} scan details`}
       subtitle={`Variant: ${String(ocr.selected_variant ?? "primary")}`}
       meta={formatPercent(
         typeof ocr.average_confidence === "number" ? ocr.average_confidence : null,
@@ -742,7 +742,7 @@ export function RequirementIntakePage({ role }: { role: IntakeRole }) {
 
       <FormCard
         title="Universal requirement intake"
-        description="Upload spreadsheets, PDFs, screenshots, photos, handwritten lists, or paste raw requirement text. The system stores the original source, extracts requirement lines asynchronously, and sends low-confidence items to review."
+        description="Upload spreadsheets, PDFs, screenshots, photos, handwritten lists, or paste raw requirement text. We extract the requirement lines for you and flag any uncertain items for review."
       >
         <form onSubmit={handleTextSubmit} className="page-stack">
           <FormGrid>

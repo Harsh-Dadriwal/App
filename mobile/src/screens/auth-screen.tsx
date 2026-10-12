@@ -45,14 +45,14 @@ export function AuthScreen() {
     const message = error instanceof Error ? error.message : "Unable to continue.";
 
     if (message.toLowerCase().includes("database error saving new user")) {
-      return "Signup could not finish because the Supabase signup trigger is still failing. Run db/auth_trigger_username_roles_repair.sql in Supabase first, then try again.";
+      return "We could not finish creating your account. Please try again or contact support.";
     }
 
     if (
       message.toLowerCase().includes("error sending confirmation email") ||
       message.includes("535 5.7.8")
     ) {
-      return "Signup reached email confirmation, but your SMTP credentials were rejected by Gmail. Recheck the SMTP username, app password, host, port, and encryption settings in Supabase Auth.";
+      return "We could not send the confirmation email right now. Please try again shortly or contact support.";
     }
 
     if (message.toLowerCase().includes("user already registered")) {
@@ -90,7 +90,7 @@ export function AuthScreen() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        setNotice("Login successful.");
+        setNotice("Logged in.");
       }
       replace("dashboard");
     } catch (error) {
@@ -139,13 +139,13 @@ export function AuthScreen() {
   return (
     <ScreenShell
       title="Mobile site and material operations"
-      subtitle="Sign in once and manage approvals, product selection, ordering, notes, and admin workflows from the same Supabase backend."
+      subtitle="Log in once to manage approvals, product selection, ordering and notes in one place."
       currentScreen="dashboard"
     >
       <Card tone="brand">
         <View style={styles.toggleRow}>
           <Pressable style={[styles.toggle, authMode === "login" && styles.toggleActive]} onPress={() => setAuthMode("login")}>
-            <Text style={[styles.toggleText, authMode === "login" && styles.toggleTextActive]}>Login</Text>
+            <Text style={[styles.toggleText, authMode === "login" && styles.toggleTextActive]}>Log in</Text>
           </Pressable>
           <Pressable style={[styles.toggle, authMode === "signup" && styles.toggleActive]} onPress={() => setAuthMode("signup")}>
             <Text style={[styles.toggleText, authMode === "signup" && styles.toggleTextActive]}>Sign up</Text>
@@ -186,7 +186,7 @@ export function AuthScreen() {
             <Field label="Email" value={email} onChangeText={(value) => setEmail(normalizeEmail(value))} placeholder="you@example.com" />
             {authMode === "signup" ? <Field label="Phone (optional)" value={phone} onChangeText={(value) => setPhone(normalizePhone(value))} placeholder="+91..." /> : null}
             <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
-            <AppButton label={busy ? "Please wait..." : authMode === "signup" ? "Create account" : "Login"} onPress={() => void handleEmail()} disabled={busy} />
+            <AppButton label={busy ? "Please wait..." : authMode === "signup" ? "Create account" : "Log in"} onPress={() => void handleEmail()} disabled={busy} />
           </>
         ) : (
           <>

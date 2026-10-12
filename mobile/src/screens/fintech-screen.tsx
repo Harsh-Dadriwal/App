@@ -264,7 +264,7 @@ export function FintechScreen() {
         loading={wallet.loading}
         error={wallet.error}
         hasData={wallet.data.length > 0}
-        empty="Your fintech account hasn't been created yet. Ask your admin to run the migration setup."
+        empty="Your wallet is not set up yet. Please contact support."
       >
         <Card tone="brand">
           <Text style={{ fontSize: 32, fontWeight: "900", color: palette.brand, letterSpacing: -0.5 }}>
@@ -297,7 +297,7 @@ export function FintechScreen() {
         loading={subscriptions.loading}
         error={subscriptions.error}
         hasData={subscriptions.data.length > 0}
-        empty="You are not subscribed to any savings plans yet. View available modules on the web app."
+        empty="You are not subscribed to any savings plans yet. Browse available plans on the web app."
       >
         {subscriptions.data.map((sub: any) => (
           <Card key={sub.id} tone="soft">

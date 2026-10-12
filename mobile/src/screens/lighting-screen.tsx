@@ -354,7 +354,7 @@ export function LightingScreen() {
   return (
     <ScreenShell
       title="Lighting Workspace"
-      subtitle={role === "admin" ? "Monitor high-value lighting specs, prioritize deals, and manage sales follow-ups." : "Preview warm luxury, cool clarity, and high-CRI scenes using live product specs."}
+      subtitle={role === "admin" ? "Monitor high-value lighting specs, prioritize deals, and manage sales follow-ups." : "Preview warm luxury, cool clarity, and high-CRI scenes using real product specs."}
       currentScreen="lighting"
       showBack
     >
@@ -366,7 +366,7 @@ export function LightingScreen() {
             loading={products.loading}
             error={products.error}
             hasData={products.data.length > 0}
-            empty="No lighting products found yet. Run the lighting visualizer SQL file first."
+            empty="No lighting products available yet."
           >
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.compareToggleRow}>
@@ -515,7 +515,7 @@ export function LightingScreen() {
                       <Text style={styles.leadLocation}>{businessType} • {location}</Text>
                     </View>
                     <View style={styles.priceContainer}>
-                      <Text style={styles.dealValue}>₹{dealValue.toLocaleString()}</Text>
+                      <Text style={styles.dealValue}>₹{dealValue.toLocaleString("en-IN")}</Text>
                       <Text style={styles.qtyLabel}>{quantities} pcs</Text>
                     </View>
                   </View>
@@ -766,7 +766,7 @@ export function LightingScreen() {
         {activeLeadForStatus ? (
           <View style={styles.statusSheetBody}>
             <Text style={styles.sheetLeadInfo}>
-              Client: {activeLeadForStatus.contact_name} • Value: ₹{(activeLeadForStatus.configuration?.dealValue ?? 10000).toLocaleString()}
+              Client: {activeLeadForStatus.contact_name} • Value: ₹{(activeLeadForStatus.configuration?.dealValue ?? 10000).toLocaleString("en-IN")}
             </Text>
             
             <View style={styles.statusOptionsList}>

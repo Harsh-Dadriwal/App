@@ -20,7 +20,7 @@ function AppBody() {
 
   if (!configured) {
     return (
-      <ScreenShell title="Supabase setup required" subtitle="Add your Expo public Supabase URL and anon key before opening the mobile workspace." />
+      <ScreenShell title="Service unavailable" subtitle="We cannot load your workspace right now. Please try again shortly." />
     );
   }
 

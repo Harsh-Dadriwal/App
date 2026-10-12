@@ -58,8 +58,8 @@ export function SupplierFulfillmentQueue() {
         error={orders.error}
         hasData={orders.data.length > 0}
         empty={{
-          title: "No pending orders in database",
-          description: "There are no approved orders waiting for supply dispatch in the database."
+          title: "No pending orders",
+          description: "There are no approved orders waiting for dispatch."
         }}
       >
         <CardGrid>
@@ -72,7 +72,7 @@ export function SupplierFulfillmentQueue() {
             >
               <p>SKU: {item.products?.sku}</p>
               <p>Required Qty: {item.quantity_required} {item.unit_snapshot}</p>
-              <p>MRP: ₹{item.products?.mrp}</p>
+              <p>MRP: ₹{Number(item.products?.mrp ?? 0).toLocaleString("en-IN")}</p>
               <div className="inline-actions">
                 <button
                   type="button"

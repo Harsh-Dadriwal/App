@@ -120,7 +120,7 @@ export function useRows<T>(
       if (!client) {
         if (active) {
           setData([]);
-          setError(`${resolvedClientType === "read" ? "Supabase read client" : "Supabase"} is not configured.`);
+          setError("This service is temporarily unavailable. Please try again shortly.");
           setLoading(false);
         }
         return;
@@ -334,7 +334,7 @@ export function QueryState({
   children: React.ReactNode;
 }) {
   if (loading) {
-    return <div className="state-card">Loading data from the database...</div>;
+    return <div className="state-card">Loading...</div>;
   }
 
   if (error) {

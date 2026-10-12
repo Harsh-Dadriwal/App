@@ -50,7 +50,7 @@ export function ArchitectDashboardPage() {
       />
       <PageSection
         title="Architect review flow"
-        description="Architect pages read directly from project and material review views."
+        description="Project and material reviews at a glance."
       >
         <QueryState
           loading={ongoing.loading}
@@ -104,7 +104,7 @@ export function ArchitectProjectsPage({ mode }: { mode: "new" | "ongoing" }) {
   return (
     <PageSection
       title={mode === "new" ? "New architect projects" : "Ongoing architect projects"}
-      description="Projects are sourced from architect-specific database views."
+      description="Your assigned projects."
     >
       <QueryState
         loading={query.loading}
@@ -112,7 +112,7 @@ export function ArchitectProjectsPage({ mode }: { mode: "new" | "ongoing" }) {
         hasData={query.data.length > 0}
         empty={{
           title: "No project data",
-          description: "Rows will appear here as soon as the underlying view returns records."
+          description: "Projects will appear here once assigned."
         }}
       >
         <DataTable
@@ -198,8 +198,8 @@ export function ArchitectMaterialsPage() {
           error={materials.error}
           hasData={materials.data.length > 0}
           empty={{
-            title: "No material tracker records",
-            description: "Add order items to architect-associated sites to populate this view."
+            title: "No materials to track yet",
+            description: "Materials for your assigned sites will appear here."
           }}
         >
           <FormNotice error={mutation.error} success={mutation.success} />

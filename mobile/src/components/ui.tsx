@@ -329,7 +329,7 @@ export function QueryState({
       <Card tone="soft">
         <View style={styles.centerRow}>
           <ActivityIndicator color={palette.brand} />
-          <Text style={styles.mutedText}>Loading from Supabase...</Text>
+          <Text style={styles.mutedText}>Loading...</Text>
         </View>
       </Card>
     );

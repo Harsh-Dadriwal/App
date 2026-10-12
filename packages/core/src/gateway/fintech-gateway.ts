@@ -21,7 +21,7 @@ function callRpcFallback(
   if (!runRpcFallback) {
     return Promise.resolve({
       data: null,
-      error: "Backend API is not configured."
+      error: "This service is temporarily unavailable. Please try again shortly."
     } satisfies BackendResult<Record<string, unknown>>);
   }
 

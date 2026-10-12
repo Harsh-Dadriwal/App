@@ -87,7 +87,7 @@ export class FirebaseAuthService {
   async verifyFirebaseToken(idToken: string): Promise<string> {
     const projectId = process.env.FIREBASE_PROJECT_ID;
     if (!projectId) {
-      throw new UnauthorizedException("FIREBASE_PROJECT_ID environment variable is not set.");
+      throw new UnauthorizedException("Sign-in is temporarily unavailable. Please try again shortly.");
     }
 
     try {
@@ -119,7 +119,7 @@ export class FirebaseAuthService {
       .maybeSingle();
 
     if (profileError) {
-      throw new BadRequestException(`Failed to check user profile: ${profileError.message}`);
+      throw new BadRequestException("We could not sign you in right now. Please try again.");
     }
 
     let authUserId: string;
@@ -132,7 +132,7 @@ export class FirebaseAuthService {
       // 2. If user profile doesn't have an auth_user_id, check if user exists in auth.users by phone
       const { data: authUsers, error: listError } = await supabase.auth.admin.listUsers();
       if (listError) {
-        throw new BadRequestException(`Failed to retrieve auth users: ${listError.message}`);
+        throw new BadRequestException("We could not sign you in right now. Please try again.");
       }
 
       const existingAuthUser = authUsers.users.find((u) => u.phone === normalizedPhone);
@@ -148,7 +148,7 @@ export class FirebaseAuthService {
             .eq("id", userProfile.id);
 
           if (linkError) {
-            throw new BadRequestException(`Failed to link auth user: ${linkError.message}`);
+            throw new BadRequestException("We could not sign you in right now. Please try again.");
           }
           finalProfile = { ...userProfile, auth_user_id: authUserId };
         } else {
@@ -174,7 +174,7 @@ export class FirebaseAuthService {
         });
 
         if (createError) {
-          throw new BadRequestException(`Failed to register user in auth: ${createError.message}`);
+          throw new BadRequestException("We could not create your account right now. Please try again.");
         }
 
         authUserId = newAuthUser.user.id;
@@ -187,7 +187,7 @@ export class FirebaseAuthService {
           .maybeSingle();
 
         if (fetchError || !freshProfile) {
-          throw new BadRequestException("User registration completed, but profile sync failed.");
+          throw new BadRequestException("Your account was created but setup did not finish. Please sign in again.");
         }
         finalProfile = freshProfile;
       }

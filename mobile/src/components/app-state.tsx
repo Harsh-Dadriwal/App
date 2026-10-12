@@ -33,7 +33,7 @@ export function useRows<T>(
       currentClient = client;
 
       if (!client) {
-        setError(`${resolvedClientType === "read" ? "Supabase read client" : "Supabase"} is not configured.`);
+        setError("This service is temporarily unavailable. Please try again shortly.");
         setData([]);
         setLoading(false);
         return;

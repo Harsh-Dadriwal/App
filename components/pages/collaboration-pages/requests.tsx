@@ -406,7 +406,7 @@ export function AdminProductRequestsPage() {
     <div className="page-stack">
       <FormCard
         title="Resolve architect product requests"
-        description="Pick a row in the queue below, then set status, optional catalog match, and notes—same toolbar and card pattern as other admin lists."
+        description="Pick a request below, then set its status, an optional catalog match and notes."
       >
         <form onSubmit={saveResolution} className="auth-form">
           {!editingId ? (

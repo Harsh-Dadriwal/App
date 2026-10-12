@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
 import { authRoleOptions } from "@/lib/navigation";
+import { getBackendApiBaseUrl } from "@/lib/backend/config";
 import type { AppRole } from "@mahalaxmi/core/types/domain";
 
 type AuthMethod = "email" | "phone";
@@ -68,14 +69,14 @@ function mapAuthErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "Unable to continue.";
 
   if (message.toLowerCase().includes("database error saving new user")) {
-    return "Signup could not finish because the Supabase signup trigger is still failing. Run db/auth_trigger_username_roles_repair.sql in Supabase first, then try again.";
+    return "We could not finish creating your account. Please try again or contact support.";
   }
 
   if (
     message.toLowerCase().includes("error sending confirmation email") ||
     message.includes("535 5.7.8")
   ) {
-    return "Signup reached email confirmation, but your SMTP credentials were rejected by Gmail. Recheck the SMTP username, app password, host, port, and encryption settings in Supabase Auth.";
+    return "We could not send the confirmation email right now. Please try again shortly or contact support.";
   }
 
   if (message.toLowerCase().includes("user already registered")) {
@@ -359,7 +360,7 @@ export function AuthScreen() {
           throw error;
         }
 
-        setNotice("Login successful. Opening your workspace...");
+        setNotice("Logged in. Opening your workspace...");
         await completeLoginRedirect(undefined, data?.session?.user?.id);
       }
     } catch (error) {
@@ -483,7 +484,7 @@ export function AuthScreen() {
         const result = await confirmationResult.confirm(phoneForm.otp);
         const idToken = await result.user.getIdToken();
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || ""}/api/v1/auth/firebase-login`, {
+        const response = await fetch(`${getBackendApiBaseUrl()}/api/v1/auth/firebase-login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ idToken })
@@ -491,7 +492,7 @@ export function AuthScreen() {
 
         const payload = await response.json();
         if (!response.ok || !payload?.session?.access_token) {
-          throw new Error(payload?.message || "Exchange session exchange failed.");
+          throw new Error(payload?.message || "Sign-in could not be completed. Please try again.");
         }
 
         const { error: sessionError } = await supabase.auth.setSession({
@@ -616,14 +617,14 @@ export function AuthScreen() {
                   className={authMode === "login" ? "is-active" : ""}
                   onClick={() => setAuthMode("login")}
                 >
-                  Login
+                  Log in
                 </button>
                 <button
                   type="button"
                   className={authMode === "signup" ? "is-active" : ""}
                   onClick={() => setAuthMode("signup")}
                 >
-                  Sign Up
+                  Sign up
                 </button>
               </div>
               <div className="segmented-control">
@@ -671,7 +672,7 @@ export function AuthScreen() {
                 onClick={() => setAuthMode("login")}
                 style={{ marginTop: '0.5rem', background: 'transparent', border: 'none', color: '#60a5fa', cursor: 'pointer' }}
               >
-                Back to Login
+                Back to log in
               </button>
             </form>
           ) : authMode === "reset_password" ? (
@@ -788,11 +789,11 @@ export function AuthScreen() {
                 />
               </label>
               {authMode === "login" ? (
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-0.5rem', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-0.5rem', marginBottom: '0.5rem' }}>
                   <button
                     type="button"
                     onClick={() => setAuthMode("forgot_password")}
-                    style={{ background: 'transparent', border: 'none', color: '#60a5fa', fontSize: '0.85rem', cursor: 'pointer', padding: 0 }}
+                    className="text-link-button"
                   >
                     Forgot password?
                   </button>
@@ -802,7 +803,7 @@ export function AuthScreen() {
                 {isSubmitting
                   ? "Please wait..."
                   : authMode === "login"
-                    ? "Login Securely"
+                    ? "Log in securely"
                     : "Create Account"}
               </button>
             </form>

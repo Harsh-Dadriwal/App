@@ -218,11 +218,11 @@ export class RequirementsService {
 
   private async requireTenant(actor: RequestActor) {
     if (!actor.appUserId) {
-      throw new UnauthorizedException("App profile not linked.");
+      throw new UnauthorizedException("Your profile could not be found. Please sign in again.");
     }
 
     if (!actor.defaultTenantId) {
-      throw new BadRequestException("No active tenant selected.");
+      throw new BadRequestException("No active workspace selected.");
     }
 
     await this.tenantAccess.assertTenantAccess(actor, actor.defaultTenantId);

@@ -34,7 +34,7 @@ export class ProjectMediaService {
   ) {}
 
   private requireUserId(actor: RequestActor) {
-    if (!actor.appUserId) throw new UnauthorizedException("App profile not linked.");
+    if (!actor.appUserId) throw new UnauthorizedException("Your profile could not be found. Please sign in again.");
     return actor.appUserId;
   }
 

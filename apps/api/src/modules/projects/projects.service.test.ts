@@ -43,7 +43,7 @@ describe("ProjectsService Data Access & Permissions", () => {
     const mockTenantAccess: any = {
       assertTenantAccess: async (_actor: RequestActor, tenantId: string) => {
         if (tenantId !== outsiderActor.defaultTenantId) {
-          throw new ForbiddenException("You do not have access to this tenant.");
+          throw new ForbiddenException("You do not have access to this workspace.");
         }
       }
     };
@@ -100,6 +100,6 @@ describe("ProjectsService Data Access & Permissions", () => {
         user_id: "user_outsider",
         role_key: "electrician"
       });
-    }, /Selected user is not an active member of this tenant/);
+    }, /selected user is not an active member of this workspace/i);
   });
 });

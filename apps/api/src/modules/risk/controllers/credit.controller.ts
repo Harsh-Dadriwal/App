@@ -101,7 +101,7 @@ export class CreditController {
     @Body() body: { contractorId: string; orderAmount: number }
   ) {
     if (!body.contractorId || !body.orderAmount) {
-      throw new BadRequestException("contractorId and orderAmount are required.");
+      throw new BadRequestException("Contractor and order amount are required.");
     }
     return {
       data: await this.creditEngineService.approveOrder(body.contractorId, body.orderAmount)
@@ -122,7 +122,7 @@ export class CreditController {
       throw new ForbiddenException("Only finance admins can perform manual reviews.");
     }
     if (!body.contractorId || !body.action) {
-      throw new BadRequestException("contractorId and action are required.");
+      throw new BadRequestException("Contractor and action are required.");
     }
     return {
       data: await this.creditEngineService.processManualReview(

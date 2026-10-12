@@ -29,7 +29,7 @@ export class IdentityService {
 
   async getTenantMemberships(actor: RequestActor, accessToken: string) {
     if (!actor.appUserId) {
-      throw new UnauthorizedException("App profile not linked.");
+      throw new UnauthorizedException("Your profile could not be found. Please sign in again.");
     }
 
     return this.tenantsService.getMembershipsForUser(actor.appUserId, accessToken);
@@ -37,7 +37,7 @@ export class IdentityService {
 
   async switchTenant(actor: RequestActor, tenantId: string, accessToken: string) {
     if (!actor.appUserId) {
-      throw new UnauthorizedException("App profile not linked.");
+      throw new UnauthorizedException("Your profile could not be found. Please sign in again.");
     }
 
     return this.tenantsService.switchTenantForUser(actor.appUserId, tenantId, accessToken);

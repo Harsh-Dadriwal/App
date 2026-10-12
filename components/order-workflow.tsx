@@ -210,7 +210,7 @@ export function AdminWorkflowHubPage() {
           loading={recentEntities.loading}
           error={recentEntities.error}
           hasData={recentEntities.data.length > 0}
-          empty={{ title: "No recent workflow entities", description: "Run order approvals, substitute changes, or supply actions to populate this queue." }}
+          empty={{ title: "No recent activity", description: "Recent approvals, substitutions and supply updates will appear here." }}
         >
           <div className="workflow-entity-grid">
             {recentEntities.data.map((row: any) => (
@@ -225,7 +225,7 @@ export function AdminWorkflowHubPage() {
               >
                 <span>{row.entity_type.replace("_", " ")}</span>
                 <strong>{row.item_name_snapshot ?? row.order_number ?? row.entity_id}</strong>
-                <p>{row.site_name ?? "Workflow entity"}</p>
+                <p>{row.site_name ?? "Order activity"}</p>
                 <small>
                   {row.event_type} · {row.actor_name ?? "System"} · {new Date(row.created_at).toLocaleString("en-IN")}
                 </small>

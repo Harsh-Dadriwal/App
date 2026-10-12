@@ -303,7 +303,7 @@ export function AdminPartnerIncentivesPage() {
         </QueryState>
       </PageSection>
       <PageSection title="Reports" description="Top partners, paid commission, business, points issued, tier distribution, and growth rollups.">
-        <QueryState loading={reports.loading} error={reports.error} hasData={reports.data.length > 0} empty={{ title: "No incentive reports", description: "Reports populate as completed orders generate incentive ledger entries." }}>
+        <QueryState loading={reports.loading} error={reports.error} hasData={reports.data.length > 0} empty={{ title: "No incentive reports", description: "Reports appear as completed orders earn incentives." }}>
           <DataTable
             columns={["Partner", "Type", "Tier", "Business", "Commission", "Points issued", "Current points"]}
             rows={reports.data.map((row: any) => [row.partner_name, row.partner_type, row.tier_name ?? "-", formatMoney(row.total_business), formatMoney(row.commission_earned), formatPoints(row.bonus_points_earned), formatPoints(row.current_points)])}

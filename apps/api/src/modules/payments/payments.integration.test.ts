@@ -78,7 +78,7 @@ describe("Real PostgreSQL Database Integration Tests (Fail-Closed & Durable Pers
         });
       },
       (err: any) => {
-        assert.match(err.message, /does not belong to your tenant/);
+        assert.match(err.message, /You do not have access to this/);
         return true;
       }
     );
@@ -182,7 +182,7 @@ describe("Real PostgreSQL Database Integration Tests (Fail-Closed & Durable Pers
         await failClosedService.getPaymentRecord("order_unreachable");
       },
       (err: any) => {
-        assert.match(err.message, /Database payment lookup failed/);
+        assert.match(err.message, /could not process your payment/);
         return true;
       }
     );

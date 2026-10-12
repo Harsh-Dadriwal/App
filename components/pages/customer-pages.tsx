@@ -131,7 +131,7 @@ export function CustomerDashboardPage() {
       />
       <PageSection
         title="Project overview"
-        description="Customer dashboard data is coming directly from database views, not preview records."
+        description="Your live project progress, approvals and spending at a glance."
       >
         <QueryState
           loading={sites.loading}
@@ -139,7 +139,7 @@ export function CustomerDashboardPage() {
           hasData={sites.data.length > 0}
           empty={{
             title: "No sites assigned",
-            description: "You have no sites assigned to you in the database. Create your first site below to see live project tracking."
+            description: "You have no sites yet. Create your first site below to start tracking your project."
           }}
         >
           <CardGrid>
@@ -206,14 +206,14 @@ export function DirectoryPage({
     <div className="page-stack">
       <PageSection
         title={title}
-        description="Only database records that are active, verified, and admin-approved appear here."
+        description="Only active, verified and approved professionals appear here."
       >
         <QueryState
           loading={directory.loading}
           error={directory.error}
           hasData={directory.data.length > 0}
           empty={{
-            title: "No matching professionals in database",
+            title: "No matching professionals",
             description: "There are currently no verified professionals in this directory. When admin verifies them, they will appear here automatically."
           }}
         >
@@ -511,8 +511,8 @@ export function CustomerSitesPage() {
           error={sites.error}
           hasData={sites.data.length > 0}
           empty={{
-            title: "No site records found in database",
-            description: "Insert site data using the wizard above to populate this section."
+            title: "No sites yet",
+            description: "Add a site using the form above to get started."
           }}
         >
           <ListSearchField value={siteSearch} onChange={setSiteSearch} placeholder="Search by name, code, city, or status" ariaLabel="Search sites" />
@@ -591,15 +591,15 @@ export function TipsPage({ category }: { category: "electrical_tips" | "home_tip
     <div className="page-stack">
       <PageSection
         title={category === "electrical_tips" ? "Electrical tips & tricks" : "Home tips & tricks"}
-        description="Published content is fetched from the database content table."
+        description="Helpful tips and guides for your project."
       >
         <QueryState
           loading={posts.loading}
           error={posts.error}
           hasData={posts.data.length > 0}
           empty={{
-            title: "No published tips in database",
-            description: `There is no content in the database for the category "${category}".`
+            title: "No tips published yet",
+            description: `There are no tips in the "${category}" category yet.`
           }}
         >
           <ListSearchField value={tipSearch} onChange={setTipSearch} placeholder="Search tips by title or summary" ariaLabel="Search tips" />
@@ -644,15 +644,15 @@ export function CustomerBudgetPage() {
   return (
     <PageSection
       title="Budget tracker"
-      description="Budget numbers are sourced from the tracker table and site spend fields."
+      description="Your budget and spend across all sites."
     >
       <QueryState
         loading={budgets.loading}
         error={budgets.error}
         hasData={budgets.data.length > 0}
         empty={{
-          title: "No budget records in database",
-          description: "There are no budget tracker rows for your sites. Approvals will populate this data automatically."
+          title: "No budget details yet",
+          description: "Your budget will show here once your orders are approved."
         }}
       >
         <DataTable
@@ -902,7 +902,7 @@ export function CustomerFinancePage() {
           hasData={finance.data.length > 0}
           empty={{
             title: "No finance applications yet",
-            description: "Finance applications will appear here when they are inserted in the database."
+            description: "Your finance applications will appear here once you submit one."
           }}
         >
           <ListSearchField value={financeSearch} onChange={setFinanceSearch} placeholder="Search finance applications" ariaLabel="Search finance applications" />
@@ -1026,7 +1026,7 @@ export function CustomerApprovalsPage() {
         hasData={approvals.data.length > 0}
         empty={{
           title: "No approval items waiting",
-          description: "When electrician or architect workflows reach customer approval, records will appear here."
+          description: "Items awaiting your approval will appear here."
         }}
       >
         <FormNotice error={mutation.error} success={mutation.success} />

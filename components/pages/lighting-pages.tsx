@@ -233,7 +233,7 @@ export function LightingVisualizerPage({ role }: { role: "customer" | "architect
           hasData={products.data.length > 0}
           empty={{
             title: "No lighting products yet",
-            description: "Run the lighting visualizer SQL migration or add lighting products in Supabase first.",
+            description: "Lighting products are not available yet. Please check back soon.",
           }}
         >
           <div className="lighting-layout">
@@ -312,7 +312,7 @@ export function LightingVisualizerPage({ role }: { role: "customer" | "architect
       </PageSection>
 
       {role !== "admin" ? (
-        <FormCard title="Request a quote" description="Save this exact scene, your contact details, and the selected product to Supabase so the team can follow up.">
+        <FormCard title="Request a quote" description="Share this scene and your contact details so our team can follow up with a quote.">
           <FormGrid>
             <label>
               Name
@@ -358,7 +358,7 @@ export function LightingVisualizerPage({ role }: { role: "customer" | "architect
           <FormNotice error={mutation.error} success={mutation.success} />
         </FormCard>
       ) : (
-        <PageSection title="Recent visualizer leads" description="Admin can review the most recent room-scene quote requests captured from the visualizer.">
+        <PageSection title="Recent visualizer leads" description="Most recent room-scene quote requests from the visualizer.">
           <QueryState
             loading={leads.loading}
             error={leads.error}

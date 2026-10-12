@@ -65,7 +65,7 @@ export function ElectricianDashboardPage() {
       />
       <PageSection
         title="Electrician activity"
-        description="Bid opportunities and live project execution are both sourced from database views."
+        description="Bid opportunities and live project progress."
       >
         <QueryState
           loading={ongoing.loading}
@@ -73,7 +73,7 @@ export function ElectricianDashboardPage() {
           hasData={ongoing.data.length > 0}
           empty={{
             title: "No active electrician projects",
-            description: "Assign an electrician to a site in the database to populate this dashboard."
+            description: "Projects will appear here once you are assigned to a site."
           }}
         >
           <CardGrid>
@@ -357,15 +357,15 @@ export function ElectricianProjectsPage({
       ) : null}
       <PageSection
         title={titleMap[mode]}
-        description="Project data is being read live from the matching electrician database view."
+        description="Live project progress."
       >
         <QueryState
           loading={query.loading}
           error={query.error}
           hasData={query.data.length > 0}
           empty={{
-            title: "No matching project records",
-            description: "Once rows exist in the corresponding project view, they will appear here."
+            title: "No matching projects",
+            description: "Matching projects will appear here."
           }}
         >
           <DataTable
@@ -1035,7 +1035,7 @@ export function ElectricianMaterialsPage() {
           hasData={materials.data.length > 0}
           empty={{
             title: "No material tracker data",
-            description: "Create order items linked to an electrician-assigned site to populate this screen."
+            description: "Order items for your assigned sites will appear here."
           }}
         >
           <ListSearchField

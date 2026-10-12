@@ -44,13 +44,13 @@ export function MaterialsScreen() {
   return (
     <ScreenShell
       title="Material tracker"
-      subtitle="Mobile view of live material requirements, approvals, and supply progress."
+      subtitle="Material requirements, approvals and supply progress."
       currentScreen="materials"
       showBack
     >
       {mutation.success ? <Notice message={mutation.success} tone="success" /> : null}
       {mutation.error ? <Notice message={mutation.error} tone="error" /> : null}
-      <SectionTitle title="Tracked items" description="Each card comes from the same tracker views used by the web app." />
+      <SectionTitle title="Tracked items" description="Each card shows one tracked material item." />
       <QueryState loading={query.loading} error={query.error} hasData={query.data.length > 0} empty="No material lines are visible for this user yet.">
         {query.data.map((item: any) => (
           <Card key={item.order_item_id} tone="soft">

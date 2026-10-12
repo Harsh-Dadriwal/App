@@ -72,7 +72,7 @@ export function DashboardScreen() {
   return (
     <ScreenShell
       title={`${roleLabels[profile.role]} mobile workspace`}
-      subtitle="Designed for field use: quick taps, compact lists, and faster material selection from the same Supabase data."
+      subtitle="Quick access to your materials, approvals and orders."
       currentScreen="dashboard"
     >
       <Card tone="brand">
@@ -106,7 +106,7 @@ export function DashboardScreen() {
           The mobile app uses the same tables, views, roles, notes, approvals, orders, product requests, and admin controls as the web app.
         </Text>
         <View style={{ marginTop: 14 }}>
-          <AppButton label="Sign out" icon="log-out" kind="secondary" onPress={() => void signOut()} />
+          <AppButton label="Log out" icon="log-out" kind="secondary" onPress={() => void signOut()} />
         </View>
       </Card>
     </ScreenShell>

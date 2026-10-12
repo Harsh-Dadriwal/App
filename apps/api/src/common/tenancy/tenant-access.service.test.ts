@@ -79,7 +79,7 @@ test("getActorTenantIds requires an app profile", async () => {
     () => service.getActorTenantIds(createActor({ appUserId: null })),
     (error: unknown) =>
       error instanceof UnauthorizedException &&
-      error.message === "App profile not linked."
+      error.message === "Your profile could not be found. Please sign in again."
   );
 });
 
@@ -94,7 +94,7 @@ test("assertTenantAccess rejects users outside the tenant", async () => {
     () => service.assertTenantAccess(createActor(), "tenant-1"),
     (error: unknown) =>
       error instanceof ForbiddenException &&
-      error.message === "You do not have access to this tenant."
+      error.message === "You do not have access to this workspace."
   );
 });
 
@@ -118,7 +118,7 @@ test("assertTenantAdmin rejects non-admin membership role", async () => {
     () => service.assertTenantAdmin(createActor({ role: "customer" }), "tenant-1"),
     (error: unknown) =>
       error instanceof ForbiddenException &&
-      error.message === "Admin tenant access required."
+      error.message === "Admin access required."
   );
 });
 

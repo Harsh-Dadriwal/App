@@ -164,7 +164,7 @@ function AdminCreditDashboard({ onSelectContractor }: DashboardProps) {
 
       <PageSection
         title="Contractors Credit Directory"
-        description="Real-time monitoring of limits, risk profiles, and payment behaviors. Click a contractor to adjust limits or view timelines."
+        description="Monitoring of limits, risk profiles, and payment behaviors. Click a contractor to adjust limits or view timelines."
       >
         <div className="flex justify-end mb-4">
           <button
@@ -561,7 +561,7 @@ function ContractorCreditDetail({ contractorId, onBack }: DetailProps) {
                 hasData={activeProjects.data.length > 0}
                 empty={{
                   title: "No linked projects",
-                  description: "Project records for this contractor will appear here."
+                  description: "Projects for this contractor will appear here."
                 }}
               >
                 <DataTable

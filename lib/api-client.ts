@@ -1,4 +1,5 @@
 import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
+import { getBackendApiBaseUrl } from "@/lib/backend/config";
 
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const supabase = await getSupabaseBrowserClient();
@@ -24,7 +25,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   headers.set("Pragma", "no-cache");
   headers.set("Expires", "0");
 
-  const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}${endpoint}`;
+  const url = `${getBackendApiBaseUrl()}${endpoint}`;
 
   return fetch(url, {
     cache: "no-store",

@@ -73,7 +73,7 @@ export function CatalogScreen() {
         </ScrollView>
       </Card>
 
-      <SectionTitle title="Products" description="Same live products table as the web app." />
+      <SectionTitle title="Products" description="Browse the full product catalog." />
       <QueryState
         loading={products.loading}
         error={products.error}

@@ -81,7 +81,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
 
     if (error) {
       setErrorMessage(
-        "Signed in, but the app profile could not be loaded. Run the SQL migrations in Supabase and try again."
+        "Signed in, but your profile could not be loaded. Please try again or contact support."
       );
       setProfile(null);
       return null;
@@ -129,7 +129,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
 
         if (profileResult.error) {
           setErrorMessage(
-            "Signed in, but the app profile could not be loaded. Run the SQL migrations in Supabase and try again."
+            "Signed in, but your profile could not be loaded. Please try again or contact support."
           );
           setProfile(null);
         } else {
@@ -152,7 +152,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
           await fetchTenantContext(nextProfile);
           setErrorMessage(
             profileResult.error
-              ? "Signed in, but the app profile could not be loaded. Run the SQL migrations in Supabase and try again."
+              ? "Signed in, but your profile could not be loaded. Please try again or contact support."
               : ""
           );
         } else {

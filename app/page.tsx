@@ -29,15 +29,8 @@ export default function RootPage() {
     return (
       <main className="setup-shell fade-in">
         <section className="setup-card">
-          <span className="eyebrow">Supabase Setup Required</span>
-          <h1>Connect the app with your Supabase project before using the workspace.</h1>
-          <p>
-            Add your project URL and anon key to <code>.env.local</code>.
-          </p>
-          <div className="code-block">
-            <code>NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co</code>
-            <code>NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key</code>
-          </div>
+          <span className="eyebrow">Service unavailable</span>
+          <h1>We cannot load your workspace right now. Please try again shortly.</h1>
         </section>
       </main>
     );

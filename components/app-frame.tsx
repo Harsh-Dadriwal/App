@@ -19,16 +19,8 @@ function SetupView() {
   return (
     <main className="setup-shell">
       <section className="setup-card">
-        <span className="eyebrow">Supabase Setup Required</span>
-        <h1>Connect the app with your Supabase project before using the role-based workspace.</h1>
-        <p>
-          Add your project URL and anon key to <code>.env.local</code>, then run the Supabase SQL
-          files in the SQL editor.
-        </p>
-        <div className="code-block">
-          <code>NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co</code>
-          <code>NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key</code>
-        </div>
+        <span className="eyebrow">Service unavailable</span>
+        <h1>We cannot load your workspace right now. Please try again shortly.</h1>
       </section>
     </main>
   );
@@ -253,7 +245,7 @@ export function AppFrame({
             <strong>{theme === "dark" ? "L" : "D"}</strong>
           </button>
           <button type="button" className="secondary-button" onClick={() => void signOut()}>
-            Sign out
+            Log out
           </button>
         </div>
       </aside>

@@ -74,7 +74,7 @@ export function ApprovalsScreen() {
   return (
     <ScreenShell
       title="Customer approvals"
-      subtitle="Approve line items and substitute suggestions from the same workflow RPCs used by the web app."
+      subtitle="Approve line items and substitute suggestions."
       currentScreen="approvals"
       showBack
     >

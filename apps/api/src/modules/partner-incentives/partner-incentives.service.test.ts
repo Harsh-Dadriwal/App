@@ -65,7 +65,7 @@ describe("PartnerIncentivesService", () => {
   });
 
   it("requires tenant admin access for admin overview", async () => {
-    const service = createService({ assertTenantAdmin: async () => { throw new ForbiddenException("Admin tenant access required."); } });
+    const service = createService({ assertTenantAdmin: async () => { throw new ForbiddenException("Admin access required."); } });
     await assert.rejects(
       () => service.listAdminOverview({ authUserId: "auth", appUserId: "user", role: "architect", defaultTenantId: "tenant" }, "token"),
       ForbiddenException

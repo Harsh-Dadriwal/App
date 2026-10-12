@@ -16,6 +16,7 @@ import {
   useRows
 } from "@/components/data-view";
 import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
+import { getBackendApiBaseUrl } from "@/lib/backend/config";
 import {
   ensureWalletAccount,
   paySavingsInstallment,
@@ -389,7 +390,7 @@ export function CustomerWalletPage() {
       />
       <PageSection
         title="Wallet ledger"
-        description="This is the customer-facing wallet view for rewards, savings credits, and future financing movements."
+        description="Your rewards, savings credits and wallet activity."
       >
         <QueryState
           loading={wallet.loading || ledger.loading}
@@ -397,7 +398,7 @@ export function CustomerWalletPage() {
           hasData={Boolean(wallet.data.length)}
           empty={{
             title: "Wallet not created yet",
-            description: "Ask admin to run the fintech migration and create a wallet account for this customer."
+            description: "Your wallet is not set up yet. Please contact support."
           }}
         >
           <CardGrid>
@@ -601,7 +602,7 @@ export function CustomerSavingsPage() {
           hasData={templates.data.length > 0}
           empty={{
             title: "No active savings plans",
-            description: "Admin can create savings plan templates from the fintech control center."
+            description: "Create a savings plan to get started."
           }}
         >
           <CardGrid>
@@ -817,7 +818,7 @@ export function CustomerReferralsPage() {
         items={[
           { label: "Referral codes", value: codes.data.length },
           { label: "Referral events", value: events.data.length },
-          { label: "Reward records", value: rewards.data.length },
+          { label: "Rewards", value: rewards.data.length },
           { label: "Earned value", value: `₹${totalEarned.toLocaleString("en-IN")}` }
         ]}
       />
@@ -964,7 +965,7 @@ export function AdminFintechPage() {
       async () => {
         const sessionResult = await supabase.auth.getSession();
         const accessToken = sessionResult.data.session?.access_token;
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/risk/profile/recalculate`, {
+        const response = await fetch(`${getBackendApiBaseUrl()}/api/v1/risk/profile/recalculate`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -1024,12 +1025,26 @@ export function AdminFintechPage() {
 
   const users = useRows(
     async (client) => {
-      const { data, error } = await client
+      const { data: memberships, error: membershipError } = await client
         .from("tenant_memberships")
-        .select("user_id, user:users!tenant_memberships_user_id_fkey(id, full_name, email, role)")
+        .select("user_id")
         .eq("tenant_id", tenantId)
         .eq("is_active", true);
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
+      if (membershipError) return { data: [] as any[], error: membershipError.message };
+
+      const userIds = (memberships ?? []).map((row: any) => row.user_id).filter(Boolean);
+      if (!userIds.length) return { data: [] as any[], error: null };
+
+      const { data: people, error: usersError } = await client
+        .from("users")
+        .select("id, full_name, email, role")
+        .in("id", userIds);
+      if (usersError) return { data: [] as any[], error: usersError.message };
+
+      return {
+        data: (people ?? []).map((person: any) => ({ user_id: person.id, user: person })) as any[],
+        error: null
+      };
     },
     [tenantId]
   );
@@ -1280,7 +1295,7 @@ export function AdminFintechPage() {
       />
       <FormCard
         title="Create savings plan template"
-        description="This is the control center for your 10-12 month store-value savings product."
+        description="Set up savings plans that customers can subscribe to."
       >
         <form onSubmit={createSavingsPlan} className="auth-form">
           <FormGrid>
@@ -1470,13 +1485,13 @@ export function AdminFintechPage() {
         </QueryState>
       </PageSection>
 
-      <PageSection title="Fintech live tables" description="This gives operations visibility into the first live wallet, savings, and referral records.">
+      <PageSection title="Wallet and savings overview" description="Recent wallet, savings and referral activity.">
         <QueryState
           loading={wallets.loading || plans.loading || programs.loading || subscriptions.loading || pendingRewards.loading}
           error={wallets.error || plans.error || programs.error || subscriptions.error || pendingRewards.error}
           hasData={wallets.data.length > 0 || plans.data.length > 0 || programs.data.length > 0}
           empty={{
-            title: "No fintech records yet",
+            title: "No wallet activity yet",
             description: "Create wallets, savings plans, and referral programs to start operating the fintech layer."
           }}
         >

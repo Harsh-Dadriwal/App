@@ -99,15 +99,15 @@ describe("PaymentsService Fail-Closed Security & Integrity Controls", () => {
 
     await assert.rejects(async () => {
       await service.resolveServerAmount(tenantA, { amount: -500, purpose: "wallet_topup" });
-    }, /Wallet top-up amount must be a positive number/);
+    }, /valid top-up amount/);
 
     await assert.rejects(async () => {
       await service.resolveServerAmount(tenantA, { amount: 0, purpose: "wallet_topup" });
-    }, /Wallet top-up amount must be a positive number/);
+    }, /valid top-up amount/);
 
     await assert.rejects(async () => {
       await service.resolveServerAmount(tenantA, { amount: NaN, purpose: "wallet_topup" });
-    }, /Wallet top-up amount must be a positive number/);
+    }, /valid top-up amount/);
   });
 
   test("rejects order reference belonging to another tenant", async () => {
@@ -131,7 +131,7 @@ describe("PaymentsService Fail-Closed Security & Integrity Controls", () => {
         });
       },
       (err: any) => {
-        assert.match(err.message, /does not belong to your tenant/);
+        assert.match(err.message, /You do not have access to this/);
         return true;
       }
     );
@@ -156,7 +156,7 @@ describe("PaymentsService Fail-Closed Security & Integrity Controls", () => {
         await service.getPaymentRecord("order_fail_1");
       },
       (err: any) => {
-        assert.match(err.message, /Database payment lookup failed/);
+        assert.match(err.message, /could not process your payment/);
         return true;
       }
     );

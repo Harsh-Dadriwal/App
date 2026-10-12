@@ -72,7 +72,7 @@ export class MaintenanceService {
 
   private assertArchitectOrCustomer(actor: RequestActor) {
     if (!actor.appUserId) {
-      throw new UnauthorizedException("App profile not linked.");
+      throw new UnauthorizedException("Your profile could not be found. Please sign in again.");
     }
 
     if (!["architect", "customer"].includes(actor.role ?? "")) {
@@ -106,7 +106,7 @@ export class MaintenanceService {
 
   async submitBid(actor: RequestActor, taskId: string, body: SubmitTaskBidRequestDto) {
     if (!actor.appUserId) {
-      throw new UnauthorizedException("App profile not linked.");
+      throw new UnauthorizedException("Your profile could not be found. Please sign in again.");
     }
 
     if (!isHandymanRole(actor.role)) {

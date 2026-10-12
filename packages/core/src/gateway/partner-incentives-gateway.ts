@@ -27,7 +27,7 @@ export function createPartnerIncentivesGateway({
 }) {
   const ensureConfigured = () => {
     if (!isBackendApiConfigured()) {
-      return { data: null, error: "Backend API is not configured." };
+      return { data: null, error: "This service is temporarily unavailable. Please try again shortly." };
     }
     return null;
   };

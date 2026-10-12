@@ -25,7 +25,7 @@ export class ProjectsService {
 
   private requireProfile(actor: RequestActor) {
     if (!actor.appUserId) {
-      throw new UnauthorizedException("App profile not linked.");
+      throw new UnauthorizedException("Your profile could not be found. Please sign in again.");
     }
     return actor.appUserId;
   }
@@ -71,7 +71,7 @@ export class ProjectsService {
   }
 
   async list(actor: RequestActor, tenantId: string) {
-    if (!tenantId) throw new BadRequestException("tenant_id is required.");
+    if (!tenantId) throw new BadRequestException("Please select a workspace.");
     const userId = this.requireProfile(actor);
     await this.tenantAccess.assertTenantAccess(actor, tenantId);
 
@@ -121,7 +121,7 @@ export class ProjectsService {
   async create(actor: RequestActor, body: CreateProjectRequestDto) {
     const userId = this.requireProfile(actor);
     if (!body.tenant_id || !body.project_code?.trim() || !body.name?.trim()) {
-      throw new BadRequestException("tenant_id, project_code, and name are required.");
+      throw new BadRequestException("Project code and name are required.");
     }
     await this.tenantAccess.assertTenantAccess(actor, body.tenant_id);
 
@@ -166,7 +166,7 @@ export class ProjectsService {
     const project = await this.getProject(actor, projectId);
     await this.assertProjectManager(actor, project);
     if (!body.user_id || !body.role_key?.match(/^[a-z][a-z0-9_]{1,63}$/)) {
-      throw new BadRequestException("A user_id and valid role_key are required.");
+      throw new BadRequestException("Please choose a user and a role.");
     }
 
     const tenantMembership = await this.supabaseAdmin
@@ -180,7 +180,7 @@ export class ProjectsService {
 
     if (tenantMembership.error) throw new Error(tenantMembership.error.message);
     if (!tenantMembership.data) {
-      throw new BadRequestException("Selected user is not an active member of this tenant.");
+      throw new BadRequestException("The selected user is not an active member of this workspace.");
     }
 
     const role = await this.supabaseAdmin
@@ -192,7 +192,7 @@ export class ProjectsService {
       .eq("is_active", true)
       .maybeSingle();
     if (role.error) throw new Error(role.error.message);
-    if (!role.data) throw new BadRequestException("Role is not configured for this tenant.");
+    if (!role.data) throw new BadRequestException("This role is not available in your workspace.");
 
     const result = await this.supabaseAdmin
       .getClient()

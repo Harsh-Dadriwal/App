@@ -277,7 +277,7 @@ export function AdminCatalogPage() {
       {isCategoryModalOpen ? (
         <ModalShell
           title={editingCategoryId ? "Edit category" : "Create category"}
-          description="Maintain the first level of the product catalog directly from the admin app."
+          description="Manage the top level of the product catalog."
           onClose={closeCategoryModal}
         >
           <form onSubmit={saveCategory} className="auth-form">

@@ -33,8 +33,8 @@ import {
   listInventoryProducts,
   listProductBrands,
   listProductCategories,
-  getTallyStatus,
-  listTallyProducts,
+  getGoogleDriveProductsStatus,
+  listGoogleDriveProducts,
   saveInventoryProduct,
   updateProductImage
 } from "@/lib/backend/modules/inventory-gateway";
@@ -267,13 +267,13 @@ export function AdminUsersPage() {
   return (
     <PageSection
       title="Users, verification & promotion"
-      description="Admin can search every user, review usernames, and promote customers into any supported handyman or professional role."
+      description="Search users, review usernames and assign professional roles."
     >
       <QueryState
         loading={users.loading}
         error={users.error}
         hasData={users.data.length > 0}
-        empty={{ title: "No users found", description: "Create auth users and public user profiles to populate this page." }}
+        empty={{ title: "No users found", description: "Users will appear here once they sign up." }}
       >
         <FormNotice error={mutation.error} success={mutation.success} />
         <ListSearchField
@@ -451,7 +451,7 @@ export function AdminOrdersPage() {
 
   return (
     <div className="page-stack">
-    <FormCard title={editingId ? "Edit order" : "Create order"} description="Admin can manage order headers used by material line items.">
+    <FormCard title={editingId ? "Edit order" : "Create order"} description="Create or edit an order that material items are added to.">
       <form onSubmit={saveOrder} className="auth-form">
         <FormGrid>
           <label>
@@ -501,12 +501,12 @@ export function AdminOrdersPage() {
         <FormNotice error={mutation.error} success={mutation.success} />
       </form>
     </FormCard>
-    <PageSection title="Orders" description="Confirmed and in-progress orders from the core orders table.">
+    <PageSection title="Orders" description="Confirmed and in-progress orders.">
       <QueryState
         loading={orders.loading}
         error={orders.error}
         hasData={orders.data.length > 0}
-        empty={{ title: "No orders found", description: "Order records will appear here when site orders are inserted." }}
+        empty={{ title: "No orders found", description: "Orders will appear here once they are placed." }}
       >
         <CardGrid>
           {orders.data.map((order: any) => (
@@ -555,7 +555,7 @@ export function AdminOrdersPage() {
         </CardGrid>
       </QueryState>
     </PageSection>
-    <PageSection title="Order item supply actions" description="Admins can mark individual line items as supplied from here.">
+    <PageSection title="Order item supply actions" description="Mark individual items as supplied.">
       <QueryState
         loading={orderItems.loading}
         error={orderItems.error}
@@ -1053,7 +1053,7 @@ export function AdminProductsPage() {
           loading={products.loading}
           error={products.error}
           hasData={visibleProducts.length > 0}
-          empty={{ title: "No products found in database", description: "Add product catalog records to the database to populate this screen." }}
+          empty={{ title: "No products found", description: "Add products to the catalog to see them here." }}
         >
           <CardGrid>
             {visibleProducts.map((product: any) => (
@@ -1098,27 +1098,27 @@ export function AdminProductsPage() {
         </QueryState>
       </PageSection>
 
-      <TallyProductBrowser />
+      <GoogleDriveProductBrowser />
 
       <InventoryIntelligenceDashboard />
     </div>
   );
 }
 
-function TallyProductBrowser() {
+function GoogleDriveProductBrowser() {
   const [search, setSearch] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const status = useRows(async () => {
-    const result = await getTallyStatus();
+    const result = await getGoogleDriveProductsStatus();
     return { data: result.data ? [result.data] : [], error: result.error };
   }, []);
-  const tallyProducts = useRows(async () => {
-    const result = await listTallyProducts();
+  const driveProducts = useRows(async () => {
+    const result = await listGoogleDriveProducts();
     return { data: result.data ? [result.data] : [], error: result.error };
   }, [refreshKey, Boolean(status.data[0]?.configured)], { enabled: refreshKey > 0 && Boolean(status.data[0]?.configured) });
 
   const connector = status.data[0];
-  const source = tallyProducts.data[0];
+  const source = driveProducts.data[0];
   const products = useMemo(() => source?.products ?? [], [source]);
   const visibleProducts = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -1132,40 +1132,39 @@ function TallyProductBrowser() {
 
   return (
     <PageSection
-      title="Live Tally products"
-      description="A read-only view of stock items from TallyPrime. Refresh reads the current Tally data; it does not change your app catalog."
+      title="Stock list"
+      description="Latest stock items, closing balances and rates. Refresh to load the newest list; your catalog is not changed."
     >
       <div className="inline-actions" style={{ marginBottom: "0.75rem", flexWrap: "wrap" }}>
         <button
           type="button"
           className="primary-button"
-          disabled={!connector?.configured || tallyProducts.loading}
+          disabled={!connector?.configured || driveProducts.loading}
           onClick={() => setRefreshKey((value) => value + 1)}
         >
-          {tallyProducts.loading ? "Reading Tally..." : "Refresh from Tally"}
+          {driveProducts.loading ? "Refreshing..." : "Refresh stock list"}
         </button>
-        {connector?.company ? <span className="form-field-hint">Company: {connector.company}</span> : null}
       </div>
       {status.error ? <FormNotice error={status.error} /> : null}
       {!status.loading && connector ? <p className="form-field-hint">{connector.message}</p> : null}
-      {tallyProducts.error ? <FormNotice error={tallyProducts.error} /> : null}
+      {driveProducts.error ? <FormNotice error={driveProducts.error} /> : null}
       {products.length > 0 ? (
         <>
           <ListSearchField
             value={search}
             onChange={setSearch}
-            placeholder="Filter live Tally items by name, group, or HSN"
-            ariaLabel="Filter live Tally products"
+            placeholder="Filter by name, group, or HSN"
+            ariaLabel="Filter stock items"
           />
           <p className="form-field-hint" style={{ marginTop: "-0.4rem" }}>
-            Showing {visibleProducts.length} of {source?.total ?? products.length} live item{(source?.total ?? products.length) === 1 ? "" : "s"}.
+            Showing {visibleProducts.length} of {source?.total ?? products.length} item{(source?.total ?? products.length) === 1 ? "" : "s"}.
           </p>
           <CardGrid>
             {visibleProducts.map((product: any) => (
               <DataCard
                 key={product.id}
                 title={product.name}
-                subtitle={[product.group, product.hsnCode ? `HSN ${product.hsnCode}` : null].filter(Boolean).join(" · ") || "Tally stock item"}
+                subtitle={[product.group, product.hsnCode ? `HSN ${product.hsnCode}` : null].filter(Boolean).join(" · ") || "Stock item"}
                 meta={product.unit ?? "unit not set"}
               >
                 <p>Available: {product.closingBalance ?? "Not reported"}</p>
@@ -1295,7 +1294,7 @@ export function AdminSubstitutionsPage() {
 
   return (
     <div className="page-stack">
-      <FormCard title="Suggest substitute" description="Admins can send substitute suggestions directly from the app.">
+      <FormCard title="Suggest substitute" description="Send a substitute suggestion for an order item.">
         <form onSubmit={saveSuggestion} className="auth-form">
           <FormGrid>
             <label>
@@ -1331,7 +1330,7 @@ export function AdminSubstitutionsPage() {
           loading={substitutions.loading}
           error={substitutions.error}
           hasData={substitutions.data.length > 0}
-          empty={{ title: "No substitution records in database", description: "Substitute suggestion rows will appear here when they are created in the database." }}
+          empty={{ title: "No substitutions yet", description: "Substitute suggestions will appear here once created." }}
         >
           <DataTable
             columns={["Suggestion ID", "Original Item", "Status", "Reason", "Customer Response"]}
@@ -1390,7 +1389,7 @@ export function AdminContentPage() {
 
   return (
     <div className="page-stack">
-      <FormCard title={editingId ? "Edit content" : "Create content"} description="Admin can manage customer educational content directly from the frontend.">
+      <FormCard title={editingId ? "Edit content" : "Create content"} description="Create and edit tips and guides for customers.">
         <form onSubmit={saveContent} className="auth-form">
           <FormGrid>
             <label>
@@ -1432,13 +1431,13 @@ export function AdminContentPage() {
       </FormCard>
       <PageSection
         title="Tips content"
-        description="Admin can track all educational content rows from the content table."
+        description="All published and draft tips and guides."
       >
         <QueryState
           loading={posts.loading}
           error={posts.error}
           hasData={posts.data.length > 0}
-          empty={{ title: "No content posts", description: "Insert content rows to populate the customer tips pages." }}
+          empty={{ title: "No content posts", description: "Create a tip to show it to customers." }}
         >
           <CardGrid>
             {posts.data.map((post: any) => (

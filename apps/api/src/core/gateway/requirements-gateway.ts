@@ -41,7 +41,7 @@ export function createRequirementsGateway({
     if (!isBackendApiConfigured()) {
       return {
         data: [] as RequirementBatch[],
-        error: "Backend API is not configured."
+        error: "This service is temporarily unavailable. Please try again shortly."
       };
     }
 
@@ -52,7 +52,7 @@ export function createRequirementsGateway({
     if (!isBackendApiConfigured()) {
       return {
         data: null,
-        error: "Backend API is not configured."
+        error: "This service is temporarily unavailable. Please try again shortly."
       };
     }
 
@@ -63,7 +63,7 @@ export function createRequirementsGateway({
     if (!isBackendApiConfigured()) {
       return {
         data: null,
-        error: "Backend API is not configured."
+        error: "This service is temporarily unavailable. Please try again shortly."
       };
     }
 
@@ -77,7 +77,7 @@ export function createRequirementsGateway({
     if (!isBackendApiConfigured()) {
       return {
         data: null,
-        error: "Backend API is not configured."
+        error: "This service is temporarily unavailable. Please try again shortly."
       };
     }
 
@@ -95,7 +95,7 @@ export function createRequirementsGateway({
     if (!isBackendApiConfigured()) {
       return {
         data: null,
-        error: "Backend API is not configured."
+        error: "This service is temporarily unavailable. Please try again shortly."
       };
     }
 
@@ -115,7 +115,7 @@ export function createRequirementsGateway({
     if (!isBackendApiConfigured()) {
       return {
         data: null,
-        error: "Backend API is not configured."
+        error: "This service is temporarily unavailable. Please try again shortly."
       };
     }
 

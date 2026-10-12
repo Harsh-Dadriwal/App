@@ -16,7 +16,7 @@ export class TenantAccessService {
 
   private requireActorProfile(actor: RequestActor) {
     if (!actor.appUserId) {
-      throw new UnauthorizedException("App profile not linked.");
+      throw new UnauthorizedException("Your profile could not be found. Please sign in again.");
     }
   }
 
@@ -39,7 +39,7 @@ export class TenantAccessService {
   async assertTenantAccess(actor: RequestActor, tenantId: string) {
     const tenantIds = await this.getActorTenantIds(actor);
     if (!tenantIds.has(tenantId)) {
-      throw new ForbiddenException("You do not have access to this tenant.");
+      throw new ForbiddenException("You do not have access to this workspace.");
     }
   }
 
@@ -66,7 +66,7 @@ export class TenantAccessService {
     }
 
     if (!result.data || !["admin", "owner"].includes(String(result.data.role))) {
-      throw new ForbiddenException("Admin tenant access required.");
+      throw new ForbiddenException("Admin access required.");
     }
   }
 
@@ -83,7 +83,7 @@ export class TenantAccessService {
     }
 
     if (!result.data) {
-      throw new ForbiddenException(`${table} row not found.`);
+      throw new ForbiddenException("We could not find that item.");
     }
 
     return result.data as unknown as T;
@@ -118,7 +118,7 @@ export class TenantAccessService {
     }
 
     if (!result.data) {
-      throw new ForbiddenException("Wallet account not found.");
+      throw new ForbiddenException("Your wallet could not be found.");
     }
 
     await this.assertTenantAccess(actor, result.data.tenant_id);

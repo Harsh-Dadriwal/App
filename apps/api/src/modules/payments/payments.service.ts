@@ -54,7 +54,7 @@ export class PaymentsService {
 
   private requireActor(actor: RequestActor) {
     if (!actor.authUserId || !actor.appUserId) {
-      throw new UnauthorizedException("Authenticated app user required.");
+      throw new UnauthorizedException("Please sign in to continue.");
     }
   }
 
@@ -69,18 +69,18 @@ export class PaymentsService {
     // Business payment purposes MUST resolve payable amount from authoritative server database
     if (purpose === "order_payment" || purpose === "site_order") {
       if (!refId) {
-        throw new BadRequestException("Reference ID required for order payment.");
+        throw new BadRequestException("Please select an order to pay.");
       }
       const order = await this.fetchSiteOrder(refId);
       if (!order) {
-        throw new BadRequestException("Nonexistent or invalid site order reference.");
+        throw new BadRequestException("We could not find that order.");
       }
       if (actor.defaultTenantId && order.tenant_id && order.tenant_id !== actor.defaultTenantId) {
-        throw new BadRequestException("Order reference does not belong to your tenant.");
+        throw new BadRequestException("You do not have access to this order.");
       }
       const dbAmount = Number(order.total_amount ?? 0);
       if (!Number.isFinite(dbAmount) || dbAmount <= 0) {
-        throw new BadRequestException("Invalid order amount in server record.");
+        throw new BadRequestException("This order amount is not valid. Please contact support.");
       }
       if (body.amount !== undefined && Number(body.amount) !== dbAmount) {
         throw new BadRequestException(
@@ -92,14 +92,14 @@ export class PaymentsService {
 
     if (purpose === "savings_installment") {
       if (!refId) {
-        throw new BadRequestException("Reference ID required for savings installment payment.");
+        throw new BadRequestException("Please select an installment to pay.");
       }
       const installment = await this.fetchSavingsInstallment(refId);
       if (!installment) {
-        throw new BadRequestException("Nonexistent or invalid savings installment reference.");
+        throw new BadRequestException("We could not find that installment.");
       }
       if (actor.defaultTenantId && installment.tenant_id && installment.tenant_id !== actor.defaultTenantId) {
-        throw new BadRequestException("Installment reference does not belong to your tenant.");
+        throw new BadRequestException("You do not have access to this installment.");
       }
       const dueAmount = Number(installment.expected_amount ?? 0) - Number(installment.paid_amount ?? 0);
       if (!Number.isFinite(dueAmount) || dueAmount <= 0) {
@@ -115,18 +115,18 @@ export class PaymentsService {
 
     if (purpose === "repayment_schedule") {
       if (!refId) {
-        throw new BadRequestException("Reference ID required for repayment schedule payment.");
+        throw new BadRequestException("Please select a repayment to pay.");
       }
       const schedule = await this.fetchRepaymentSchedule(refId);
       if (!schedule) {
-        throw new BadRequestException("Nonexistent or invalid repayment schedule reference.");
+        throw new BadRequestException("We could not find that repayment.");
       }
       if (actor.defaultTenantId && schedule.tenant_id && schedule.tenant_id !== actor.defaultTenantId) {
-        throw new BadRequestException("Repayment schedule does not belong to your tenant.");
+        throw new BadRequestException("You do not have access to this repayment.");
       }
       const dueAmount = Number(schedule.installment_amount ?? 0);
       if (!Number.isFinite(dueAmount) || dueAmount <= 0) {
-        throw new BadRequestException("Invalid repayment schedule amount.");
+        throw new BadRequestException("This repayment amount is not valid. Please contact support.");
       }
       if (body.amount !== undefined && Number(body.amount) !== dueAmount) {
         throw new BadRequestException(
@@ -138,7 +138,7 @@ export class PaymentsService {
 
     if (purpose === "wallet_topup") {
       if (!Number.isFinite(clientAmount) || clientAmount <= 0) {
-        throw new BadRequestException("Wallet top-up amount must be a positive number.");
+        throw new BadRequestException("Please enter a valid top-up amount.");
       }
       if (clientAmount > 500000) {
         throw new BadRequestException("Wallet top-up exceeds maximum transaction limit (₹500,000).");
@@ -148,7 +148,7 @@ export class PaymentsService {
 
     // Default / general purpose: strictly validate non-zero positive numeric input
     if (!Number.isFinite(clientAmount) || clientAmount <= 0) {
-      throw new BadRequestException("Amount must be a positive finite number.");
+      throw new BadRequestException("Please enter a valid amount.");
     }
 
     return { amount: clientAmount, currency: "INR", purpose, referenceId: refId };
@@ -280,7 +280,7 @@ export class PaymentsService {
 
     if (error) {
       this.logger.error(`Database error fetching payment record for order ${orderId}: ${error.message}`);
-      throw new InternalServerErrorException(`Database payment lookup failed: ${error.message}`);
+      throw new InternalServerErrorException("We could not process your payment right now. Please try again.");
     }
 
     if (!data) {
@@ -322,7 +322,7 @@ export class PaymentsService {
 
     if (error) {
       this.logger.error(`Database error inserting payment record for order ${record.orderId}: ${error.message}`);
-      throw new InternalServerErrorException(`Payment persistence failed: ${error.message}`);
+      throw new InternalServerErrorException("We could not process your payment right now. Please try again.");
     }
   }
 
@@ -340,7 +340,7 @@ export class PaymentsService {
 
     if (error) {
       this.logger.error(`Database error updating payment record for order ${record.orderId}: ${error.message}`);
-      throw new InternalServerErrorException(`Payment record update failed: ${error.message}`);
+      throw new InternalServerErrorException("We could not process your payment right now. Please try again.");
     }
   }
 
@@ -348,7 +348,7 @@ export class PaymentsService {
     const client = this.supabaseAdmin.getClient();
     const { data, error } = await client.from("site_orders").select("*").eq("id", orderId).maybeSingle();
     if (error) {
-      throw new InternalServerErrorException(`Database error looking up site order: ${error.message}`);
+      throw new InternalServerErrorException("We could not find that order right now. Please try again.");
     }
     return data ?? undefined;
   }
@@ -361,7 +361,7 @@ export class PaymentsService {
       .eq("id", installmentId)
       .maybeSingle();
     if (error) {
-      throw new InternalServerErrorException(`Database error looking up savings installment: ${error.message}`);
+      throw new InternalServerErrorException("We could not find that installment right now. Please try again.");
     }
     return data ?? undefined;
   }
@@ -374,7 +374,7 @@ export class PaymentsService {
       .eq("id", scheduleId)
       .maybeSingle();
     if (error) {
-      throw new InternalServerErrorException(`Database error looking up repayment schedule: ${error.message}`);
+      throw new InternalServerErrorException("We could not find that repayment right now. Please try again.");
     }
     return data ?? undefined;
   }
