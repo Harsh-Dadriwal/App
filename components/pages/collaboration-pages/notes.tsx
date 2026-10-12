@@ -113,7 +113,7 @@ export function ProjectNotesPage({ role }: { role: AppRole }) {
     <div className="page-stack">
       <FormCard
         title={editingId ? "Edit note" : "Send a project note"}
-        description="Same guided layout on every role: choose the site and audience, then write the note."
+        description="Choose the site and who to send it to, then write your note."
       >
         <form onSubmit={saveNote} className="auth-form">
           {isNoteWizard ? <FlowWizardSteps steps={NOTE_STEPS} currentStep={noteCreateStep} ariaLabel="Steps to send a note" /> : null}

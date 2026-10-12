@@ -191,7 +191,7 @@ export function ArchitectMaterialsPage() {
     <div className="page-stack">
       <PageSection
         title="Architect material tracker"
-        description="Search lines like the electrician tracker. Approve or reject when status is pending architect review."
+        description="Search items, then approve or reject those waiting for your review."
       >
         <QueryState
           loading={materials.loading}

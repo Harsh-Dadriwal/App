@@ -196,7 +196,7 @@ export function ElectricianProjectsPage({
           description={
             editingBidId
               ? "Update your offer on this project."
-              : "Pick the open project first, then add amount and optional timeline—the same guided pattern as other forms in the app."
+              : "Pick an open project first, then add your amount and an optional timeline."
           }
         >
           <form onSubmit={saveBid} className="auth-form">
@@ -584,7 +584,7 @@ export function ElectricianMaterialsPage() {
         description={
           editingId
             ? "Update this line on the order. The same fields are used as when you first added it."
-            : "Step through: pick your site and order, then category, brand, and product—same guided order as admin catalog tools."
+            : "Pick your site and order, then the category, brand and product."
         }
       >
         <form onSubmit={saveOrderItem} className="auth-form">

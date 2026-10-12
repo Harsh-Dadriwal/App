@@ -363,7 +363,7 @@ export function CustomerSitesPage() {
         description={
           editingSiteId
             ? "Update your site record in one place."
-            : "Work through basics, then location, then an optional description—the same guided layout as electrician and admin forms."
+            : "Work through the basics, then the location, then an optional description."
         }
       >
         <form onSubmit={saveSite} className="auth-form">
