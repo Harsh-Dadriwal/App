@@ -44,7 +44,7 @@ export class InventoryService {
       (action === "change_price" && role === "pricing_manager");
 
     if (!isAllowed) {
-      throw new ForbiddenException(`Permission denied for inventory action: ${action}`);
+      throw new ForbiddenException("You do not have permission to do this.");
     }
   }
 

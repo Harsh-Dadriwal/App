@@ -14,5 +14,5 @@ export const listProductBrands = inventoryGateway.listProductBrands;
 export const listInventoryProducts = inventoryGateway.listInventoryProducts;
 export const saveInventoryProduct = inventoryGateway.saveInventoryProduct;
 export const updateProductImage = inventoryGateway.updateProductImage;
-export const getTallyStatus = inventoryGateway.getTallyStatus;
-export const listTallyProducts = inventoryGateway.listTallyProducts;
+export const getGoogleDriveProductsStatus = inventoryGateway.getGoogleDriveProductsStatus;
+export const listGoogleDriveProducts = inventoryGateway.listGoogleDriveProducts;

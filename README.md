@@ -63,13 +63,12 @@ The platform uses a modern, hybrid data-fetching model. The **Next.js Frontend**
 - **Frontend Only**: Run `npm run dev` in the root. The app will fetch data directly from Supabase. Payments will work via Next.js API routes.
 - **Backend API**: Navigate to `apps/api` and run `npm run start:dev`. Required only for background workflows and specific data aggregations.
 
-## TallyPrime product browser
+## Google Drive product feed
 
-The admin **Products & Inventory** page includes a live, read-only Tally product browser. It retrieves the currently loaded company's stock items directly from the TallyPrime HTTP server; it does not modify Tally or create duplicate app products.
+The admin **Products & Inventory** page includes a live, read-only Google Drive product feed. It reads the JSON file that your Tally integration uploads to Drive; it does not contact Tally, change Drive, or create duplicate app products.
 
-1. In TallyPrime, enable the HTTP Server (the standard local port is `9000`) and load the company you want to browse.
-2. On the machine running the Nest API, set `TALLY_BASE_URL=http://127.0.0.1:9000` in `.env.local`. If Tally is on another machine, use its private network address instead.
-3. Optionally set `TALLY_COMPANY` to force a specific loaded company.
-4. Restart the API, open **Admin → Products & Inventory**, and select **Refresh from Tally**.
+1. Share the JSON file from Drive so the API server can download it, then copy its direct-download URL. For a Drive file ID, the usual format is `https://drive.google.com/uc?export=download&id=YOUR_FILE_ID`.
+2. On the machine running the Nest API, set `GOOGLE_DRIVE_PRODUCTS_URL` to that link in `.env.local`.
+3. Restart the API, open **Admin → Products & Inventory**, and select **Refresh from Google Drive**.
 
-Keep the Tally HTTP port on a private network. The browser talks only to this app's authenticated API; Tally is never exposed to client browsers.
+The file can be a bare array or use `products`, `items`, `stockItems`, `stock_items`, or `data` as its array key. Each item needs a `name` (or `item_name` / `stockItemName`); common Tally names such as `MASTERID`, `PARENT`, `BASEUNITS`, `CLOSINGBALANCE`, `CLOSINGRATE`, and `HSNCODE` are recognized automatically.
