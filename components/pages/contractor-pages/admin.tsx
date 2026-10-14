@@ -33,8 +33,6 @@ import {
   listInventoryProducts,
   listProductBrands,
   listProductCategories,
-  getGoogleDriveProductsStatus,
-  listGoogleDriveProducts,
   saveInventoryProduct,
   updateProductImage
 } from "@/lib/backend/modules/inventory-gateway";
@@ -1098,84 +1096,8 @@ export function AdminProductsPage() {
         </QueryState>
       </PageSection>
 
-      <GoogleDriveProductBrowser />
-
       <InventoryIntelligenceDashboard />
     </div>
-  );
-}
-
-function GoogleDriveProductBrowser() {
-  const [search, setSearch] = useState("");
-  const [refreshKey, setRefreshKey] = useState(0);
-  const status = useRows(async () => {
-    const result = await getGoogleDriveProductsStatus();
-    return { data: result.data ? [result.data] : [], error: result.error };
-  }, []);
-  const driveProducts = useRows(async () => {
-    const result = await listGoogleDriveProducts();
-    return { data: result.data ? [result.data] : [], error: result.error };
-  }, [refreshKey, Boolean(status.data[0]?.configured)], { enabled: refreshKey > 0 && Boolean(status.data[0]?.configured) });
-
-  const connector = status.data[0];
-  const source = driveProducts.data[0];
-  const products = useMemo(() => source?.products ?? [], [source]);
-  const visibleProducts = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return products;
-    return products.filter((product: any) =>
-      [product.name, product.group, product.hsnCode, product.id]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term))
-    );
-  }, [products, search]);
-
-  return (
-    <PageSection
-      title="Stock list"
-      description="Latest stock items, closing balances and rates. Refresh to load the newest list; your catalog is not changed."
-    >
-      <div className="inline-actions" style={{ marginBottom: "0.75rem", flexWrap: "wrap" }}>
-        <button
-          type="button"
-          className="primary-button"
-          disabled={!connector?.configured || driveProducts.loading}
-          onClick={() => setRefreshKey((value) => value + 1)}
-        >
-          {driveProducts.loading ? "Refreshing..." : "Refresh stock list"}
-        </button>
-      </div>
-      {status.error ? <FormNotice error={status.error} /> : null}
-      {!status.loading && connector ? <p className="form-field-hint">{connector.message}</p> : null}
-      {driveProducts.error ? <FormNotice error={driveProducts.error} /> : null}
-      {products.length > 0 ? (
-        <>
-          <ListSearchField
-            value={search}
-            onChange={setSearch}
-            placeholder="Filter by name, group, or HSN"
-            ariaLabel="Filter stock items"
-          />
-          <p className="form-field-hint" style={{ marginTop: "-0.4rem" }}>
-            Showing {visibleProducts.length} of {source?.total ?? products.length} item{(source?.total ?? products.length) === 1 ? "" : "s"}.
-          </p>
-          <CardGrid>
-            {visibleProducts.map((product: any) => (
-              <DataCard
-                key={product.id}
-                title={product.name}
-                subtitle={[product.group, product.hsnCode ? `HSN ${product.hsnCode}` : null].filter(Boolean).join(" · ") || "Stock item"}
-                meta={product.unit ?? "unit not set"}
-              >
-                <p>Available: {product.closingBalance ?? "Not reported"}</p>
-                <p>Closing rate: {product.closingRate ?? "Not reported"}</p>
-                {product.gstApplicable ? <p>GST: {product.gstApplicable}</p> : null}
-              </DataCard>
-            ))}
-          </CardGrid>
-        </>
-      ) : null}
-    </PageSection>
   );
 }
 

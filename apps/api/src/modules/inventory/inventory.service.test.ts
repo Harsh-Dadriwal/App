@@ -73,4 +73,16 @@ describe("Inventory Permissions Enforcement", () => {
       });
     }
   });
+
+  it("keeps the price list and its cost prices away from customers", () => {
+    const service = new InventoryService({} as any, {} as any, {} as any);
+    assert.throws(() => {
+      service.assertInventoryPermission(customerActor, "view_price_list");
+    }, ForbiddenException);
+    assert.doesNotThrow(() => {
+      service.assertInventoryPermission(warehouseActor, "view_price_list");
+    });
+    assert.equal(service.canViewCostPrice(warehouseActor), false);
+    assert.equal(service.canViewCostPrice(adminActor), true);
+  });
 });

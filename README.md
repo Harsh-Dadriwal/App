@@ -63,12 +63,20 @@ The platform uses a modern, hybrid data-fetching model. The **Next.js Frontend**
 - **Frontend Only**: Run `npm run dev` in the root. The app will fetch data directly from Supabase. Payments will work via Next.js API routes.
 - **Backend API**: Navigate to `apps/api` and run `npm run start:dev`. Required only for background workflows and specific data aggregations.
 
-## Google Drive product feed
+## Price list
 
-The admin **Products & Inventory** page includes a live, read-only Google Drive product feed. It reads the JSON file that your Tally integration uploads to Drive; it does not contact Tally, change Drive, or create duplicate app products.
+**Admin → Price List** (and the admin **Price list** shortcut in the mobile app) browses the retail price list exported from Tally: categories, groups and items with MRP, final price, cost price (admins only) and stock. Selecting an item opens a large customer-facing price view. The list is stored in the database and replaced as a whole each time an admin selects **Update from Tally**; it does not change your product catalog.
 
-1. Share the JSON file from Drive so the API server can download it, then copy its direct-download URL. For a Drive file ID, the usual format is `https://drive.google.com/uc?export=download&id=YOUR_FILE_ID`.
-2. On the machine running the Nest API, set `GOOGLE_DRIVE_PRODUCTS_URL` to that link in `.env.local`.
-3. Restart the API, open **Admin → Products & Inventory**, and select **Refresh from Google Drive**.
+1. Run `db/price_list.sql` once in the Supabase SQL editor.
+2. On the Nest API (`apps/api`), set `PRICE_LIST_DRIVE_FILE_ID` to the Drive file ID of the Tally export and `GOOGLE_SERVICE_ACCOUNT_JSON` to a service account key (single line). Share the Drive file with the service account's `client_email`. `SUPABASE_SERVICE_ROLE_KEY` must also be set, because the price list tables are readable only by the API.
+3. Alternatively, leave those two empty and set `GOOGLE_DRIVE_PRODUCTS_URL` to a public direct-download link (`https://drive.google.com/uc?export=download&id=YOUR_FILE_ID`).
+4. Restart the API, open **Admin → Price List**, and select **Update from Tally**.
 
-The file can be a bare array or use `products`, `items`, `stockItems`, `stock_items`, or `data` as its array key. Each item needs a `name` (or `item_name` / `stockItemName`); common Tally names such as `MASTERID`, `PARENT`, `BASEUNITS`, `CLOSINGBALANCE`, `CLOSINGRATE`, and `HSNCODE` are recognized automatically.
+The raw Tally export (UTF-16, `EWSRNO` / `EWCategory` / `EWGroup` / `EWItemName` / `EWMRP` / `EWFINAL` / `EWCOST` / `EWCLSTK` fields) is read as-is. A plain JSON array of stock items (`name`, `parent`, `closingRate`, `closingBalance`, ...) also works. Category images are added from the Categories tab on the web page.
+
+## Complaints & installation requests
+
+Customers raise a complaint or an installation request from **Complaints & Installation** (web) or the dashboard shortcut (mobile). Every active electrician in the workspace gets an in-app notification, sees the request under **Service Requests**, and can offer to take it with an optional message and quote. The customer picks one of the offers. Only the chosen electrician (and admins) see the customer's address and phone number. The electrician then marks the job started and completed, and the customer is notified at each step. Admins see every request under **Admin → Service Requests**.
+
+Setup: run `db/service_requests.sql` once in the Supabase SQL editor and deploy the Nest API. `SUPABASE_SERVICE_ROLE_KEY` must be set on the API, because these tables are readable only through it.
+

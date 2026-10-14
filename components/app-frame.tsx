@@ -107,8 +107,11 @@ export function AppFrame({
   const navBadges = useMemo(() => {
     const unreadNotes = notifications.data.filter((item: any) => item.data?.module === "site_notes" && !item.is_read).length;
     const unreadRequests = notifications.data.filter((item: any) => item.data?.module === "product_requests" && !item.is_read).length;
+    const unreadServiceRequests = notifications.data.filter((item: any) => item.data?.module === "service_requests" && !item.is_read).length;
     return {
       "/customer/approvals": approvals.data.length,
+      "/customer/service-requests": unreadServiceRequests,
+      "/electrician/service-requests": unreadServiceRequests,
       "/customer/notes": unreadNotes,
       "/electrician/notes": unreadNotes,
       "/architect/notes": unreadNotes,

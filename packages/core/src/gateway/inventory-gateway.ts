@@ -10,6 +10,35 @@ type InventoryGatewayDependencies = {
   getSupabaseClient: () => Promise<any | null> | any | null;
 };
 
+export type PriceListItem = {
+  category: string;
+  group_name: string;
+  item_name: string;
+  final_price: number;
+  mrp: number;
+  /** Only sent to admins; absent for everyone else. */
+  cost_price?: number;
+  stock_label: string;
+};
+
+export type PriceList = {
+  configured: boolean;
+  syncedAt: string | null;
+  items: PriceListItem[];
+  categoryImages: Record<string, string>;
+};
+
+const PRICE_LIST_UNAVAILABLE = "The price list is not available right now. Please try again shortly.";
+
+/** stock_label is free text from Tally ("12 pcs", "0 pcs"); out of stock is read off its leading number. */
+export function isPriceListItemOutOfStock(item: Pick<PriceListItem, "stock_label">) {
+  return /^-?0+(\.0+)?(\D|$)/.test(item.stock_label.trim());
+}
+
+export function formatPriceListAmount(value: number) {
+  return `\u20b9${Math.round(Number(value) || 0).toLocaleString("en-IN")}`;
+}
+
 export function createInventoryGateway({
   isBackendApiConfigured,
   backendRequest,
@@ -124,18 +153,25 @@ export function createInventoryGateway({
     return { data: result.data ?? null, error: result.error?.message ?? null };
   }
 
-  async function getGoogleDriveProductsStatus(): Promise<BackendResult<{ configured: boolean; message: string }>> {
+  async function getPriceList(): Promise<BackendResult<PriceList>> {
     if (!isBackendApiConfigured()) {
-      return { data: null, error: "Connect the backend API to use the Google Drive product feed." };
+      return { data: null, error: PRICE_LIST_UNAVAILABLE };
     }
-    return backendRequest("/api/v1/inventory/google-drive/status");
+    return backendRequest("/api/v1/inventory/price-list", { timeoutMs: 30_000 });
   }
 
-  async function listGoogleDriveProducts(query = ""): Promise<BackendResult<{ products: any[]; total: number }>> {
+  async function syncPriceList(): Promise<BackendResult<{ count: number; syncedAt: string }>> {
     if (!isBackendApiConfigured()) {
-      return { data: null, error: "Connect the backend API to use the Google Drive product feed." };
+      return { data: null, error: PRICE_LIST_UNAVAILABLE };
     }
-    return backendRequest(`/api/v1/inventory/google-drive/products?query=${encodeURIComponent(query)}&limit=100`, { timeoutMs: 15_000 });
+    return backendRequest("/api/v1/inventory/price-list/sync", { method: "POST", timeoutMs: 60_000 });
+  }
+
+  async function savePriceListCategoryImage(category: string, imageUrl: string): Promise<BackendResult<{ category: string; imageUrl: string }>> {
+    if (!isBackendApiConfigured()) {
+      return { data: null, error: PRICE_LIST_UNAVAILABLE };
+    }
+    return backendRequest("/api/v1/inventory/price-list/category-image", { method: "POST", body: { category, imageUrl } });
   }
 
   return {
@@ -144,7 +180,8 @@ export function createInventoryGateway({
     listInventoryProducts,
     saveInventoryProduct,
     updateProductImage,
-    getGoogleDriveProductsStatus,
-    listGoogleDriveProducts
+    getPriceList,
+    syncPriceList,
+    savePriceListCategoryImage
   };
 }

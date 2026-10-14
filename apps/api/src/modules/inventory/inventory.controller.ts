@@ -1,13 +1,13 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { SupabaseAuthGuard } from "../../common/auth/supabase-auth.guard";
 import { InventoryService } from "./inventory.service";
-import { GoogleDriveProductsService } from "./google-drive-products.service";
+import { PriceListService } from "./price-list.service";
 import type { AuthenticatedRequest } from "../../common/auth/authenticated-request";
 
 @Controller("/api/v1/inventory")
 @UseGuards(SupabaseAuthGuard)
 export class InventoryController {
-  constructor(private readonly inventoryService: InventoryService, private readonly googleDriveProducts: GoogleDriveProductsService) {}
+  constructor(private readonly inventoryService: InventoryService, private readonly priceList: PriceListService) {}
 
   private getAccessToken(request: AuthenticatedRequest) {
     const authHeader = request.headers.authorization || "";
@@ -29,16 +29,25 @@ export class InventoryController {
     return { data: await this.inventoryService.listProducts(request.actor!, this.getAccessToken(request)) };
   }
 
-  @Get("/google-drive/status")
-  async googleDriveStatus(@Req() request: AuthenticatedRequest) {
-    this.inventoryService.assertInventoryPermission(request.actor!, "view_products");
-    return { data: this.googleDriveProducts.status() };
+  @Get("/price-list")
+  async listPriceList(@Req() request: AuthenticatedRequest) {
+    this.inventoryService.assertInventoryPermission(request.actor!, "view_price_list");
+    const tenantId = await this.inventoryService.requireTenantId(request.actor!);
+    return { data: await this.priceList.list(tenantId, this.inventoryService.canViewCostPrice(request.actor!)) };
   }
 
-  @Get("/google-drive/products")
-  async listGoogleDriveProducts(@Req() request: AuthenticatedRequest, @Query("query") query?: string, @Query("limit") limit?: string) {
-    this.inventoryService.assertInventoryPermission(request.actor!, "view_products");
-    return { data: await this.googleDriveProducts.listProducts(query, Number(limit) || 100) };
+  @Post("/price-list/sync")
+  async syncPriceList(@Req() request: AuthenticatedRequest) {
+    this.inventoryService.assertInventoryPermission(request.actor!, "import_products");
+    const tenantId = await this.inventoryService.requireTenantId(request.actor!);
+    return { data: await this.priceList.sync(tenantId) };
+  }
+
+  @Post("/price-list/category-image")
+  async savePriceListCategoryImage(@Req() request: AuthenticatedRequest, @Body() body: { category?: string; imageUrl?: string }) {
+    this.inventoryService.assertInventoryPermission(request.actor!, "import_products");
+    const tenantId = await this.inventoryService.requireTenantId(request.actor!);
+    return { data: await this.priceList.saveCategoryImage(tenantId, body?.category, body?.imageUrl) };
   }
 
   @Get("/alerts/low-stock")

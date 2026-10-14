@@ -47,6 +47,7 @@ export const roleNav: Record<
   customer: [
     { href: "/customer", label: "Dashboard" },
     { href: "/customer/requirements", label: "Requirements", shortLabel: "Requirements" },
+    { href: "/customer/service-requests", label: "Complaints & Installation", shortLabel: "Service" },
     { href: "/customer/lighting", label: "Lighting Visualizer", shortLabel: "Lighting" },
     { href: "/customer/electricians", label: "Electricians" },
     { href: "/customer/architects", label: "Architects" },
@@ -66,6 +67,7 @@ export const roleNav: Record<
   electrician: [
     { href: "/electrician", label: "Dashboard" },
     { href: "/electrician/requirements", label: "Requirements", shortLabel: "Requirements" },
+    { href: "/electrician/service-requests", label: "Service Requests", shortLabel: "Service" },
     { href: "/electrician/projects/new", label: "New Projects" },
     { href: "/electrician/projects/market", label: "Assigned to Others", shortLabel: "Market" },
     { href: "/electrician/projects/ongoing", label: "Ongoing Projects", shortLabel: "Ongoing" },
@@ -105,12 +107,14 @@ export const roleNav: Record<
   admin: [
     { href: "/admin", label: "Dashboard" },
     { href: "/admin/requirements", label: "Requirements Queue", shortLabel: "Requirements" },
+    { href: "/admin/service-requests", label: "Service Requests", shortLabel: "Service" },
     { href: "/admin/lighting", label: "Lighting Leads", shortLabel: "Lighting" },
     { href: "/admin/users", label: "Users & Verification", shortLabel: "Users" },
     { href: "/admin/assignments", label: "Site Assignments", shortLabel: "Assignments" },
     { href: "/admin/orders", label: "Orders" },
     { href: "/admin/workflows", label: "Workflow Center", shortLabel: "Workflow" },
     { href: "/admin/products", label: "Products & Inventory", shortLabel: "Products" },
+    { href: "/admin/price-list", label: "Price List", shortLabel: "Prices" },
     { href: "/admin/catalog", label: "Categories & Brands", shortLabel: "Catalog" },
     { href: "/admin/fintech", label: "Wallets, Savings & Referrals", shortLabel: "Fintech" },
     { href: "/admin/credit", label: "Contractor Credit", shortLabel: "Credit" },

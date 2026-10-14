@@ -1824,3 +1824,161 @@ textarea::placeholder {
 }
 .text-link-button:hover { text-decoration: underline; }
 .text-link-button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+
+.price-list-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.price-list-toolbar .segmented-control { flex: 1 1 280px; max-width: 420px; }
+.price-list-toolbar .primary-button { margin-left: auto; width: auto; }
+.price-list-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.price-list-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.price-list-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font: inherit;
+  color: var(--text-main);
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.price-list-row:hover { background: var(--surface-hover); border-color: var(--primary); }
+.price-list-row:focus-visible,
+.price-list-row-open:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.price-list-row--split { cursor: default; }
+.price-list-row-open {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.price-list-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+  min-width: 0;
+}
+.price-list-row-main span,
+.price-list-row-price span,
+.price-list-row-price s { font-size: 0.8125rem; color: var(--text-muted); }
+.price-list-row-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  white-space: nowrap;
+}
+.price-list-row .badge { text-transform: none; white-space: nowrap; }
+.price-list-badge--out {
+  background: var(--error-bg);
+  color: var(--error);
+  border-color: var(--error);
+}
+.price-list-thumb {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  background: var(--surface-hover);
+  border: 1px solid var(--border-color);
+}
+label.secondary-button { cursor: pointer; white-space: nowrap; }
+label.secondary-button.is-disabled { opacity: 0.6; cursor: not-allowed; }
+
+.price-view {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+.price-view-close {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 9999px;
+  cursor: pointer;
+}
+.price-view-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  text-align: center;
+}
+.price-view-body p { margin: 0; color: inherit; }
+.price-view-body h2 { margin: 0; font-size: clamp(1.5rem, 4vw, 2.5rem); color: inherit; }
+.price-view-image { width: min(60vw, 280px); height: min(60vw, 280px); object-fit: contain; margin-bottom: 1rem; }
+.price-view-meta, .price-view-mrp { opacity: 0.75; }
+.price-view-mrp { font-size: 1.25rem; margin-top: 1rem; }
+.price-view-price { font-size: clamp(3rem, 12vw, 6rem); font-weight: 800; line-height: 1.1; }
+.price-view-savings { font-size: 1.25rem; font-weight: 600; }
+
+@media (max-width: 640px) {
+  .price-list-row { flex-wrap: wrap; }
+  .price-list-toolbar .primary-button { margin-left: 0; width: 100%; }
+}
+
+.service-offers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.service-offer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--surface-tint);
+}
+.service-offer > div { min-width: 0; flex: 1; }
+.service-offer .primary-button { width: auto; flex-shrink: 0; }
+.service-offer .badge { margin-left: 0.5rem; }
+.service-offer p { margin: 0.15rem 0 0; }
+@media (max-width: 640px) {
+  .service-offer { flex-direction: column; }
+  .service-offer .primary-button { width: 100%; }
+}

@@ -1,4 +1,5 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { BackHandler } from "react-native";
 
 export type MobileScreen =
   | "dashboard"
@@ -10,6 +11,8 @@ export type MobileScreen =
   | "incentives"
   | "notes"
   | "admin-catalog"
+  | "price-list"
+  | "service-requests"
   | "fintech";
 
 type NavigationContextValue = {
@@ -56,6 +59,16 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
     }),
     [screen, history.length]
   );
+
+  // Android back button walks back through the app's own screens before leaving the app.
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (history.length <= 1) return false;
+      setHistory((current) => current.slice(0, -1));
+      return true;
+    });
+    return () => subscription.remove();
+  }, [history.length]);
 
   return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>;
 }

@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -9,10 +10,12 @@ import {
   Text,
   TextInput,
   View,
-  useWindowDimensions
+  useWindowDimensions,
+  type KeyboardTypeOptions,
+  type TextInputProps
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { palette } from "@/lib/theme";
+import { palette, radii, shadow } from "@/lib/theme";
 import { roleLabels } from "@mahalaxmi/core/types/domain";
 import { useAuth } from "@/providers/auth-provider";
 import {
@@ -20,15 +23,18 @@ import {
   type MobileScreen
 } from "@/providers/navigation-provider";
 
-const tabConfig: Record<string, Array<{ key: MobileScreen; label: string; icon: keyof typeof Feather.glyphMap }>> = {
+type IconName = keyof typeof Feather.glyphMap;
+
+const tabConfig: Record<string, Array<{ key: MobileScreen; label: string; icon: IconName }>> = {
   customer: [
     { key: "dashboard", label: "Home", icon: "home" },
-    { key: "lighting", label: "Lighting", icon: "sun" },
+    { key: "service-requests", label: "Service", icon: "tool" },
     { key: "catalog", label: "Catalog", icon: "grid" },
     { key: "order-builder", label: "Order", icon: "shopping-bag" }
   ],
   electrician: [
     { key: "dashboard", label: "Home", icon: "home" },
+    { key: "service-requests", label: "Jobs", icon: "tool" },
     { key: "order-builder", label: "Order", icon: "shopping-bag" },
     { key: "materials", label: "Tracker", icon: "layers" },
     { key: "incentives", label: "Rewards", icon: "award" }
@@ -42,10 +48,10 @@ const tabConfig: Record<string, Array<{ key: MobileScreen; label: string; icon: 
   ],
   admin: [
     { key: "dashboard", label: "Home", icon: "home" },
-    { key: "lighting", label: "Lighting", icon: "sun" },
+    { key: "price-list", label: "Prices", icon: "tag" },
     { key: "order-builder", label: "Order", icon: "shopping-bag" },
     { key: "admin-catalog", label: "Admin", icon: "settings" },
-    { key: "fintech", label: "Fintech", icon: "dollar-sign" }
+    { key: "fintech", label: "Fintech", icon: "credit-card" }
   ]
 };
 
@@ -75,28 +81,25 @@ export function ScreenShell({
   const content = (
     <View style={styles.screen}>
       <View style={[styles.hero, compact && styles.heroCompact]}>
-        <View style={styles.heroGlow} />
+        <View style={styles.heroGlowLarge} />
+        <View style={styles.heroGlowSmall} />
         <View style={styles.heroTopRow}>
-          <View style={styles.heroTopLeft}>
-            {showBack && canGoBack ? (
-              <Pressable style={styles.backButton} onPress={goBack}>
-                <Feather name="arrow-left" size={16} color={palette.ink} />
-                <Text style={styles.backButtonText}>Back</Text>
-              </Pressable>
-            ) : (
-              <View style={styles.workspaceBadge}>
-              <Text style={styles.workspaceBadgeText}>
-                {activeTenant?.app_name ?? (profile ? `${roleLabels[profile.role]} mobile` : "Mahalaxmi Electricals")}
-              </Text>
+          {showBack && canGoBack ? (
+            <Pressable style={styles.backButton} onPress={goBack} accessibilityRole="button" accessibilityLabel="Go back" hitSlop={8}>
+              <Feather name="arrow-left" size={18} color={palette.nightText} />
+            </Pressable>
+          ) : (
+            <View style={styles.brandMark}>
+              <Feather name="zap" size={16} color={palette.night} />
             </View>
-            )}
-            {profile ? (
-              <Text style={styles.kicker}>
-                {activeTenant?.display_name || profile.company_name || profile.city || "Live field workspace"}
-              </Text>
-            ) : (
-              <Text style={styles.kicker}>Fast field operations</Text>
-            )}
+          )}
+          <View style={styles.heroTopCopy}>
+            <Text style={styles.workspaceName} numberOfLines={1}>
+              {activeTenant?.app_name ?? "Mahalaxmi Electricals"}
+            </Text>
+            <Text style={styles.kicker} numberOfLines={1}>
+              {profile ? `${roleLabels[profile.role]}${activeTenant?.display_name ? ` · ${activeTenant.display_name}` : ""}` : "Electrical supplies & services"}
+            </Text>
           </View>
           {profile ? (
             <View style={styles.avatar}>
@@ -134,9 +137,7 @@ export function ScreenShell({
   );
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.backgroundTintTop} />
-      <View style={styles.backgroundTintBottom} />
+    <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
       <KeyboardAvoidingView
         style={styles.keyboardAvoider}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -155,25 +156,28 @@ export function ScreenShell({
         )}
       </KeyboardAvoidingView>
       {showTabs ? (
-        <View style={styles.tabBar}>
-          {tabs.map((tab) => {
-            const active = tab.key === activeScreen;
-            return (
-              <Pressable
-                key={tab.key}
-                style={[styles.tabButton, active && styles.tabButtonActive]}
-                onPress={() => replace(tab.key)}
-              >
-                <Feather
-                  name={tab.icon}
-                  size={18}
-                  color={active ? "#ffffff" : palette.muted}
-                />
-                <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{tab.label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <SafeAreaView edges={["bottom"]} style={styles.tabBarWrap}>
+          <View style={styles.tabBar}>
+            {tabs.map((tab) => {
+              const active = tab.key === activeScreen;
+              return (
+                <Pressable
+                  key={tab.key}
+                  style={[styles.tabButton, active && styles.tabButtonActive]}
+                  onPress={() => replace(tab.key)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={tab.label}
+                >
+                  <Feather name={tab.icon} size={19} color={active ? "#ffffff" : palette.muted} />
+                  <Text style={[styles.tabLabel, active && styles.tabLabelActive]} numberOfLines={1}>
+                    {tab.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </SafeAreaView>
       ) : null}
     </SafeAreaView>
   );
@@ -212,7 +216,10 @@ export function SectionTitle({
   return (
     <View style={styles.sectionHead}>
       <View style={styles.sectionCopy}>
-        <Text style={styles.sectionTitle}>{title}</Text>
+        <View style={styles.sectionTitleRow}>
+          <View style={styles.sectionAccent} />
+          <Text style={styles.sectionTitle}>{title}</Text>
+        </View>
         {description ? <Text style={styles.sectionDescription}>{description}</Text> : null}
       </View>
       {action}
@@ -225,34 +232,33 @@ export function AppButton({
   onPress,
   kind = "primary",
   disabled = false,
+  loading = false,
   icon
 }: {
   label: string;
   onPress: () => void;
   kind?: "primary" | "secondary";
   disabled?: boolean;
-  icon?: keyof typeof Feather.glyphMap;
+  loading?: boolean;
+  icon?: IconName;
 }) {
+  const primary = kind === "primary";
+  const tint = primary ? "#ffffff" : palette.ink;
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled}
-      style={[
+      disabled={disabled || loading}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
+      style={({ pressed }) => [
         styles.button,
-        kind === "primary" ? styles.buttonPrimary : styles.buttonSecondary,
-        disabled && styles.buttonDisabled
+        primary ? styles.buttonPrimary : styles.buttonSecondary,
+        pressed && styles.buttonPressed,
+        (disabled || loading) && styles.buttonDisabled
       ]}
     >
-      {icon ? (
-        <Feather
-          name={icon}
-          size={16}
-          color={kind === "primary" ? "#fffaf4" : palette.ink}
-        />
-      ) : null}
-      <Text style={kind === "primary" ? styles.buttonPrimaryText : styles.buttonSecondaryText}>
-        {label}
-      </Text>
+      {loading ? <ActivityIndicator size="small" color={tint} /> : icon ? <Feather name={icon} size={17} color={tint} /> : null}
+      <Text style={primary ? styles.buttonPrimaryText : styles.buttonSecondaryText}>{label}</Text>
     </Pressable>
   );
 }
@@ -263,7 +269,12 @@ export function Field({
   onChangeText,
   placeholder,
   secureTextEntry,
-  multiline = false
+  multiline = false,
+  icon,
+  hint,
+  keyboardType,
+  autoCapitalize,
+  autoComplete
 }: {
   label: string;
   value: string;
@@ -271,19 +282,47 @@ export function Field({
   placeholder?: string;
   secureTextEntry?: boolean;
   multiline?: boolean;
+  icon?: IconName;
+  hint?: string;
+  keyboardType?: KeyboardTypeOptions;
+  autoCapitalize?: TextInputProps["autoCapitalize"];
+  autoComplete?: TextInputProps["autoComplete"];
 }) {
+  const [focused, setFocused] = useState(false);
+  const [revealed, setRevealed] = useState(false);
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={palette.muted}
-        style={[styles.input, multiline && styles.textarea]}
-        secureTextEntry={secureTextEntry}
-        multiline={multiline}
-      />
+      <View style={[styles.inputShell, multiline && styles.inputShellMultiline, focused && styles.inputShellFocused]}>
+        {icon ? <Feather name={icon} size={17} color={focused ? palette.brand : palette.muted} style={multiline ? styles.inputIconTop : undefined} /> : null}
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor="#a89c8d"
+          style={[styles.input, multiline && styles.textarea]}
+          secureTextEntry={secureTextEntry && !revealed}
+          multiline={multiline}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize ?? (secureTextEntry ? "none" : undefined)}
+          autoComplete={autoComplete}
+          autoCorrect={secureTextEntry ? false : undefined}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          accessibilityLabel={label}
+        />
+        {secureTextEntry ? (
+          <Pressable
+            onPress={() => setRevealed((current) => !current)}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={revealed ? "Hide password" : "Show password"}
+          >
+            <Feather name={revealed ? "eye-off" : "eye"} size={18} color={palette.muted} />
+          </Pressable>
+        ) : null}
+      </View>
+      {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
     </View>
   );
 }
@@ -305,7 +344,12 @@ export function Chip({
     );
   }
   return (
-    <Pressable style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
+    <Pressable
+      style={({ pressed }) => [styles.chip, active && styles.chipActive, pressed && styles.buttonPressed]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: Boolean(active) }}
+    >
       <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
     </Pressable>
   );
@@ -326,28 +370,28 @@ export function QueryState({
 }) {
   if (loading) {
     return (
-      <Card tone="soft">
-        <View style={styles.centerRow}>
-          <ActivityIndicator color={palette.brand} />
-          <Text style={styles.mutedText}>Loading...</Text>
-        </View>
-      </Card>
+      <View style={styles.stateCard}>
+        <ActivityIndicator color={palette.brand} />
+        <Text style={styles.mutedText}>Loading...</Text>
+      </View>
     );
   }
 
   if (error) {
     return (
-      <Card tone="soft">
-        <Text style={styles.errorText}>{error}</Text>
-      </Card>
+      <View style={[styles.stateCard, styles.stateCardError]}>
+        <Feather name="alert-circle" size={22} color={palette.danger} />
+        <Text style={[styles.errorText, styles.stateText]}>{error}</Text>
+      </View>
     );
   }
 
   if (!hasData) {
     return (
-      <Card tone="soft">
-        <Text style={styles.mutedText}>{empty}</Text>
-      </Card>
+      <View style={styles.stateCard}>
+        <Feather name="inbox" size={22} color={palette.muted} />
+        <Text style={[styles.mutedText, styles.stateText]}>{empty}</Text>
+      </View>
     );
   }
 
@@ -361,23 +405,15 @@ export function Notice({
   message: string;
   tone?: "default" | "error" | "success";
 }) {
+  const icon: IconName = tone === "error" ? "alert-circle" : tone === "success" ? "check-circle" : "info";
+  const color = tone === "error" ? palette.danger : tone === "success" ? palette.success : palette.brandDeep;
   return (
     <View
-      style={[
-        styles.notice,
-        tone === "error" && styles.noticeError,
-        tone === "success" && styles.noticeSuccess
-      ]}
+      style={[styles.notice, tone === "error" && styles.noticeError, tone === "success" && styles.noticeSuccess]}
+      accessibilityLiveRegion="polite"
     >
-      <Text
-        style={[
-          styles.noticeText,
-          tone === "error" && styles.errorText,
-          tone === "success" && styles.successText
-        ]}
-      >
-        {message}
-      </Text>
+      <Feather name={icon} size={18} color={color} />
+      <Text style={[styles.noticeText, { color }]}>{message}</Text>
     </View>
   );
 }
@@ -390,143 +426,125 @@ const styles = StyleSheet.create({
   keyboardAvoider: {
     flex: 1
   },
-  backgroundTintTop: {
-    position: "absolute",
-    top: -80,
-    left: -40,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: "rgba(79, 70, 229, 0.1)"
-  },
-  backgroundTintBottom: {
-    position: "absolute",
-    right: -50,
-    bottom: 60,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: "rgba(15, 23, 42, 0.05)"
-  },
   scroll: {
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 24
+    paddingTop: 8,
+    paddingBottom: 28
   },
   scrollWithTabs: {
-    paddingBottom: 110
+    paddingBottom: 116
   },
   nonScrollBody: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingTop: 10
+    paddingTop: 8
   },
   screen: {
     gap: 16
   },
   hero: {
     overflow: "hidden",
-    padding: 20,
-    borderWidth: 1,
-    borderColor: palette.line,
-    borderRadius: 32,
-    backgroundColor: palette.surfaceRaised,
-    shadowColor: palette.shadow,
-    shadowOpacity: 1,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 16 },
-    elevation: 4
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 22,
+    borderRadius: radii.xl,
+    backgroundColor: palette.night,
+    ...shadow,
+    shadowOpacity: 0.18,
+    elevation: 6
   },
   heroCompact: {
-    padding: 18
+    paddingHorizontal: 18
   },
-  heroGlow: {
+  heroGlowLarge: {
     position: "absolute",
-    right: -20,
-    top: -10,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: palette.brandSoft
+    right: -60,
+    top: -70,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: "rgba(194, 87, 12, 0.35)"
+  },
+  heroGlowSmall: {
+    position: "absolute",
+    right: 40,
+    bottom: -50,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: "rgba(224, 163, 58, 0.16)"
   },
   heroTopRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 18
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 20
   },
-  heroTopLeft: {
+  heroTopCopy: {
     flex: 1,
-    gap: 8
+    gap: 2
   },
-  workspaceBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: palette.surfaceSoft,
-    borderWidth: 1,
-    borderColor: palette.line
-  },
-  workspaceBadgeText: {
-    color: palette.brandDeep,
-    textTransform: "uppercase",
-    letterSpacing: 1.6,
-    fontSize: 11,
-    fontWeight: "800"
+  brandMark: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: palette.gold,
+    alignItems: "center",
+    justifyContent: "center"
   },
   backButton: {
-    alignSelf: "flex-start",
-    flexDirection: "row",
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 999,
-    backgroundColor: palette.surfaceSoft,
-    borderWidth: 1,
-    borderColor: palette.line
+    justifyContent: "center"
   },
-  backButtonText: {
-    color: palette.ink,
-    fontWeight: "700"
+  workspaceName: {
+    color: palette.nightText,
+    fontSize: 14,
+    fontWeight: "800",
+    letterSpacing: 0.2
   },
   kicker: {
-    color: palette.muted,
-    fontSize: 13,
+    color: palette.nightMuted,
+    fontSize: 12,
     fontWeight: "600"
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: palette.ink,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: palette.brand,
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.35)",
     alignItems: "center",
     justifyContent: "center"
   },
   avatarText: {
-    color: "#fffaf4",
+    color: "#ffffff",
     fontSize: 16,
     fontWeight: "800"
   },
   title: {
-    color: palette.ink,
-    fontSize: 34,
+    color: "#ffffff",
+    fontSize: 28,
     fontWeight: "900",
-    lineHeight: 38
+    lineHeight: 33,
+    letterSpacing: -0.3
   },
   titleCompact: {
-    fontSize: 30,
-    lineHeight: 34
+    fontSize: 25,
+    lineHeight: 30
   },
   subtitle: {
-    color: palette.muted,
+    color: palette.nightMuted,
     marginTop: 8,
-    lineHeight: 22,
-    fontSize: 15
+    lineHeight: 21,
+    fontSize: 14
   },
   tenantSwitchRow: {
-    marginTop: 14
+    marginTop: 16
   },
   tenantSwitchWrap: {
     flexDirection: "row",
@@ -534,135 +552,205 @@ const styles = StyleSheet.create({
   },
   tenantPill: {
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingVertical: 8,
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: palette.lineStrong,
-    backgroundColor: palette.surfaceSoft
+    backgroundColor: "rgba(255, 255, 255, 0.1)"
   },
   tenantPillActive: {
-    backgroundColor: palette.ink,
-    borderColor: palette.ink
+    backgroundColor: palette.gold
   },
   tenantPillText: {
-    color: palette.ink,
+    color: palette.nightText,
     fontWeight: "700",
     fontSize: 12
   },
   tenantPillTextActive: {
-    color: "#fffaf4"
+    color: palette.night
   },
   card: {
     padding: 18,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: palette.line,
-    borderRadius: 28,
+    borderRadius: radii.lg,
     backgroundColor: palette.surface,
-    shadowColor: palette.shadow,
-    shadowOpacity: 0.9,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 3,
+    ...shadow,
     gap: 10
   },
   cardSoft: {
-    backgroundColor: palette.surfaceSoft
+    backgroundColor: palette.surfaceSoft,
+    shadowOpacity: 0,
+    elevation: 0,
+    borderWidth: 1
   },
   cardBrand: {
     backgroundColor: palette.brandSoft,
-    borderColor: "rgba(180, 83, 9, 0.15)"
+    borderColor: "rgba(194, 87, 12, 0.18)",
+    borderWidth: 1
   },
   cardDanger: {
-    backgroundColor: "rgba(239, 68, 68, 0.08)",
-    borderColor: "rgba(239, 68, 68, 0.25)"
+    backgroundColor: palette.dangerSoft,
+    borderColor: "rgba(220, 38, 38, 0.25)",
+    borderWidth: 1
   },
   sectionHead: {
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 12,
-    alignItems: "flex-start"
+    alignItems: "flex-start",
+    marginTop: 4
   },
   sectionCopy: {
     flex: 1,
     gap: 4
   },
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  sectionAccent: {
+    width: 4,
+    height: 18,
+    borderRadius: 2,
+    backgroundColor: palette.brand
+  },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 19,
     fontWeight: "800",
-    color: palette.ink
+    color: palette.ink,
+    letterSpacing: -0.2
   },
   sectionDescription: {
     color: palette.muted,
-    lineHeight: 21
+    lineHeight: 20,
+    fontSize: 13.5
   },
   button: {
-    minHeight: 50,
-    borderRadius: 16,
+    minHeight: 52,
+    borderRadius: radii.md,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
     flexDirection: "row",
     gap: 8
   },
   buttonPrimary: {
-    backgroundColor: palette.brand
+    backgroundColor: palette.brand,
+    shadowColor: palette.brand,
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 4
   },
   buttonSecondary: {
-    backgroundColor: palette.surfaceSoft,
+    backgroundColor: palette.surface,
     borderWidth: 1,
     borderColor: palette.lineStrong
   },
+  buttonPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }]
+  },
   buttonDisabled: {
-    opacity: 0.55
+    opacity: 0.5
   },
   buttonPrimaryText: {
-    color: "#fffaf4",
-    fontWeight: "800"
+    color: "#ffffff",
+    fontWeight: "800",
+    fontSize: 15
   },
   buttonSecondaryText: {
     color: palette.ink,
-    fontWeight: "800"
+    fontWeight: "800",
+    fontSize: 15
   },
   fieldWrap: {
-    gap: 8
+    gap: 7,
+    marginBottom: 4
   },
   fieldLabel: {
-    fontWeight: "800",
-    color: palette.ink
+    fontWeight: "700",
+    color: palette.ink,
+    fontSize: 13.5
+  },
+  fieldHint: {
+    color: palette.muted,
+    fontSize: 12.5,
+    lineHeight: 17
+  },
+  inputShell: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    minHeight: 52,
+    paddingHorizontal: 14,
+    borderWidth: 1.5,
+    borderColor: palette.line,
+    borderRadius: radii.md,
+    backgroundColor: palette.surfaceSoft
+  },
+  inputShellMultiline: {
+    alignItems: "flex-start",
+    paddingVertical: 12
+  },
+  inputShellFocused: {
+    borderColor: palette.brand,
+    backgroundColor: palette.surface
+  },
+  inputIconTop: {
+    marginTop: 2
   },
   input: {
-    borderWidth: 1,
-    borderColor: palette.lineStrong,
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    backgroundColor: palette.surface,
-    color: palette.ink
+    flex: 1,
+    paddingVertical: 12,
+    color: palette.ink,
+    fontSize: 15
   },
   textarea: {
-    minHeight: 110,
+    minHeight: 96,
+    paddingVertical: 0,
     textAlignVertical: "top"
   },
   chip: {
-    minHeight: 44,
+    minHeight: 40,
     justifyContent: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: palette.line,
-    backgroundColor: palette.surfaceSoft
+    backgroundColor: palette.surface
   },
   chipActive: {
-    backgroundColor: palette.ink,
-    borderColor: palette.ink
+    backgroundColor: palette.brand,
+    borderColor: palette.brand
   },
   chipText: {
     color: palette.ink,
-    fontWeight: "700"
+    fontWeight: "700",
+    fontSize: 13.5
   },
   chipTextActive: {
-    color: "#fffaf2"
+    color: "#ffffff"
+  },
+  stateCard: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: palette.lineStrong,
+    backgroundColor: palette.surfaceSoft
+  },
+  stateCardError: {
+    borderColor: "rgba(220, 38, 38, 0.35)",
+    backgroundColor: palette.dangerSoft
+  },
+  stateText: {
+    textAlign: "center"
   },
   centerRow: {
     flexDirection: "row",
@@ -682,51 +770,60 @@ const styles = StyleSheet.create({
     lineHeight: 21
   },
   notice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
     padding: 14,
-    borderRadius: 18,
-    backgroundColor: palette.surfaceSoft
+    borderRadius: radii.md,
+    backgroundColor: palette.brandSoft
   },
   noticeError: {
-    backgroundColor: "rgba(178,63,45,0.10)"
+    backgroundColor: palette.dangerSoft
   },
   noticeSuccess: {
-    backgroundColor: "rgba(46,123,78,0.10)"
+    backgroundColor: palette.successSoft
   },
   noticeText: {
-    color: palette.ink
+    flex: 1,
+    lineHeight: 20,
+    fontWeight: "600"
+  },
+  tabBarWrap: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0
   },
   tabBar: {
-    position: "absolute",
-    left: 14,
-    right: 14,
-    bottom: 12,
+    marginHorizontal: 14,
+    marginBottom: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
+    gap: 4,
+    padding: 6,
     borderRadius: 24,
-    backgroundColor: "rgba(15, 23, 42, 0.95)",
-    shadowColor: palette.shadow,
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 6
+    backgroundColor: palette.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.line,
+    ...shadow,
+    shadowOpacity: 0.14,
+    shadowRadius: 20,
+    elevation: 10
   },
   tabButton: {
     flex: 1,
-    minHeight: 52,
+    minHeight: 54,
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    gap: 4
+    gap: 3
   },
   tabButtonActive: {
-    backgroundColor: "rgba(255, 255, 255, 0.16)"
+    backgroundColor: palette.brand
   },
   tabLabel: {
-    color: "#94a3b8",
+    color: palette.muted,
     fontSize: 11,
     fontWeight: "700"
   },

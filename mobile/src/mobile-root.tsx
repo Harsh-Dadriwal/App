@@ -1,7 +1,9 @@
-import { View } from "react-native";
+import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
+import { StatusBar } from "expo-status-bar";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { palette } from "@/lib/theme";
 import { AuthProvider, useAuth } from "@/providers/auth-provider";
 import { NavigationProvider, useMobileNavigation } from "@/providers/navigation-provider";
-import { ScreenShell } from "@/components/ui";
 import { AuthScreen } from "@/screens/auth-screen";
 import { DashboardScreen } from "@/screens/dashboard-screen";
 import { CatalogScreen } from "@/screens/catalog-screen";
@@ -10,9 +12,23 @@ import { ApprovalsScreen } from "@/screens/approvals-screen";
 import { MaterialsScreen } from "@/screens/materials-screen";
 import { NotesScreen } from "@/screens/notes-screen";
 import { AdminCatalogScreen } from "@/screens/admin-catalog-screen";
+import { PriceListScreen } from "@/screens/price-list-screen";
+import { ServiceRequestsScreen } from "@/screens/service-requests-screen";
 import { FintechScreen } from "@/screens/fintech-screen";
 import { LightingScreen } from "@/screens/lighting-screen";
 import { IncentivesScreen } from "@/screens/incentives-screen";
+
+function Splash({ title, message, busy }: { title?: string; message: string; busy?: boolean }) {
+  return (
+    <View style={styles.splash}>
+      <StatusBar style="light" />
+      <Image source={require("../assets/splash-icon.png")} style={styles.splashLogo} />
+      <Text style={styles.splashTitle}>{title ?? "Mahalaxmi Electricals"}</Text>
+      <Text style={styles.splashMessage}>{message}</Text>
+      {busy ? <ActivityIndicator color={palette.gold} style={{ marginTop: 20 }} /> : null}
+    </View>
+  );
+}
 
 function AppBody() {
   const { configured, loading, session, profile } = useAuth();
@@ -20,16 +36,24 @@ function AppBody() {
 
   if (!configured) {
     return (
-      <ScreenShell title="Service unavailable" subtitle="We cannot load your workspace right now. Please try again shortly." />
+      <Splash
+        title="Service unavailable"
+        message="This copy of the app was built without its server settings. Please install the latest version or contact support."
+      />
     );
   }
 
   if (loading) {
-    return <ScreenShell title="Opening mobile workspace" subtitle="Checking your session and profile..." />;
+    return <Splash message="Opening your workspace..." busy />;
   }
 
   if (!session || !profile) {
-    return <AuthScreen />;
+    return (
+      <>
+        <StatusBar style="light" />
+        <AuthScreen />
+      </>
+    );
   }
 
   if (screen === "catalog") return <CatalogScreen />;
@@ -40,18 +64,36 @@ function AppBody() {
   if (screen === "incentives") return <IncentivesScreen />;
   if (screen === "notes") return <NotesScreen />;
   if (screen === "admin-catalog") return <AdminCatalogScreen />;
+  if (screen === "price-list") return <PriceListScreen />;
+  if (screen === "service-requests") return <ServiceRequestsScreen />;
   if (screen === "fintech") return <FintechScreen />;
   return <DashboardScreen />;
 }
 
 export function MobileRoot() {
   return (
-    <AuthProvider>
-      <NavigationProvider>
-        <View style={{ flex: 1 }}>
-          <AppBody />
-        </View>
-      </NavigationProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <NavigationProvider>
+          <View style={{ flex: 1, backgroundColor: palette.bg }}>
+            <StatusBar style="dark" />
+            <AppBody />
+          </View>
+        </NavigationProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  splash: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 32,
+    backgroundColor: palette.night
+  },
+  splashLogo: { width: 88, height: 88, borderRadius: 26, marginBottom: 20 },
+  splashTitle: { color: "#ffffff", fontSize: 22, fontWeight: "900", textAlign: "center" },
+  splashMessage: { color: palette.nightMuted, fontSize: 15, marginTop: 10, textAlign: "center", lineHeight: 22 }
+});

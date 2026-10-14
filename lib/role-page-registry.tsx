@@ -21,6 +21,7 @@ import {
   AdminUsersPage,
   AdminOrdersPage,
   AdminProductsPage,
+  AdminPriceListPage,
   AdminSubstitutionsPage,
   AdminContentPage
 } from "@/components/pages/contractor-pages";
@@ -40,6 +41,11 @@ import {
   AdminFintechPage
 } from "@/components/pages/fintech-pages";
 import { AdminCreditPage } from "@/components/pages/credit-pages";
+import {
+  AdminServiceRequestsPage,
+  CustomerServiceRequestsPage,
+  ElectricianServiceRequestsPage
+} from "@/components/pages/service-requests-pages";
 import { LightingVisualizerPage } from "@/components/pages/lighting-pages";
 import { AdminWorkflowHubPage } from "@/components/order-workflow";
 import {
@@ -62,6 +68,7 @@ export const rolePageRegistry: RolePageRegistry = {
   customer: {
     "": { title: "Dashboard", component: <CustomerDashboardPage /> },
     requirements: { title: "Requirements", component: <RequirementIntakePage role="customer" /> },
+    "service-requests": { title: "Complaints & Installation", component: <CustomerServiceRequestsPage /> },
     lighting: { title: "Lighting Visualizer", component: <LightingVisualizerPage role="customer" /> },
     electricians: {
       title: "Electricians Directory",
@@ -107,6 +114,7 @@ export const rolePageRegistry: RolePageRegistry = {
   electrician: {
     "": { title: "Dashboard", component: <ElectricianDashboardPage /> },
     requirements: { title: "Requirements", component: <RequirementIntakePage role="electrician" /> },
+    "service-requests": { title: "Service Requests", component: <ElectricianServiceRequestsPage /> },
     "projects/new": { title: "New Projects", component: <ElectricianProjectsPage mode="new" /> },
     "projects/market": {
       title: "Assigned to Others",
@@ -137,12 +145,14 @@ export const rolePageRegistry: RolePageRegistry = {
   admin: {
     "": { title: "Dashboard", component: <AdminDashboardPage /> },
     requirements: { title: "Requirements Queue", component: <AdminRequirementsPage /> },
+    "service-requests": { title: "Service Requests", component: <AdminServiceRequestsPage /> },
     lighting: { title: "Lighting Leads", component: <LightingVisualizerPage role="admin" /> },
     users: { title: "Users & Verification", component: <AdminUsersPage /> },
     assignments: { title: "Site Assignments", component: <AdminAssignmentsPage /> },
     orders: { title: "Orders", component: <AdminOrdersPage /> },
     workflows: { title: "Workflow Center", component: <AdminWorkflowHubPage /> },
     products: { title: "Products & Inventory", component: <AdminProductsPage /> },
+    "price-list": { title: "Price List", component: <AdminPriceListPage /> },
     catalog: { title: "Categories & Brands", component: <AdminCatalogPage /> },
     fintech: { title: "Wallets, Savings & Referrals", component: <AdminFintechPage /> },
     credit: { title: "Contractor Credit Engine", component: <AdminCreditPage /> },

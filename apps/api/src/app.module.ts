@@ -20,6 +20,7 @@ import { MonetizationModule } from "./modules/monetization/monetization.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
 import { ProjectMediaModule } from "./modules/project-media/project-media.module";
 import { PartnerIncentivesModule } from "./modules/partner-incentives/partner-incentives.module";
+import { ServiceRequestsModule } from "./modules/service-requests/service-requests.module";
 
 @Module({
   imports: [
@@ -45,7 +46,8 @@ import { PartnerIncentivesModule } from "./modules/partner-incentives/partner-in
     MonetizationModule,
     ProjectsModule,
     ProjectMediaModule,
-    PartnerIncentivesModule
+    PartnerIncentivesModule,
+    ServiceRequestsModule
   ],
   controllers: [HealthController]
 })

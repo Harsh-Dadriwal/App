@@ -7,5 +7,6 @@ export { createInventoryGateway } from "./inventory-gateway";
 export { createNotificationsGateway } from "./notifications-gateway";
 export { createRequirementsGateway } from "./requirements-gateway";
 export { createPaymentsGateway } from "./payments-gateway";
+export * from "./service-requests-gateway";
 
 export * from "./partner-incentives-gateway";

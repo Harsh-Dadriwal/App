@@ -1,114 +1,165 @@
-import { ScrollView, Text, View } from "react-native";
+import { Feather } from "@expo/vector-icons";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/providers/auth-provider";
 import { AppButton, Card, ScreenShell, SectionTitle } from "@/components/ui";
+import { palette, radii, shadow } from "@/lib/theme";
 import { roleLabels, type AppRole } from "@mahalaxmi/core/types/domain";
 import { useMobileNavigation, type MobileScreen } from "@/providers/navigation-provider";
 
-const roleActions: Record<AppRole, Array<{ label: string; route: MobileScreen }>> = {
+type Action = { label: string; hint: string; route: MobileScreen; icon: keyof typeof Feather.glyphMap };
+
+const notes: Action = { label: "Project notes", hint: "Site conversations", route: "notes", icon: "message-square" };
+
+const roleActions: Record<AppRole, Action[]> = {
   customer: [
-    { label: "Lighting visualizer", route: "lighting" },
-    { label: "Customer approvals", route: "approvals" },
-    { label: "Easy product ordering", route: "order-builder" },
-    { label: "Project notes", route: "notes" }
+    { label: "Complaints & installation", hint: "Get an electrician", route: "service-requests", icon: "tool" },
+    { label: "Order products", hint: "Quick material order", route: "order-builder", icon: "shopping-bag" },
+    { label: "Approvals", hint: "Items waiting for you", route: "approvals", icon: "check-square" },
+    { label: "Lighting visualizer", hint: "Plan your lights", route: "lighting", icon: "sun" },
+    { label: "Catalog", hint: "Browse products", route: "catalog", icon: "grid" },
+    notes
   ],
   electrician: [
-    { label: "Material tracker", route: "materials" },
-    { label: "Partner incentives", route: "incentives" },
-    { label: "Fast order builder", route: "order-builder" },
-    { label: "Project notes", route: "notes" }
+    { label: "Service requests", hint: "Jobs near you", route: "service-requests", icon: "tool" },
+    { label: "Order builder", hint: "Order for a site", route: "order-builder", icon: "shopping-bag" },
+    { label: "Material tracker", hint: "What's supplied", route: "materials", icon: "layers" },
+    { label: "Rewards", hint: "Partner incentives", route: "incentives", icon: "award" },
+    notes
   ],
   architect: [
-    { label: "Lighting visualizer", route: "lighting" },
-    { label: "Partner incentives", route: "incentives" },
-    { label: "Create material order", route: "order-builder" },
-    { label: "Material reviews", route: "materials" },
-    { label: "Project notes", route: "notes" }
+    { label: "Lighting visualizer", hint: "Design scenes", route: "lighting", icon: "sun" },
+    { label: "Material reviews", hint: "Approve items", route: "materials", icon: "layers" },
+    { label: "Material order", hint: "Order for a site", route: "order-builder", icon: "shopping-bag" },
+    { label: "Rewards", hint: "Partner incentives", route: "incentives", icon: "award" },
+    notes
   ],
   admin: [
-    { label: "Lighting leads", route: "lighting" },
-    { label: "Create quick order", route: "order-builder" },
-    { label: "Admin catalog", route: "admin-catalog" },
-    { label: "Notes and monitoring", route: "notes" }
+    { label: "Price list", hint: "Tally prices & stock", route: "price-list", icon: "tag" },
+    { label: "Service requests", hint: "Complaints & installs", route: "service-requests", icon: "tool" },
+    { label: "Quick order", hint: "Create an order", route: "order-builder", icon: "shopping-bag" },
+    { label: "Admin catalog", hint: "Products & photos", route: "admin-catalog", icon: "settings" },
+    { label: "Lighting leads", hint: "Customer scenes", route: "lighting", icon: "sun" },
+    { label: "Fintech", hint: "Wallets & savings", route: "fintech", icon: "credit-card" },
+    notes
   ],
-  supplier: [
-    { label: "Lighting scene preview", route: "lighting" },
-    { label: "Return to dashboard", route: "dashboard" },
-    { label: "Project notes", route: "notes" }
-  ],
-  pop_man: [
-    { label: "Task dashboard", route: "dashboard" },
-    { label: "Project notes", route: "notes" }
-  ],
-  carpenter: [
-    { label: "Task dashboard", route: "dashboard" },
-    { label: "Project notes", route: "notes" }
-  ],
-  painter: [
-    { label: "Task dashboard", route: "dashboard" },
-    { label: "Project notes", route: "notes" }
-  ],
-  tiles_man: [
-    { label: "Task dashboard", route: "dashboard" },
-    { label: "Project notes", route: "notes" }
-  ],
-  plumber: [
-    { label: "Task dashboard", route: "dashboard" },
-    { label: "Project notes", route: "notes" }
-  ]
+  supplier: [{ label: "Lighting preview", hint: "Scene previews", route: "lighting", icon: "sun" }, notes],
+  pop_man: [notes],
+  carpenter: [notes],
+  painter: [notes],
+  tiles_man: [notes],
+  plumber: [notes]
 };
+
+function greeting() {
+  const hour = new Date().getHours();
+  return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+}
 
 export function DashboardScreen() {
   const { profile, signOut } = useAuth();
   const { navigate } = useMobileNavigation();
 
   if (!profile) {
-    return (
-      <ScreenShell title="Loading workspace" subtitle="Fetching your profile and role-based mobile workspace." />
-    );
+    return <ScreenShell title="Loading your workspace" subtitle="Fetching your profile..." />;
   }
 
-  const actions = roleActions[profile.role] ?? [];
+  const actions = roleActions[profile.role] ?? [notes];
+  const firstName = (profile.full_name ?? "").trim().split(/\s+/)[0] || "there";
+  const isPendingProfessional = profile.role !== "customer" && profile.role !== "admin" && profile.verification_status === "pending";
 
   return (
     <ScreenShell
-      title={`${roleLabels[profile.role]} mobile workspace`}
-      subtitle="Quick access to your materials, approvals and orders."
+      title={`${greeting()}, ${firstName}`}
+      subtitle="What would you like to do today?"
       currentScreen="dashboard"
     >
-      <Card tone="brand">
-        <Text style={{ fontSize: 22, fontWeight: "800" }}>{profile.full_name ?? "User"}</Text>
-        <Text style={{ marginTop: 6, lineHeight: 22 }}>{profile.email ?? profile.phone ?? roleLabels[profile.role]}</Text>
-        <Text style={{ marginTop: 6, lineHeight: 22 }}>
-          Role: {roleLabels[profile.role]}{profile.company_name ? ` · ${profile.company_name}` : ""}
-        </Text>
-      </Card>
+      {isPendingProfessional ? (
+        <Card tone="brand">
+          <View style={styles.row}>
+            <Feather name="clock" size={18} color={palette.brandDeep} />
+            <Text style={styles.pendingText}>
+              Your {roleLabels[profile.role].toLowerCase()} account is waiting for admin verification. You can already look around.
+            </Text>
+          </View>
+        </Card>
+      ) : null}
 
-      <SectionTitle
-        title="Quick actions"
-        description="Mobile-first shortcuts for the tasks people actually do on site."
-      />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={{ flexDirection: "row", gap: 12 }}>
-          {actions.map((action) => (
-            <View key={action.route} style={{ width: 260 }}>
-              <Card tone="soft">
-                <Text style={{ fontSize: 18, fontWeight: "700", marginBottom: 10 }}>{action.label}</Text>
-                <AppButton label="Open" icon="arrow-up-right" onPress={() => navigate(action.route)} />
-              </Card>
+      <SectionTitle title="Quick actions" />
+      <View style={styles.grid}>
+        {actions.map((action) => (
+          <Pressable
+            key={`${action.route}-${action.label}`}
+            style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
+            onPress={() => navigate(action.route)}
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+          >
+            <View style={styles.tileIcon}>
+              <Feather name={action.icon} size={20} color={palette.brand} />
             </View>
-          ))}
-        </View>
-      </ScrollView>
+            <Text style={styles.tileLabel} numberOfLines={2}>{action.label}</Text>
+            <Text style={styles.tileHint} numberOfLines={1}>{action.hint}</Text>
+          </Pressable>
+        ))}
+      </View>
 
+      <SectionTitle title="Your account" />
       <Card>
-        <Text style={{ fontSize: 18, fontWeight: "700", marginBottom: 8 }}>Everything stays in sync</Text>
-        <Text style={{ lineHeight: 22 }}>
-          The mobile app uses the same tables, views, roles, notes, approvals, orders, product requests, and admin controls as the web app.
-        </Text>
-        <View style={{ marginTop: 14 }}>
-          <AppButton label="Log out" icon="log-out" kind="secondary" onPress={() => void signOut()} />
+        <View style={styles.row}>
+          <View style={styles.accountAvatar}>
+            <Text style={styles.accountAvatarText}>{(profile.full_name ?? profile.email ?? "U").slice(0, 1).toUpperCase()}</Text>
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.accountName}>{profile.full_name ?? "User"}</Text>
+            <Text style={styles.accountMeta}>{profile.email ?? profile.phone ?? ""}</Text>
+            <Text style={styles.accountMeta}>
+              {roleLabels[profile.role]}{profile.company_name ? ` · ${profile.company_name}` : ""}
+            </Text>
+          </View>
         </View>
+        <AppButton label="Log out" icon="log-out" kind="secondary" onPress={() => void signOut()} />
       </Card>
     </ScreenShell>
   );
 }
+
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  row: { flexDirection: "row", alignItems: "center", gap: 12 },
+  pendingText: { flex: 1, color: palette.brandDeep, fontWeight: "600", lineHeight: 20 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  tile: {
+    flexBasis: "47%",
+    flexGrow: 1,
+    minHeight: 128,
+    padding: 16,
+    borderRadius: radii.lg,
+    backgroundColor: palette.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.line,
+    ...shadow
+  },
+  tilePressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
+  tileIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: palette.brandSoft,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14
+  },
+  tileLabel: { fontSize: 15, fontWeight: "800", color: palette.ink, lineHeight: 19 },
+  tileHint: { fontSize: 12.5, color: palette.muted, marginTop: 4 },
+  accountAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: palette.night,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  accountAvatarText: { color: palette.gold, fontSize: 18, fontWeight: "900" },
+  accountName: { fontSize: 16, fontWeight: "800", color: palette.ink },
+  accountMeta: { color: palette.muted, fontSize: 13, marginTop: 2 }
+});
