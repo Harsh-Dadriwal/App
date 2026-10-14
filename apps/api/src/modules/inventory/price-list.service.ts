@@ -8,6 +8,9 @@ const DRIVE_READONLY_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
 const DOWNLOAD_FAILED = "The price list could not be downloaded right now. Please try again shortly.";
 const PAGE_SIZE = 1000;
 
+/** A download problem whose message is safe and useful to show the admin. */
+class PriceListSourceError extends Error {}
+
 @Injectable()
 export class PriceListService {
   private readonly logger = new Logger(PriceListService.name);
@@ -25,6 +28,17 @@ export class PriceListService {
 
   private get publicUrl() {
     return (process.env.GOOGLE_DRIVE_PRODUCTS_URL || "").trim();
+  }
+
+  /** Adds confirm=t to Drive "uc" links so Google skips its download-warning page. */
+  private publicDownloadUrl() {
+    try {
+      const url = new URL(this.publicUrl);
+      if (url.hostname.endsWith("google.com") && !url.searchParams.has("confirm")) url.searchParams.set("confirm", "t");
+      return url.toString();
+    } catch {
+      return this.publicUrl;
+    }
   }
 
   isConfigured() {
@@ -73,9 +87,16 @@ export class PriceListService {
         { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(25_000) }
       );
     } else {
-      response = await fetch(this.publicUrl, { signal: AbortSignal.timeout(25_000) });
+      response = await fetch(this.publicDownloadUrl(), { signal: AbortSignal.timeout(25_000) });
     }
     if (!response.ok) throw new Error(`Price list download failed: ${response.status} ${await response.text()}`);
+    if ((response.headers.get("content-type") || "").includes("text/html")) {
+      // Google answers with a sign-in or verification page instead of the file when it
+      // is not shared publicly, or when it refuses requests from server IP addresses.
+      throw new PriceListSourceError(
+        "Google Drive sent a web page instead of the price list file. Share the file as \"Anyone with the link\", or set up the service account."
+      );
+    }
     return Buffer.from(await response.arrayBuffer());
   }
 
@@ -89,7 +110,7 @@ export class PriceListService {
       buffer = await this.downloadSource();
     } catch (error) {
       this.logger.error(error instanceof Error ? error.message : String(error));
-      throw new BadGatewayException(DOWNLOAD_FAILED);
+      throw new BadGatewayException(error instanceof PriceListSourceError ? error.message : DOWNLOAD_FAILED);
     }
 
     const items = parsePriceListDocument(buffer);

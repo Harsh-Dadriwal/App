@@ -9,6 +9,12 @@ function toFriendlyError(message: string | null, status: number): string {
     return "This feature is not available right now. Please try again later.";
   }
   if (status === 429) return "Too many requests. Please wait a moment and try again.";
+  if (status === 504) return "The server took too long to respond. Please try again.";
+  // The API words its 502/503 messages for users (e.g. why a sync failed); platform
+  // errors with these codes carry no `message`, so they still fall back below.
+  if ((status === 502 || status === 503) && message && !/exception|error:|\bat\s+\S+\s*\(/i.test(message)) {
+    return message.trim();
+  }
   if (status >= 500) return SERVER_ERROR_MESSAGE;
   return message?.trim() || SERVER_ERROR_MESSAGE;
 }
