@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, type DependencyList, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type DependencyList, type ReactNode } from "react";
 import { getSupabaseBrowserClient, getSupabaseReadBrowserClient } from "@mahalaxmi/core/supabase/client";
 import { useSharedMutationAction } from "@mahalaxmi/core/hooks/use-mutation-action";
+import { queryCacheKey, readQueryCache, trackQuery, writeQueryCache } from "@mahalaxmi/core/hooks/query-cache";
+import { SkeletonCards } from "@/components/skeleton";
 
 export function FormFieldHint({ children }: { children: ReactNode }) {
   return <p className="form-field-hint">{children}</p>;
@@ -86,11 +88,15 @@ export function useRows<T>(
   deps: DependencyList,
   options?: { realtimeTable?: string; clientType?: "primary" | "read"; enabled?: boolean }
 ) {
-  const [data, setData] = useState<T[]>([]);
+  // Same query (fetcher source + its inputs) -> same cache entry; see query-cache.ts.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const cacheKey = useMemo(() => queryCacheKey([fetcher.toString(), deps, options?.clientType ?? null, options?.realtimeTable ?? null]), deps);
+  const [initialCache] = useState(() => (options?.enabled === false ? null : readQueryCache<T>(cacheKey)));
+  const [data, setData] = useState<T[]>(initialCache ?? []);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(initialCache === null);
   const [reloadKey, setReloadKey] = useState(0);
-  const hasLoadedRef = useRef(false);
+  const hasLoadedRef = useRef(initialCache !== null);
 
   useEffect(() => {
     let active = true;
@@ -103,6 +109,15 @@ export function useRows<T>(
           setError(null);
         }
         return;
+      }
+
+      // Show the last result for this exact query straight away, then refresh it below.
+      const cached = readQueryCache<T>(cacheKey);
+      if (cached) {
+        hasLoadedRef.current = true;
+        setData(cached);
+        setError(null);
+        setLoading(false);
       }
 
       // Only show the loading state on the first fetch. Refetches (from
@@ -137,15 +152,21 @@ export function useRows<T>(
           .subscribe();
       }
 
-      const result = await fetcher(client);
+      const result = await trackQuery(fetcher(client));
+      if (!result.error) {
+        writeQueryCache(cacheKey, result.data);
+      }
 
       if (!active) {
         return;
       }
 
       hasLoadedRef.current = true;
-      setData(result.data);
-      setError(result.error);
+      // A failed background refresh keeps the cached copy on screen instead of blanking it.
+      if (!(result.error && cached)) {
+        setData(result.data);
+        setError(result.error);
+      }
       setLoading(false);
     })();
 
@@ -155,7 +176,7 @@ export function useRows<T>(
         void getSupabaseBrowserClient().then(c => c && c.removeChannel(channel));
       }
     };
-  }, [...deps, reloadKey, options?.enabled]);
+  }, [...deps, cacheKey, reloadKey, options?.enabled]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -334,7 +355,7 @@ export function QueryState({
   children: React.ReactNode;
 }) {
   if (loading) {
-    return <div className="state-card">Loading...</div>;
+    return <SkeletonCards />;
   }
 
   if (error) {

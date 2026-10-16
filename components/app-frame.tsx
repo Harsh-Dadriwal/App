@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useMutationAction, useRows } from "@/components/data-view";
 import { useAuth } from "@/components/providers/auth-provider";
+import { SkeletonWorkspace, TopProgressBar } from "@/components/skeleton";
 import { useTheme } from "@/components/theme-provider";
 import { getRoleNav, roleLabels } from "@/lib/navigation";
 import type { AppRole } from "@mahalaxmi/core/types/domain";
@@ -27,14 +28,7 @@ function SetupView() {
 }
 
 function LoadingView() {
-  return (
-    <main className="loading-shell">
-      <div className="loading-card">
-        <span className="eyebrow">Connecting</span>
-        <h1>Loading your Mahalaxmi Electricals workspace...</h1>
-      </div>
-    </main>
-  );
+  return <SkeletonWorkspace />;
 }
 
 export function AppFrame({
@@ -254,6 +248,7 @@ export function AppFrame({
       </aside>
 
       <section className="workspace-main">
+        <TopProgressBar />
         <header className="workspace-header">
           <div className="header-left">
             <button 

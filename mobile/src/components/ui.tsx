@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { palette, radii, shadow } from "@/lib/theme";
+import { subscribeQueryActivity } from "@mahalaxmi/core/hooks/query-cache";
 import { roleLabels } from "@mahalaxmi/core/types/domain";
 import { useAuth } from "@/providers/auth-provider";
 import {
@@ -138,6 +139,7 @@ export function ScreenShell({
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
+      <RefreshLine />
       <KeyboardAvoidingView
         style={styles.keyboardAvoider}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -369,12 +371,7 @@ export function QueryState({
   children: React.ReactNode;
 }) {
   if (loading) {
-    return (
-      <View style={styles.stateCard}>
-        <ActivityIndicator color={palette.brand} />
-        <Text style={styles.mutedText}>Loading...</Text>
-      </View>
-    );
+    return <SkeletonList />;
   }
 
   if (error) {
@@ -396,6 +393,79 @@ export function QueryState({
   }
 
   return <>{children}</>;
+}
+
+/**
+ * Thin sliding line at the top of the screen while fresh data loads in the background.
+ * Waits 250ms before showing so quick refreshes do not flicker.
+ */
+function RefreshLine() {
+  const [busy, setBusy] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const { width } = useWindowDimensions();
+  const slide = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => subscribeQueryActivity(setBusy), []);
+
+  useEffect(() => {
+    if (!busy) {
+      setVisible(false);
+      return;
+    }
+    const timer = setTimeout(() => setVisible(true), 250);
+    return () => clearTimeout(timer);
+  }, [busy]);
+
+  useEffect(() => {
+    if (!visible) return;
+    slide.setValue(0);
+    const loop = Animated.loop(Animated.timing(slide, { toValue: 1, duration: 1100, useNativeDriver: true }));
+    loop.start();
+    return () => loop.stop();
+  }, [visible, slide]);
+
+  // The track always keeps its 3px so the screen does not shift when the line appears.
+  if (!visible) return <View pointerEvents="none" style={styles.refreshTrack} />;
+  const translateX = slide.interpolate({ inputRange: [0, 1], outputRange: [-width * 0.4, width] });
+  return (
+    <View pointerEvents="none" style={styles.refreshTrack}>
+      <Animated.View style={[styles.refreshBar, { width: width * 0.4, transform: [{ translateX }] }]} />
+    </View>
+  );
+}
+
+/** A gently pulsing placeholder block, shaped like the content it stands in for. */
+function SkeletonBlock({ width, height = 12, pulse }: { width: number | `${number}%`; height?: number; pulse: Animated.Value }) {
+  return <Animated.View style={[styles.skeletonBlock, { width, height, opacity: pulse }]} />;
+}
+
+/** Placeholder cards shown while a list loads for the first time. */
+export function SkeletonList({ count = 3 }: { count?: number }) {
+  const pulse = useRef(new Animated.Value(0.45)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.45, duration: 700, useNativeDriver: true })
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+
+  return (
+    <View accessibilityRole="progressbar" accessibilityLabel="Loading" style={{ gap: 12 }}>
+      {Array.from({ length: count }, (_, index) => (
+        <View key={index} style={styles.skeletonCard}>
+          <SkeletonBlock width="35%" pulse={pulse} />
+          <SkeletonBlock width={index % 2 ? "62%" : "78%"} height={18} pulse={pulse} />
+          <SkeletonBlock width="90%" pulse={pulse} />
+          <SkeletonBlock width="50%" pulse={pulse} />
+        </View>
+      ))}
+    </View>
+  );
 }
 
 export function Notice({
@@ -744,6 +814,27 @@ const styles = StyleSheet.create({
     borderStyle: "dashed",
     borderColor: palette.lineStrong,
     backgroundColor: palette.surfaceSoft
+  },
+  refreshTrack: {
+    height: 3,
+    overflow: "hidden"
+  },
+  refreshBar: {
+    height: 3,
+    borderRadius: 3,
+    backgroundColor: palette.brand
+  },
+  skeletonCard: {
+    gap: 12,
+    padding: 18,
+    borderRadius: radii.lg,
+    backgroundColor: palette.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.line
+  },
+  skeletonBlock: {
+    borderRadius: 999,
+    backgroundColor: palette.line
   },
   stateCardError: {
     borderColor: "rgba(220, 38, 38, 0.35)",

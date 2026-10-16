@@ -1,17 +1,21 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase, supabaseRead } from "@/lib/supabase";
 import { useSharedMutationAction } from "@mahalaxmi/core/hooks/use-mutation-action";
+import { queryCacheKey, readQueryCache, trackQuery, writeQueryCache } from "@mahalaxmi/core/hooks/query-cache";
 
 export function useRows<T>(
   fetcher: (client: NonNullable<typeof supabase>) => Promise<{ data: T[]; error: string | null }>,
   deps: any[],
   options?: { realtimeTable?: string; clientType?: "primary" | "read"; enabled?: boolean }
 ) {
-  const [data, setData] = useState<T[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Same query (fetcher source + its inputs) -> same cache entry; see query-cache.ts.
+  const cacheKey = useMemo(() => queryCacheKey([fetcher.toString(), deps, options?.clientType ?? null, options?.realtimeTable ?? null]), deps);
+  const [initialCache] = useState(() => (options?.enabled === false ? null : readQueryCache<T>(cacheKey)));
+  const [data, setData] = useState<T[]>(initialCache ?? []);
+  const [loading, setLoading] = useState(initialCache === null);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  const hasLoadedRef = useRef(false);
+  const hasLoadedRef = useRef(initialCache !== null);
 
   useEffect(() => {
     let active = true;
@@ -50,17 +54,30 @@ export function useRows<T>(
           .subscribe();
       }
 
+      // Show the last result for this exact query straight away, then refresh it below.
+      const cached = readQueryCache<T>(cacheKey);
+      if (cached) {
+        hasLoadedRef.current = true;
+        setData(cached);
+        setError(null);
+        setLoading(false);
+      }
+
       // Only show the loading state on the first fetch. Refetches (from
       // mutations, realtime updates, or manual refetch()) keep showing the
       // previously loaded data instead of blanking the screen.
       if (!hasLoadedRef.current) {
         setLoading(true);
       }
-      const result = await fetcher(client);
+      const result = await trackQuery(fetcher(client));
+      if (!result.error) writeQueryCache(cacheKey, result.data);
       if (!active) return;
       hasLoadedRef.current = true;
-      setData(result.data);
-      setError(result.error);
+      // A failed background refresh keeps the cached copy on screen instead of blanking it.
+      if (!(result.error && cached)) {
+        setData(result.data);
+        setError(result.error);
+      }
       setLoading(false);
     })();
     
@@ -73,7 +90,7 @@ export function useRows<T>(
         }, 100);
       }
     };
-  }, [...deps, reloadKey, options?.enabled]);
+  }, [...deps, cacheKey, reloadKey, options?.enabled]);
 
   return { data, loading, error, refetch: () => setReloadKey((value) => value + 1) };
 }

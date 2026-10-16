@@ -11,6 +11,7 @@ import {
 import { fetchProfileWithRetry } from "@mahalaxmi/core/auth";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@mahalaxmi/core/supabase/client";
 import type { ActiveTenant, TenantMembership, UserProfile } from "@mahalaxmi/core/types/domain";
+import { clearQueryCache, configureQueryCacheStorage, setQueryCacheScope } from "@mahalaxmi/core/hooks/query-cache";
 import {
   fetchAppProfile,
   fetchTenantMemberships,
@@ -38,6 +39,46 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+// Page data cached for this browser tab survives a reload (see query-cache.ts).
+if (typeof window !== "undefined") {
+  try {
+    configureQueryCacheStorage(window.sessionStorage);
+  } catch {
+    // Storage blocked: the in-memory cache still works.
+  }
+}
+
+/**
+ * The signed-in user's profile and workspaces, kept on this device so a reload opens the
+ * workspace at once while fresh copies load in the background. Cleared on sign-out.
+ */
+const SNAPSHOT_KEY = "me:auth-snapshot:v1";
+type AuthSnapshot = {
+  authUserId: string;
+  profile: UserProfile;
+  tenantMemberships: TenantMembership[];
+  activeTenant: ActiveTenant | null;
+};
+
+function readSnapshot(authUserId: string): AuthSnapshot | null {
+  try {
+    const raw = window.localStorage.getItem(SNAPSHOT_KEY);
+    const snapshot = raw ? (JSON.parse(raw) as AuthSnapshot) : null;
+    return snapshot?.authUserId === authUserId && snapshot.profile ? snapshot : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSnapshot(snapshot: AuthSnapshot | null) {
+  try {
+    if (snapshot) window.localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
+    else window.localStorage.removeItem(SNAPSHOT_KEY);
+  } catch {
+    // Storage blocked: the app just loads from the network as before.
+  }
+}
 
 function AuthProvider({ children }: { children: ReactNode }) {
   const configured = isSupabaseConfigured();
@@ -124,10 +165,21 @@ function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session);
       const sessionUserId = data.session?.user?.id;
 
+      const snapshot = sessionUserId ? readSnapshot(sessionUserId) : null;
+      if (snapshot) {
+        // Open the workspace straight away; the fetches below refresh it.
+        setProfile(snapshot.profile);
+        setTenantMemberships(snapshot.tenantMemberships);
+        setActiveTenant(snapshot.activeTenant);
+        setIsLoading(false);
+      }
+
       if (sessionUserId) {
         const profileResult = await fetchProfileWithRetry(() => fetchAppProfile(sessionUserId));
 
-        if (profileResult.error) {
+        if (profileResult.error && snapshot) {
+          // Keep the remembered profile when only the background refresh failed.
+        } else if (profileResult.error) {
           setErrorMessage(
             "Signed in, but your profile could not be loaded. Please try again or contact support."
           );
@@ -142,8 +194,14 @@ function AuthProvider({ children }: { children: ReactNode }) {
 
       setIsLoading(false);
 
-      const listener = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+      const listener = supabase.auth.onAuthStateChange(async (event, nextSession) => {
         setSession(nextSession);
+
+        // INITIAL_SESSION repeats the session loaded above, and a token refresh does not
+        // change who is signed in; refetching the profile for either only adds a delay.
+        if ((event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") && nextSession?.user?.id === sessionUserId) {
+          return;
+        }
 
         if (nextSession?.user?.id) {
           const profileResult = await fetchProfileWithRetry(() => fetchAppProfile(nextSession.user.id));
@@ -160,6 +218,8 @@ function AuthProvider({ children }: { children: ReactNode }) {
           setTenantMemberships([]);
           setActiveTenant(null);
           setErrorMessage("");
+          writeSnapshot(null);
+          clearQueryCache();
         }
 
         setIsLoading(false);
@@ -191,6 +251,8 @@ function AuthProvider({ children }: { children: ReactNode }) {
       setTenantMemberships([]);
       setActiveTenant(null);
       setErrorMessage("");
+      writeSnapshot(null);
+      clearQueryCache();
     }
   }
 
@@ -214,6 +276,16 @@ function AuthProvider({ children }: { children: ReactNode }) {
     setErrorMessage("");
     return true;
   }
+
+  useEffect(() => {
+    const authUserId = session?.user?.id;
+    if (authUserId && profile) {
+      writeSnapshot({ authUserId, profile, tenantMemberships, activeTenant });
+    }
+  }, [session?.user?.id, profile, tenantMemberships, activeTenant]);
+
+  // Set during render (idempotent) so pages read the right cache on their first render.
+  setQueryCacheScope(profile?.id ? `${profile.id}:${activeTenant?.id ?? "none"}` : "anon");
 
   const value = useMemo(
     () => ({

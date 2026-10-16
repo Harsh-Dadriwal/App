@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
+import { SkeletonWorkspace } from "@/components/skeleton";
 import { isSupabaseConfigured } from "@mahalaxmi/core/supabase/client";
 
 export default function RootPage() {
@@ -36,13 +37,5 @@ export default function RootPage() {
     );
   }
 
-  return (
-    <main className="loading-shell fade-in">
-      <div className="loading-card">
-        <span className="eyebrow">Initializing</span>
-        <h1>Welcome to Mahalaxmi Electricals</h1>
-        <p>Loading your workspace...</p>
-      </div>
-    </main>
-  );
+  return <SkeletonWorkspace />;
 }

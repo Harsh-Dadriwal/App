@@ -10,7 +10,9 @@ import {
   fetchProfileWithRetry,
   isRecoverableAuthSessionError
 } from "@mahalaxmi/core/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { clearQueryCache, setQueryCacheScope } from "@mahalaxmi/core/hooks/query-cache";
 import type { ActiveTenant, TenantMembership, UserProfile } from "@mahalaxmi/core/types/domain";
 import {
   fetchAppProfile,
@@ -35,6 +37,33 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/**
+ * The signed-in user's profile and workspaces, kept on the phone so the app opens straight
+ * into the workspace while fresh copies load in the background. Cleared on sign-out.
+ */
+const SNAPSHOT_KEY = "me:auth-snapshot:v1";
+type AuthSnapshot = {
+  authUserId: string;
+  profile: UserProfile;
+  tenantMemberships: TenantMembership[];
+  activeTenant: ActiveTenant | null;
+};
+
+async function readSnapshot(authUserId: string): Promise<AuthSnapshot | null> {
+  try {
+    const raw = await AsyncStorage.getItem(SNAPSHOT_KEY);
+    const snapshot = raw ? (JSON.parse(raw) as AuthSnapshot) : null;
+    return snapshot?.authUserId === authUserId && snapshot.profile ? snapshot : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSnapshot(snapshot: AuthSnapshot | null) {
+  const write = snapshot ? AsyncStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot)) : AsyncStorage.removeItem(SNAPSHOT_KEY);
+  void write.catch(() => undefined);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
@@ -44,6 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [errorMessage, setErrorMessage] = useState("");
 
   async function clearBrokenSession() {
+    writeSnapshot(null);
+    clearQueryCache();
     if (!supabase) {
       return;
     }
@@ -82,13 +113,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setActiveTenant(resolveActiveTenant(profileValue, enrichedMemberships));
   }
 
-  async function refreshProfile(userId?: string) {
+  async function refreshProfile(userId?: string, options?: { keepOnError?: boolean }) {
     if (!userId) {
       setProfile(null);
       return null;
     }
 
     const result = await fetchProfileWithRetry(() => fetchAppProfile(userId));
+    // Keep the remembered profile when only the background refresh failed.
+    if (result.error && options?.keepOnError) {
+      return null;
+    }
     if (result.error) {
       setProfile(null);
       setErrorMessage("Signed in, but the mobile app profile could not be loaded.");
@@ -124,7 +159,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setSession(nextSession);
         if (nextSession?.user?.id) {
-          await refreshProfile(nextSession.user.id);
+          const snapshot = await readSnapshot(nextSession.user.id);
+          if (snapshot && mounted) {
+            // Open the workspace straight away; refreshProfile below brings it up to date.
+            setProfile(snapshot.profile);
+            setTenantMemberships(snapshot.tenantMemberships);
+            setActiveTenant(snapshot.activeTenant);
+            setLoading(false);
+          }
+          await refreshProfile(nextSession.user.id, { keepOnError: Boolean(snapshot) });
         }
       } catch (error) {
         if (isRecoverableAuthSessionError(error)) {
@@ -139,9 +182,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })();
 
-    const { data } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+    const { data } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
       try {
         setSession(nextSession);
+        // INITIAL_SESSION repeats the session restored above and a token refresh keeps the
+        // same user, so neither needs the profile downloaded again.
+        if (event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {
+          return;
+        }
         if (nextSession?.user?.id) {
           await refreshProfile(nextSession.user.id);
         } else {
@@ -149,6 +197,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setTenantMemberships([]);
           setActiveTenant(null);
           setErrorMessage("");
+          writeSnapshot(null);
+          clearQueryCache();
         }
       } catch (error) {
         if (isRecoverableAuthSessionError(error)) {
@@ -178,6 +228,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setTenantMemberships([]);
       setActiveTenant(null);
       setErrorMessage("");
+      writeSnapshot(null);
+      clearQueryCache();
     }
   }
 
@@ -197,6 +249,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setErrorMessage("");
     return true;
   }
+
+  useEffect(() => {
+    const authUserId = session?.user?.id;
+    if (authUserId && profile) {
+      writeSnapshot({ authUserId, profile, tenantMemberships, activeTenant });
+    }
+  }, [session?.user?.id, profile, tenantMemberships, activeTenant]);
+
+  // Set during render (idempotent) so screens read the right cache on their first render.
+  setQueryCacheScope(profile?.id ? `${profile.id}:${activeTenant?.id ?? "none"}` : "anon");
 
   const value = useMemo(
     () => ({
