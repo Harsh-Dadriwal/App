@@ -14,18 +14,16 @@ import type { AppRole } from "@mahalaxmi/core/types/domain";
 
 type Step = "phone" | "otp" | "profile" | "email" | "forgot" | "reset";
 type EmailMode = "login" | "signup";
-type SignupRole = "customer" | "electrician" | "architect";
-
-const ROLES: Array<{ id: SignupRole; title: string; text: string; icon: string }> = [
-  { id: "customer", title: "Customer", text: "Buy materials, raise complaints and installations", icon: "🏠" },
-  { id: "electrician", title: "Electrician", text: "Take jobs, order for sites and earn rewards", icon: "⚡" },
-  { id: "architect", title: "Architect", text: "Plan lighting and review site materials", icon: "📐" }
-];
-
-const PERKS = [
-  "Live prices and stock from the shop",
-  "Raise complaints and book installations",
-  "Track orders, approvals and savings"
+/** What a customer gets from the app (every new account is a customer). */
+const PERKS: Array<{ icon: string; title: string; text: string }> = [
+  { icon: "🛠️", title: "Book repairs and installations", text: "Raise a complaint or installation request and choose who does the job." },
+  { icon: "🛒", title: "Order electrical materials", text: "Order for your home or site straight from the shop." },
+  { icon: "✅", title: "Approve before it is supplied", text: "Check every item on your site's list and approve it first." },
+  { icon: "💡", title: "Plan your lighting", text: "See how lights will look in your rooms before you buy." },
+  { icon: "💰", title: "Save every month", text: "Join a savings plan and get bonus points at maturity." },
+  { icon: "🎁", title: "Wallet and referral rewards", text: "Earn rewards when friends you invite join." },
+  { icon: "📊", title: "Track your budget", text: "Keep your project spending in one place." },
+  { icon: "📘", title: "Home and electrical tips", text: "Practical guides for a safer, smarter home." }
 ];
 
 function normalizeUsername(value: string) {
@@ -123,29 +121,6 @@ function UsernameHint({ state }: { state: ReturnType<typeof useUsernameCheck> })
   return <span className="field-status">Letters, numbers, dots and underscores</span>;
 }
 
-function RolePicker({ value, onChange }: { value: SignupRole; onChange: (role: SignupRole) => void }) {
-  return (
-    <div className="role-picker" role="radiogroup" aria-label="I am a">
-      {ROLES.map((role) => (
-        <button
-          key={role.id}
-          type="button"
-          role="radio"
-          aria-checked={value === role.id}
-          className={`role-option${value === role.id ? " is-active" : ""}`}
-          onClick={() => onChange(role.id)}
-        >
-          <span className="role-option-icon" aria-hidden="true">{role.icon}</span>
-          <span>
-            <strong>{role.title}</strong>
-            <small>{role.text}</small>
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export function AuthScreen() {
   const router = useRouter();
   const { refreshProfile } = useAuth();
@@ -168,7 +143,6 @@ export function AuthScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState<SignupRole>("customer");
   const [referralCode, setReferralCode] = useState("");
   const usernameState = useUsernameCheck(step === "profile" || (step === "email" && emailMode === "signup") ? username : "");
 
@@ -259,10 +233,10 @@ export function AuthScreen() {
     if (usernameState === "taken") return setError("This username is already taken. Please choose another one.");
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setError("Enter a valid email address, or leave it empty.");
     void run(async () => {
-      const result = await completePhoneSignup(signupToken, { full_name: fullName.trim(), username, email: email || undefined, role });
+      const result = await completePhoneSignup(signupToken, { full_name: fullName.trim(), username, email: email || undefined });
       if (result.error || !result.data) throw new Error(result.error ?? "We could not create your account. Please try again.");
       await storeSession(result.data.session);
-      await openWorkspace(role);
+      await openWorkspace("customer");
     });
   }
 
@@ -299,12 +273,13 @@ export function AuthScreen() {
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth`,
-          data: { full_name: fullName.trim(), username, role, phone: mobile, referral_code: referralCode || undefined }
+          // Every new account is a customer; the role is fixed on the server too.
+          data: { full_name: fullName.trim(), username, role: "customer", phone: mobile, referral_code: referralCode || undefined }
         }
       });
       if (signupError) throw signupError;
       if (data.session) {
-        await openWorkspace(role);
+        await openWorkspace("customer");
         return;
       }
       setEmailMode("login");
@@ -382,12 +357,15 @@ export function AuthScreen() {
           <span className="auth2-logo">⚡</span>
           <span>Mahalaxmi Electricals</span>
         </div>
-        <h1>Everything electrical, one app.</h1>
-        <ul>
+        <h1>Everything your home needs, electrically.</h1>
+        <ul className="auth2-perks">
           {PERKS.map((perk) => (
-            <li key={perk}>
-              <span>✓</span>
-              {perk}
+            <li key={perk.title}>
+              <span className="auth2-perk-icon">{perk.icon}</span>
+              <span>
+                <strong>{perk.title}</strong>
+                <small>{perk.text}</small>
+              </span>
             </li>
           ))}
         </ul>
@@ -475,10 +453,6 @@ export function AuthScreen() {
                 <span>Email <small>(optional)</small></span>
                 <input type="email" value={email} onChange={(event) => setEmail(event.target.value.trim().toLowerCase())} autoComplete="email" placeholder="you@example.com" />
               </label>
-              <div className="auth-field">
-                <span>I am a</span>
-                <RolePicker value={role} onChange={setRole} />
-              </div>
               <button type="submit" className="primary-button auth2-submit" disabled={busy}>
                 {busy ? "Creating your account…" : "Create account"}
               </button>
@@ -527,15 +501,11 @@ export function AuthScreen() {
                 <input type="email" value={email} onChange={(event) => setEmail(event.target.value.trim().toLowerCase())} autoComplete="email" placeholder="you@example.com" required />
               </label>
               {emailMode === "signup" ? phoneField("Mobile number *") : null}
-              {passwordField(emailMode === "login" ? "current-password" : "new-password")}
+              {passwordField(emailMode === "login" ? "current-password" : "new-password", emailMode === "login" ? "Password" : "Password *")}
               {emailMode === "login" ? (
                 <button type="button" className="text-link-button auth2-forgot" onClick={() => go("forgot")}>Forgot password?</button>
               ) : (
                 <>
-                  <div className="auth-field">
-                    <span>I am a</span>
-                    <RolePicker value={role} onChange={setRole} />
-                  </div>
                   <label className="auth-field">
                     <span>Referral code <small>(optional)</small></span>
                     <input value={referralCode} onChange={(event) => setReferralCode(event.target.value.trim().toUpperCase())} placeholder="e.g. ME-ABC123" />
@@ -578,6 +548,23 @@ export function AuthScreen() {
           {notice ? <p className="notice success" role="status">{notice}</p> : null}
 
           <p className="auth2-legal">By continuing you agree to Mahalaxmi Electricals&apos; terms and privacy policy.</p>
+
+          {step === "phone" || step === "email" ? (
+            <section className="auth2-perks-inline" aria-label="What you get">
+              <h3>What you get</h3>
+              <ul className="auth2-perks">
+                {PERKS.map((perk) => (
+                  <li key={perk.title}>
+                    <span className="auth2-perk-icon">{perk.icon}</span>
+                    <span>
+                      <strong>{perk.title}</strong>
+                      <small>{perk.text}</small>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
         </div>
       </section>
     </main>

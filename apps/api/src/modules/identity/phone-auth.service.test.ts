@@ -184,7 +184,7 @@ describe("Phone OTP via TextBee", () => {
     await assert.rejects(service.verifyCode("9000000001", code), /expired/);
   });
 
-  it("creates the account from the profile step with name, username, email and role", async () => {
+  it("creates a customer account from the profile step with name, username and email, ignoring any role sent", async () => {
     const { service, tables, lastCode } = setup();
     await service.sendCode("9000000001");
     const pending = await service.verifyCode("9000000001", lastCode());
@@ -200,12 +200,12 @@ describe("Phone OTP via TextBee", () => {
     assert.equal(result.status, "signed_in");
     assert.equal(result.isNewUser, true);
     assert.equal(result.session.refresh_token, "refresh-auth-1");
-    assert.equal(tables.users[0].role, "electrician");
+    assert.equal(tables.users[0].role, "customer");
     assert.equal(tables.users[0].full_name, "Ravi Kumar");
     assert.equal(tables.users[0].email, "ravi@example.com");
   });
 
-  it("requires a name and a free username, and an unknown role becomes customer", async () => {
+  it("requires a name and a free username, and always creates a customer", async () => {
     const { service, tables, lastCode } = setup({
       profiles: [{ id: "p-other", auth_user_id: "auth-other", phone: "+919111111111", username: "taken.name", email: null }],
       authUsers: [{ id: "auth-other", phone: "919111111111", email: "other@example.com" }]

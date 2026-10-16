@@ -13,33 +13,6 @@ export const roleLabels: Record<AppRole, string> = {
   plumber: "Plumber"
 };
 
-export const authRoleOptions = [
-  {
-    value: "customer",
-    label: "Customer",
-    description: "Create sites, approve materials, track budget, and manage project purchases.",
-    signupAllowed: true
-  },
-  {
-    value: "electrician",
-    label: "Electrician",
-    description: "Bid on projects, draft technical lists, and track material execution.",
-    signupAllowed: true
-  },
-  {
-    value: "architect",
-    label: "Architect",
-    description: "Review materials, add aesthetic items, and manage approval flows.",
-    signupAllowed: true
-  },
-  {
-    value: "admin",
-    label: "Admin",
-    description: "Operations, verification, inventory, substitutions, and supply control.",
-    signupAllowed: false
-  }
-] as const;
-
 type NavItem = {
   href: string;
   label: string;

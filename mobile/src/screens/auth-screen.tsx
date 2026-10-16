@@ -26,12 +26,16 @@ import { useMobileNavigation } from "@/providers/navigation-provider";
 
 type Step = "phone" | "otp" | "profile" | "email" | "forgot";
 type EmailMode = "login" | "signup";
-type SignupRole = "customer" | "electrician" | "architect";
-
-const ROLES: Array<{ id: SignupRole; title: string; text: string; icon: keyof typeof Feather.glyphMap }> = [
-  { id: "customer", title: "Customer", text: "Buy materials, raise complaints and installations", icon: "home" },
-  { id: "electrician", title: "Electrician", text: "Take jobs, order for sites and earn rewards", icon: "zap" },
-  { id: "architect", title: "Architect", text: "Plan lighting and review site materials", icon: "pen-tool" }
+/** What a customer gets from the app (every new account is a customer). */
+const PERKS: Array<{ icon: keyof typeof Feather.glyphMap; title: string; text: string }> = [
+  { icon: "tool", title: "Book repairs and installations", text: "Raise a complaint or installation request and choose who does the job." },
+  { icon: "shopping-bag", title: "Order electrical materials", text: "Order for your home or site straight from the shop." },
+  { icon: "check-square", title: "Approve before it is supplied", text: "Check every item on your site's list and approve it first." },
+  { icon: "sun", title: "Plan your lighting", text: "See how lights will look in your rooms before you buy." },
+  { icon: "trending-up", title: "Save every month", text: "Join a savings plan and get bonus points at maturity." },
+  { icon: "gift", title: "Wallet and referral rewards", text: "Earn rewards when friends you invite join." },
+  { icon: "pie-chart", title: "Track your budget", text: "Keep your project spending in one place." },
+  { icon: "book-open", title: "Home and electrical tips", text: "Practical guides for a safer, smarter home." }
 ];
 
 // Optional: the web app's address, so password-reset and confirmation emails open its /auth page.
@@ -110,31 +114,21 @@ function OtpBoxes({ value, onChange }: { value: string; onChange: (value: string
   );
 }
 
-function RolePicker({ value, onChange }: { value: SignupRole; onChange: (role: SignupRole) => void }) {
+function PerksList() {
   return (
-    <View style={{ gap: 10 }}>
-      <Text style={styles.groupLabel}>I am a</Text>
-      {ROLES.map((option) => {
-        const active = value === option.id;
-        return (
-          <Pressable
-            key={option.id}
-            style={[styles.roleCard, active && styles.roleCardActive]}
-            onPress={() => onChange(option.id)}
-            accessibilityRole="radio"
-            accessibilityState={{ checked: active }}
-          >
-            <View style={[styles.roleIcon, active && styles.roleIconActive]}>
-              <Feather name={option.icon} size={18} color={active ? "#ffffff" : palette.brand} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.roleTitle}>{option.title}</Text>
-              <Text style={styles.roleText}>{option.text}</Text>
-            </View>
-            <Feather name={active ? "check-circle" : "circle"} size={20} color={active ? palette.brand : palette.lineStrong} />
-          </Pressable>
-        );
-      })}
+    <View style={styles.perks}>
+      <Text style={styles.perksTitle}>What you get</Text>
+      {PERKS.map((perk) => (
+        <View key={perk.title} style={styles.perkRow}>
+          <View style={styles.perkIcon}>
+            <Feather name={perk.icon} size={17} color={palette.brand} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.perkName}>{perk.title}</Text>
+            <Text style={styles.perkText}>{perk.text}</Text>
+          </View>
+        </View>
+      ))}
     </View>
   );
 }
@@ -206,7 +200,6 @@ export function AuthScreen() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<SignupRole>("customer");
   const usernameState = useUsernameCheck(step === "profile" || (step === "email" && emailMode === "signup") ? username : "");
 
   useEffect(() => {
@@ -276,7 +269,7 @@ export function AuthScreen() {
     if (usernameState === "taken") return setError("This username is already taken. Please choose another one.");
     if (email && !isValidEmail(email)) return setError("Enter a valid email address, or leave it empty.");
     void run(async () => {
-      const result = await completePhoneSignup(signupToken, { full_name: fullName.trim(), username, email: email || undefined, role });
+      const result = await completePhoneSignup(signupToken, { full_name: fullName.trim(), username, email: email || undefined });
       if (result.error || !result.data) throw new Error(result.error ?? "We could not create your account. Please try again.");
       await storeSession(result.data.session);
     });
@@ -311,7 +304,8 @@ export function AuthScreen() {
         email,
         password,
         options: {
-          data: { full_name: fullName.trim(), username, role, phone: mobile },
+          // Every new account is a customer; the role is fixed on the server too.
+          data: { full_name: fullName.trim(), username, role: "customer", phone: mobile },
           ...(WEB_APP_URL ? { emailRedirectTo: `${WEB_APP_URL}/auth` } : {})
         }
       });
@@ -354,7 +348,7 @@ export function AuthScreen() {
             <View style={styles.glow} />
             <Image source={require("../../assets/splash-icon.png")} style={styles.logo} />
             <Text style={styles.brandName}>Mahalaxmi Electricals</Text>
-            <Text style={styles.brandTagline}>Everything electrical, one app.</Text>
+            <Text style={styles.brandTagline}>Everything your home needs, electrically.</Text>
           </View>
 
           <View style={styles.sheet}>
@@ -435,7 +429,6 @@ export function AuthScreen() {
                   autoComplete="email"
                   placeholder="you@example.com"
                 />
-                <RolePicker value={role} onChange={setRole} />
                 <AppButton label="Create account" icon="user-plus" loading={busy} onPress={completeProfile} />
               </View>
             ) : null}
@@ -502,9 +495,7 @@ export function AuthScreen() {
                   <Pressable onPress={() => go("forgot")} style={{ alignSelf: "flex-end" }} hitSlop={8} accessibilityRole="button">
                     <Text style={styles.link}>Forgot password?</Text>
                   </Pressable>
-                ) : (
-                  <RolePicker value={role} onChange={setRole} />
-                )}
+                ) : null}
                 <AppButton
                   label={emailMode === "login" ? "Log in" : "Create account"}
                   icon={emailMode === "login" ? "log-in" : "user-plus"}
@@ -536,6 +527,8 @@ export function AuthScreen() {
             {notice ? <Notice message={notice} tone="success" /> : null}
 
             <Text style={styles.legal}>By continuing you agree to Mahalaxmi Electricals&apos; terms and privacy policy.</Text>
+
+            {step === "phone" || step === "email" ? <PerksList /> : null}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -625,20 +618,11 @@ const styles = StyleSheet.create({
   segmentButtonActive: { backgroundColor: palette.surface, ...shadow },
   segmentText: { fontWeight: "700", color: palette.muted, fontSize: 15 },
   segmentTextActive: { color: palette.ink },
-  roleCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 14,
-    borderRadius: radii.md,
-    borderWidth: 1.5,
-    borderColor: palette.line,
-    backgroundColor: palette.surface
-  },
-  roleCardActive: { borderColor: palette.brand, backgroundColor: palette.brandSoft },
-  roleIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: palette.brandSoft },
-  roleIconActive: { backgroundColor: palette.brand },
-  roleTitle: { fontWeight: "800", color: palette.ink, fontSize: 15 },
-  roleText: { color: palette.muted, fontSize: 12.5, marginTop: 2, lineHeight: 17 },
+  perks: { gap: 14, marginTop: 8, paddingTop: 20, borderTopWidth: 1, borderTopColor: palette.line },
+  perksTitle: { fontSize: 17, fontWeight: "900", color: palette.ink },
+  perkRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  perkIcon: { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: palette.brandSoft },
+  perkName: { fontSize: 14.5, fontWeight: "800", color: palette.ink },
+  perkText: { fontSize: 12.5, color: palette.muted, marginTop: 2, lineHeight: 17 },
   legal: { textAlign: "center", fontSize: 12, color: palette.muted, marginTop: 8 }
 });

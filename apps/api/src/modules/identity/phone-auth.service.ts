@@ -12,8 +12,8 @@ import { TextBeeSmsService } from "./textbee-sms.service";
 
 export type SignupProfile = { full_name?: unknown; username?: unknown; role?: unknown };
 
-/** Roles a new user may pick when signing up by phone; anything else becomes a customer. */
-const SIGNUP_ROLES = ["customer", "electrician", "architect"];
+/** Every new account is a customer; admins promote people to other roles afterwards. */
+const SIGNUP_ROLE = "customer";
 
 /** Internal-only address used to issue sessions for phone-only accounts; never emailed. */
 const PHONE_LOGIN_EMAIL_DOMAIN = "phone.mahalaxmi-electricals.app";
@@ -219,13 +219,13 @@ export class PhoneAuthService {
     return createHmac("sha256", secret).update(`signup:${value}`).digest("base64url");
   }
 
-  /** Name and username are required; email is optional; role defaults to customer. */
+  /** Name and username are required; email is optional; the role is always customer. */
   private parseProfile(raw: unknown, options: { lenient: boolean }) {
     const source = (raw && typeof raw === "object" ? raw : {}) as SignupProfile & { email?: unknown };
     const fullName = cleanText(source.full_name, 150);
     const username = cleanText(source.username, 24).toLowerCase().replace(/[^a-z0-9._]/g, "");
     const email = cleanText(source.email, 255).toLowerCase();
-    const role = SIGNUP_ROLES.includes(String(source.role)) ? String(source.role) : "customer";
+    const role = SIGNUP_ROLE;
 
     const problem =
       fullName.length < 2 ? "Enter your full name."
