@@ -26,6 +26,7 @@ const fintechGateway = createFintechGateway({
   runRpcFallback
 });
 
+export const joinSavingsPlan = fintechGateway.joinSavingsPlan;
 export const postWalletEntry = fintechGateway.postWalletEntry;
 export const paySavingsInstallment = fintechGateway.paySavingsInstallment;
 export const ensureWalletAccount = fintechGateway.ensureWalletAccount;

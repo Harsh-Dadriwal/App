@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { SupabaseAdminService } from "../../common/supabase/supabase-admin.service";
 import { DomainEventsService } from "../../common/events/domain-events.service";
 import { TenantAccessService } from "../../common/tenancy/tenant-access.service";
@@ -53,6 +53,117 @@ export class WalletService {
       amount: args.target_amount ?? null
     });
     return data;
+  }
+
+  /**
+   * Enrols the signed-in user in a savings plan: the subscription and its full instalment
+   * schedule. Runs with the service role because instalment rows may only be written by
+   * workspace admins under RLS; access is checked here instead. A subscription left
+   * without instalments by an earlier failed attempt is completed rather than duplicated.
+   */
+  async joinSavingsPlan(actor: RequestActor, templateId: unknown) {
+    const userId = actor.appUserId;
+    if (!userId) throw new UnauthorizedException("Your profile could not be found. Please sign in again.");
+    const tenantId = actor.defaultTenantId;
+    if (!tenantId) throw new BadRequestException("Please select a workspace.");
+    await this.tenantAccess.assertTenantAccess(actor, tenantId);
+    if (typeof templateId !== "string" || !templateId) throw new BadRequestException("Choose a savings plan to join.");
+
+    const db = this.supabaseAdmin.getClient();
+    const template = await db
+      .from("savings_plan_templates")
+      .select("id, tenant_id, status, installment_amount, installment_count, frequency_days, maturity_bonus_amount")
+      .eq("id", templateId)
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+    if (template.error) throw new Error(template.error.message);
+    if (!template.data) throw new NotFoundException("This savings plan could not be found.");
+    if (template.data.status !== "active") throw new ForbiddenException("This savings plan is not open for new members right now.");
+
+    const installmentCount = Number(template.data.installment_count);
+    const installmentAmount = Number(template.data.installment_amount);
+    const frequencyDays = Number(template.data.frequency_days) || 30;
+    if (!(installmentCount > 0) || !(installmentAmount > 0)) {
+      throw new BadRequestException("This savings plan is not set up correctly. Please contact support.");
+    }
+
+    const wallet = await db
+      .from("wallet_accounts")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle();
+    if (wallet.error) throw new Error(wallet.error.message);
+    if (!wallet.data) throw new BadRequestException("Your wallet is not set up yet. Please contact support to activate it.");
+
+    const addDays = (date: Date, days: number) => new Date(date.getTime() + days * 86_400_000).toISOString().slice(0, 10);
+
+    // Reuse a subscription to this plan that has no instalments (an earlier failed join).
+    const existing = await db
+      .from("savings_plan_subscriptions")
+      .select("id, subscription_number, started_at, savings_installments(count)")
+      .eq("tenant_id", tenantId)
+      .eq("user_id", userId)
+      .eq("plan_template_id", templateId)
+      .eq("status", "active");
+    if (existing.error) throw new Error(existing.error.message);
+    const unfinished = (existing.data ?? []).find((row: any) => Number(row.savings_installments?.[0]?.count ?? 0) === 0);
+
+    let subscription: { id: string; subscription_number: string; started_at: string };
+    let createdNow = false;
+    if (unfinished) {
+      subscription = unfinished as typeof subscription;
+    } else {
+      const today = new Date();
+      const inserted = await db
+        .from("savings_plan_subscriptions")
+        .insert({
+          tenant_id: tenantId,
+          wallet_account_id: wallet.data.id,
+          user_id: userId,
+          plan_template_id: templateId,
+          subscription_number: `SAV-${Date.now().toString().slice(-8)}${Math.floor(Math.random() * 90 + 10)}`,
+          status: "active",
+          started_at: today.toISOString().slice(0, 10),
+          maturity_date: addDays(today, frequencyDays * installmentCount),
+          installment_amount: installmentAmount,
+          installment_count: installmentCount,
+          maturity_bonus_amount: Number(template.data.maturity_bonus_amount ?? 0),
+          created_by: userId
+        })
+        .select("id, subscription_number, started_at")
+        .single();
+      if (inserted.error) throw new Error(inserted.error.message);
+      subscription = inserted.data;
+      createdNow = true;
+    }
+
+    const start = new Date(`${subscription.started_at}T00:00:00Z`);
+    const rows = Array.from({ length: installmentCount }, (_, index) => ({
+      tenant_id: tenantId,
+      subscription_id: subscription.id,
+      installment_number: index + 1,
+      due_date: addDays(start, frequencyDays * index),
+      expected_amount: installmentAmount,
+      status: "pending"
+    }));
+    const installments = await db.from("savings_installments").insert(rows);
+    if (installments.error) {
+      // Never leave a subscription behind without its schedule.
+      if (createdNow) await db.from("savings_plan_subscriptions").delete().eq("id", subscription.id);
+      throw new Error(installments.error.message);
+    }
+
+    await this.domainEvents.publish("wallet.savings_plan.joined", {
+      actorUserId: userId,
+      tenantId,
+      subscriptionId: subscription.id,
+      planTemplateId: templateId
+    });
+
+    return { subscriptionId: subscription.id, subscriptionNumber: subscription.subscription_number, installmentCount };
   }
 
   async ensureWalletAccount(actor: RequestActor, accessToken: string, args: Record<string, unknown>) {

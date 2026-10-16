@@ -33,6 +33,18 @@ export function createFintechGateway({
   backendRequest,
   runRpcFallback
 }: FintechGatewayDependencies) {
+  /** Server-only: the instalment schedule can only be written by the API (see WalletService.joinSavingsPlan). */
+  async function joinSavingsPlan(templateId: string) {
+    if (!isBackendApiConfigured()) {
+      return { data: null, error: "This service is temporarily unavailable. Please try again shortly." };
+    }
+    return backendRequest<{ subscriptionId: string; subscriptionNumber: string; installmentCount: number }>(`/api/v1/savings/subscriptions`, {
+      method: "POST",
+      body: { templateId },
+      timeoutMs: 20_000
+    });
+  }
+
   async function postWalletEntry(args: Record<string, unknown>) {
     if (isBackendApiConfigured()) {
       const result = await backendRequest(`/api/v1/wallet/entries`, {
@@ -94,6 +106,7 @@ export function createFintechGateway({
   }
 
   return {
+    joinSavingsPlan,
     postWalletEntry,
     paySavingsInstallment,
     ensureWalletAccount,

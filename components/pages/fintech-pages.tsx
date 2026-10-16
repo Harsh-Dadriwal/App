@@ -19,6 +19,7 @@ import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
 import { getBackendApiBaseUrl } from "@/lib/backend/config";
 import {
   ensureWalletAccount,
+  joinSavingsPlan,
   paySavingsInstallment,
   postWalletEntry,
   resolveReferralReward
@@ -40,15 +41,6 @@ function makeCode(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 }
 
-function makeSubscriptionNumber() {
-  return `SAV-${Date.now().toString().slice(-8)}`;
-}
-
-function addDays(baseDate: Date, days: number) {
-  const next = new Date(baseDate);
-  next.setDate(next.getDate() + days);
-  return next;
-}
 
 let razorpayScriptPromise: Promise<void> | null = null;
 
@@ -501,53 +493,17 @@ export function CustomerSavingsPage() {
     if (!walletAccountId) {
       mutation.reset();
       await mutation.run(async () => ({
-        error: { message: "Wallet account not found for this tenant. Create wallet accounts first from admin fintech." }
+        error: { message: "Your wallet is not set up yet. Please contact support to activate it." }
       }));
       setSelectedTemplateId("");
       return;
     }
 
-    const startDate = new Date();
-    const subscriptionNumber = makeSubscriptionNumber();
-
+    // The API creates the subscription and its instalment schedule together; customers
+    // cannot write instalment rows directly under RLS.
     const ok = await mutation.run(async () => {
-      const subscriptionPayload = {
-        tenant_id: tenantId,
-        wallet_account_id: walletAccountId,
-        user_id: customerId,
-        plan_template_id: template.id,
-        subscription_number: subscriptionNumber,
-        status: "active",
-        started_at: startDate.toISOString().slice(0, 10),
-        maturity_date: addDays(startDate, Number(template.frequency_days ?? 30) * Number(template.installment_count ?? 1))
-          .toISOString()
-          .slice(0, 10),
-        installment_amount: Number(template.installment_amount ?? 0),
-        installment_count: Number(template.installment_count ?? 0),
-        maturity_bonus_amount: Number(template.maturity_bonus_amount ?? 0),
-        created_by: customerId
-      };
-
-      const subscriptionResult = await client
-        .from("savings_plan_subscriptions")
-        .insert(subscriptionPayload)
-        .select("id")
-        .single();
-
-      if (subscriptionResult.error || !subscriptionResult.data?.id) {
-        return { error: subscriptionResult.error };
-      }
-
-      const rows = Array.from({ length: Number(template.installment_count ?? 0) }).map((_, index) => ({
-        tenant_id: tenantId,
-        subscription_id: subscriptionResult.data.id,
-        installment_number: index + 1,
-        due_date: addDays(startDate, Number(template.frequency_days ?? 30) * index).toISOString().slice(0, 10),
-        expected_amount: Number(template.installment_amount ?? 0),
-        status: "pending"
-      }));
-
-      return client.from("savings_installments").insert(rows);
+      const result = await joinSavingsPlan(template.id);
+      return result.error ? { error: result.error } : undefined;
     }, "Savings plan enrolled successfully.");
 
     if (ok) {

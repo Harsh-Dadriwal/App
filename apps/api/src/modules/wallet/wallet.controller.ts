@@ -29,6 +29,11 @@ export class WalletController {
     return { data: await this.walletService.ensureWalletAccount(request.actor!, this.getAccessToken(request), body) };
   }
 
+  @Post("/savings/subscriptions")
+  async joinSavingsPlan(@Req() request: AuthenticatedRequest, @Body() body: { templateId?: string }) {
+    return { data: await this.walletService.joinSavingsPlan(request.actor!, body?.templateId) };
+  }
+
   @Post("/savings/installments/pay")
   async payInstallment(@Req() request: AuthenticatedRequest, @Body() body: PaySavingsInstallmentRequestDto) {
     return { data: await this.walletService.paySavingsInstallment(request.actor!, this.getAccessToken(request), body) };
