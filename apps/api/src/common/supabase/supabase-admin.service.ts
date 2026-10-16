@@ -58,6 +58,16 @@ export class SupabaseAdminService {
     return this.readClient;
   }
 
+  /** A plain public-key client, e.g. to redeem a one-time sign-in token for a session. */
+  createAnonClient() {
+    return createClient(this.url, this.anonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false
+      }
+    });
+  }
+
   createUserClient(accessToken: string) {
     return createClient(this.url, this.anonKey, {
       auth: {

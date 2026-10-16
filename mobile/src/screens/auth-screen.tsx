@@ -127,7 +127,8 @@ export function AuthScreen() {
     try {
       const result = await backendRequest<{ session?: { access_token: string; refresh_token?: string } }>("/api/v1/auth/firebase-login", {
         method: "POST",
-        body: { idToken },
+        // Name, username and role are only used if this number has no account yet.
+        body: { idToken, profile: authMode === "signup" ? { full_name: fullName.trim(), username, role } : undefined },
         requireAuth: false,
         timeoutMs: 20_000
       });
@@ -154,6 +155,10 @@ export function AuthScreen() {
   async function handleSendCode() {
     setErrorMessage("");
     setNotice("");
+    if (authMode === "signup" && (!fullName.trim() || !username)) {
+      setErrorMessage("Add your full name and a username.");
+      return;
+    }
     const number = toE164(phone);
     if (!/^\+[1-9][0-9]{7,14}$/.test(number)) {
       setErrorMessage("Enter your mobile number, e.g. 98765 43210 or +91 98765 43210.");
@@ -191,7 +196,6 @@ export function AuthScreen() {
 
   function switchMode(next: AuthMode) {
     setAuthMode(next);
-    setLoginMethod("email");
     setVerification(null);
     setErrorMessage("");
     setNotice("");
@@ -293,7 +297,7 @@ export function AuthScreen() {
   }
 
   const isSignup = authMode === "signup";
-  const usePhone = !isSignup && loginMethod === "phone";
+  const usePhone = PHONE_LOGIN && loginMethod === "phone";
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right", "bottom"]}>
@@ -372,7 +376,7 @@ export function AuthScreen() {
               </View>
             ) : null}
 
-            {!isSignup && PHONE_LOGIN ? (
+            {PHONE_LOGIN ? (
               <View style={styles.methodRow}>
                 {(["email", "phone"] as const).map((method) => {
                   const active = loginMethod === method;
@@ -409,7 +413,7 @@ export function AuthScreen() {
                   icon="smartphone"
                   keyboardType="phone-pad"
                   autoComplete="tel"
-                  hint={verification ? undefined : "New number? We'll create a customer account for you."}
+                  hint={verification || isSignup ? undefined : "New number? We'll create a customer account for you."}
                 />
                 {verification ? (
                   <>

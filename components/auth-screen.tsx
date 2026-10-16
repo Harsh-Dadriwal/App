@@ -61,6 +61,14 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
+/** Firebase needs +<country code>; 10-digit Indian mobile numbers get +91 added. */
+function toE164(value: string) {
+  const digits = value.replace(/[^0-9+]/g, "");
+  if (digits.startsWith("+")) return digits;
+  if (/^[6-9][0-9]{9}$/.test(digits)) return `+91${digits}`;
+  return digits;
+}
+
 function normalizePhone(value: string) {
   return value.replace(/[^0-9+]/g, "");
 }
@@ -422,7 +430,7 @@ export function AuthScreen() {
           (window as any).recaptchaVerifier = verifier;
         }
 
-        const confirmationResult = await fb.auth().signInWithPhoneNumber(phoneForm.phone, verifier);
+        const confirmationResult = await fb.auth().signInWithPhoneNumber(toE164(phoneForm.phone), verifier);
         (window as any).firebaseConfirmationResult = confirmationResult;
 
         setOtpSent(true);
@@ -487,7 +495,14 @@ export function AuthScreen() {
         const response = await fetch(`${getBackendApiBaseUrl()}/api/v1/auth/firebase-login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ idToken })
+          // Name, username and role are only used if this number has no account yet.
+          body: JSON.stringify({
+            idToken,
+            profile:
+              authMode === "signup"
+                ? { full_name: phoneForm.fullName, username: phoneForm.username, role: phoneForm.role }
+                : undefined
+          })
         });
 
         const payload = await response.json();
