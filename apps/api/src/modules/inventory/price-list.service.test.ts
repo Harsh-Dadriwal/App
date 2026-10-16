@@ -107,3 +107,15 @@ describe("Price list sync and views", () => {
     assert.equal(found.get("missing"), undefined);
   });
 });
+
+describe("Google Drive links", () => {
+  it("turns any share link into the direct download address", async () => {
+    const { driveDownloadUrl } = await import("./price-list.service");
+    const direct = "https://drive.usercontent.google.com/download?id=1AD-HhCEbtpzAX2kVsQXWbJkNqi_bo3NT&export=download&confirm=t";
+    assert.equal(driveDownloadUrl("https://drive.google.com/file/d/1AD-HhCEbtpzAX2kVsQXWbJkNqi_bo3NT/view?usp=drive_link"), direct);
+    assert.equal(driveDownloadUrl("https://drive.google.com/uc?export=download&id=1AD-HhCEbtpzAX2kVsQXWbJkNqi_bo3NT"), direct);
+    assert.equal(driveDownloadUrl("https://drive.google.com/open?id=1AD-HhCEbtpzAX2kVsQXWbJkNqi_bo3NT"), direct);
+    assert.equal(driveDownloadUrl("1AD-HhCEbtpzAX2kVsQXWbJkNqi_bo3NT"), direct);
+    assert.equal(driveDownloadUrl("https://example.com/prices.json"), "https://example.com/prices.json");
+  });
+});

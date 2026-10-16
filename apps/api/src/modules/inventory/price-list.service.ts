@@ -28,6 +28,16 @@ type Snapshot = {
  * A short id for a price list item that survives re-syncs (rows are replaced each time,
  * so their database ids do not). Tally item names are unique within a company.
  */
+export function driveDownloadUrl(link: string) {
+  const value = link.trim();
+  const id =
+    /^[\w-]{20,}$/.test(value)
+      ? value
+      : value.match(/drive\.google\.com\/file\/d\/([\w-]+)/)?.[1] ??
+        (/(drive|docs)\.google\.com|drive\.usercontent\.google\.com/.test(value) ? value.match(/[?&]id=([\w-]+)/)?.[1] : undefined);
+  return id ? `https://drive.usercontent.google.com/download?id=${id}&export=download&confirm=t` : value;
+}
+
 export function priceListItemKey(itemName: string) {
   return createHash("sha1").update(itemName.trim().toLowerCase()).digest("base64url").slice(0, 12);
 }
@@ -59,19 +69,17 @@ export class PriceListService {
     return (process.env.GOOGLE_DRIVE_PRODUCTS_URL || "").trim();
   }
 
-  /** Adds confirm=t to Drive "uc" links so Google skips its download-warning page. */
+  /**
+   * Turns any Google Drive share link ("/file/d/<id>/view", "open?id=<id>", "uc?id=<id>")
+   * into the direct download address; the share links open a web page, not the file.
+   * Other links are used as they are.
+   */
   private publicDownloadUrl() {
-    try {
-      const url = new URL(this.publicUrl);
-      if (url.hostname.endsWith("google.com") && !url.searchParams.has("confirm")) url.searchParams.set("confirm", "t");
-      return url.toString();
-    } catch {
-      return this.publicUrl;
-    }
+    return driveDownloadUrl(this.publicUrl);
   }
 
   isConfigured() {
-    return Boolean((this.driveFileId && this.serviceAccountJson) || this.publicUrl);
+    return Boolean(this.driveFileId || this.publicUrl);
   }
 
   /** Service-account JWT bearer grant: no consent screen and no refresh token to expire. */
@@ -116,10 +124,14 @@ export class PriceListService {
         { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(25_000) }
       );
     } else {
-      response = await fetch(this.publicDownloadUrl(), { signal: AbortSignal.timeout(25_000) });
+      // A file shared as "Anyone with the link" needs no Google sign-in.
+      const url = this.publicUrl ? this.publicDownloadUrl() : driveDownloadUrl(this.driveFileId);
+      response = await fetch(url, { signal: AbortSignal.timeout(25_000) });
     }
     if (!response.ok) throw new Error(`Price list download failed: ${response.status} ${await response.text()}`);
     if ((response.headers.get("content-type") || "").includes("text/html")) {
+      const page = await response.text().catch(() => "");
+      this.logger.warn(`Drive answered with a web page: ${page.match(/<title>([^<]*)<\/title>/i)?.[1] ?? page.slice(0, 120)}`);
       // Google answers with a sign-in or verification page instead of the file when it
       // is not shared publicly, or when it refuses requests from server IP addresses.
       throw new PriceListSourceError(
