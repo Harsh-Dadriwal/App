@@ -29,29 +29,29 @@ type IconName = keyof typeof Feather.glyphMap;
 const tabConfig: Record<string, Array<{ key: MobileScreen; label: string; icon: IconName }>> = {
   customer: [
     { key: "dashboard", label: "Home", icon: "home" },
-    { key: "service-requests", label: "Service", icon: "tool" },
-    { key: "catalog", label: "Catalog", icon: "grid" },
-    { key: "order-builder", label: "Order", icon: "shopping-bag" }
+    { key: "shop", label: "Shop", icon: "shopping-bag" },
+    { key: "orders", label: "Orders", icon: "package" },
+    { key: "service-requests", label: "Service", icon: "tool" }
   ],
   electrician: [
     { key: "dashboard", label: "Home", icon: "home" },
+    { key: "shop", label: "Shop", icon: "shopping-bag" },
+    { key: "orders", label: "Orders", icon: "package" },
     { key: "service-requests", label: "Jobs", icon: "tool" },
-    { key: "order-builder", label: "Order", icon: "shopping-bag" },
-    { key: "materials", label: "Tracker", icon: "layers" },
     { key: "incentives", label: "Rewards", icon: "award" }
   ],
   architect: [
     { key: "dashboard", label: "Home", icon: "home" },
-    { key: "lighting", label: "Lighting", icon: "sun" },
-    { key: "order-builder", label: "Order", icon: "shopping-bag" },
+    { key: "shop", label: "Shop", icon: "shopping-bag" },
+    { key: "orders", label: "Orders", icon: "package" },
     { key: "materials", label: "Tracker", icon: "layers" },
     { key: "incentives", label: "Rewards", icon: "award" }
   ],
   admin: [
     { key: "dashboard", label: "Home", icon: "home" },
+    { key: "orders", label: "Orders", icon: "package" },
     { key: "price-list", label: "Prices", icon: "tag" },
-    { key: "order-builder", label: "Order", icon: "shopping-bag" },
-    { key: "admin-catalog", label: "Admin", icon: "settings" },
+    { key: "service-requests", label: "Service", icon: "tool" },
     { key: "fintech", label: "Fintech", icon: "credit-card" }
   ]
 };
@@ -62,7 +62,8 @@ export function ScreenShell({
   children,
   scroll = true,
   currentScreen,
-  showBack
+  showBack,
+  footer
 }: {
   title: string;
   subtitle?: string;
@@ -70,6 +71,8 @@ export function ScreenShell({
   scroll?: boolean;
   currentScreen?: MobileScreen;
   showBack?: boolean;
+  /** Floats above the tab bar, e.g. a cart summary. */
+  footer?: React.ReactNode;
 }) {
   const { width } = useWindowDimensions();
   const { profile, session, tenantMemberships, activeTenant, switchTenant } = useAuth();
@@ -157,6 +160,7 @@ export function ScreenShell({
           <View style={[styles.nonScrollBody, showTabs && styles.scrollWithTabs]}>{content}</View>
         )}
       </KeyboardAvoidingView>
+      {footer ? <View style={[styles.footer, showTabs && styles.footerWithTabs]}>{footer}</View> : null}
       {showTabs ? (
         <SafeAreaView edges={["bottom"]} style={styles.tabBarWrap}>
           <View style={styles.tabBar}>
@@ -879,6 +883,8 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: "600"
   },
+  footer: { position: "absolute", left: 14, right: 14, bottom: 16 },
+  footerWithTabs: { bottom: 96 },
   tabBarWrap: {
     position: "absolute",
     left: 0,

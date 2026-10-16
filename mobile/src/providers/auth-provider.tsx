@@ -13,6 +13,10 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { clearQueryCache, setQueryCacheScope } from "@mahalaxmi/core/hooks/query-cache";
+import { configureShopStorage } from "@mahalaxmi/core/hooks/shop-store";
+
+// The catalogue and cart are kept on the phone so the shop opens instantly.
+configureShopStorage(AsyncStorage);
 import type { ActiveTenant, TenantMembership, UserProfile } from "@mahalaxmi/core/types/domain";
 import {
   fetchAppProfile,

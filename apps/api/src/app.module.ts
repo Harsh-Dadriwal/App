@@ -21,6 +21,7 @@ import { ProjectsModule } from "./modules/projects/projects.module";
 import { ProjectMediaModule } from "./modules/project-media/project-media.module";
 import { PartnerIncentivesModule } from "./modules/partner-incentives/partner-incentives.module";
 import { ServiceRequestsModule } from "./modules/service-requests/service-requests.module";
+import { OrderRequestsModule } from "./modules/order-requests/order-requests.module";
 
 @Module({
   imports: [
@@ -47,7 +48,8 @@ import { ServiceRequestsModule } from "./modules/service-requests/service-reques
     ProjectsModule,
     ProjectMediaModule,
     PartnerIncentivesModule,
-    ServiceRequestsModule
+    ServiceRequestsModule,
+    OrderRequestsModule
   ],
   controllers: [HealthController]
 })

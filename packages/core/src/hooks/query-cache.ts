@@ -32,6 +32,11 @@ export function setQueryCacheScope(next: string) {
   scope = next || "anon";
 }
 
+/** The signed-in user + workspace the caches are namespaced by. */
+export function getQueryCacheScope() {
+  return scope;
+}
+
 export function clearQueryCache() {
   memory.clear();
   if (!storage?.key || storage.length === undefined) return;

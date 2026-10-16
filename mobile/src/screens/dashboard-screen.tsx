@@ -12,16 +12,17 @@ const notes: Action = { label: "Project notes", hint: "Site conversations", rout
 
 const roleActions: Record<AppRole, Action[]> = {
   customer: [
+    { label: "Shop products", hint: "Live stock, easy ordering", route: "shop", icon: "shopping-bag" },
+    { label: "My orders", hint: "Track your orders", route: "orders", icon: "package" },
     { label: "Complaints & installation", hint: "Get an electrician", route: "service-requests", icon: "tool" },
-    { label: "Order products", hint: "Quick material order", route: "order-builder", icon: "shopping-bag" },
     { label: "Approvals", hint: "Items waiting for you", route: "approvals", icon: "check-square" },
     { label: "Lighting visualizer", hint: "Plan your lights", route: "lighting", icon: "sun" },
-    { label: "Catalog", hint: "Browse products", route: "catalog", icon: "grid" },
     notes
   ],
   electrician: [
+    { label: "Order materials", hint: "Live stock from the store", route: "shop", icon: "shopping-bag" },
+    { label: "My orders", hint: "Track your orders", route: "orders", icon: "package" },
     { label: "Service requests", hint: "Jobs near you", route: "service-requests", icon: "tool" },
-    { label: "Order builder", hint: "Order for a site", route: "order-builder", icon: "shopping-bag" },
     { label: "Material tracker", hint: "What's supplied", route: "materials", icon: "layers" },
     { label: "Rewards", hint: "Partner incentives", route: "incentives", icon: "award" },
     notes
@@ -29,15 +30,15 @@ const roleActions: Record<AppRole, Action[]> = {
   architect: [
     { label: "Lighting visualizer", hint: "Design scenes", route: "lighting", icon: "sun" },
     { label: "Material reviews", hint: "Approve items", route: "materials", icon: "layers" },
-    { label: "Material order", hint: "Order for a site", route: "order-builder", icon: "shopping-bag" },
+    { label: "Shop products", hint: "Live stock from the store", route: "shop", icon: "shopping-bag" },
+    { label: "My orders", hint: "Track your orders", route: "orders", icon: "package" },
     { label: "Rewards", hint: "Partner incentives", route: "incentives", icon: "award" },
     notes
   ],
   admin: [
+    { label: "Orders", hint: "Confirm & deliver", route: "orders", icon: "package" },
     { label: "Price list", hint: "Tally prices & stock", route: "price-list", icon: "tag" },
     { label: "Service requests", hint: "Complaints & installs", route: "service-requests", icon: "tool" },
-    { label: "Quick order", hint: "Create an order", route: "order-builder", icon: "shopping-bag" },
-    { label: "Admin catalog", hint: "Products & photos", route: "admin-catalog", icon: "settings" },
     { label: "Lighting leads", hint: "Customer scenes", route: "lighting", icon: "sun" },
     { label: "Fintech", hint: "Wallets & savings", route: "fintech", icon: "credit-card" },
     notes

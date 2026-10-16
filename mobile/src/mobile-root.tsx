@@ -8,13 +8,11 @@ import { AuthProvider, useAuth } from "@/providers/auth-provider";
 import { NavigationProvider, useMobileNavigation } from "@/providers/navigation-provider";
 import { AuthScreen } from "@/screens/auth-screen";
 import { DashboardScreen } from "@/screens/dashboard-screen";
-import { CatalogScreen } from "@/screens/catalog-screen";
-import { OrderBuilderScreen } from "@/screens/order-builder-screen";
 import { ApprovalsScreen } from "@/screens/approvals-screen";
 import { MaterialsScreen } from "@/screens/materials-screen";
 import { NotesScreen } from "@/screens/notes-screen";
-import { AdminCatalogScreen } from "@/screens/admin-catalog-screen";
 import { PriceListScreen } from "@/screens/price-list-screen";
+import { OrdersScreen, ShopScreen } from "@/screens/shop-screen";
 import { ServiceRequestsScreen } from "@/screens/service-requests-screen";
 import { FintechScreen } from "@/screens/fintech-screen";
 import { LightingScreen } from "@/screens/lighting-screen";
@@ -75,14 +73,13 @@ function AppBody() {
     );
   }
 
-  if (screen === "catalog") return <CatalogScreen />;
+  if (screen === "shop") return <ShopScreen />;
+  if (screen === "orders") return <OrdersScreen />;
   if (screen === "lighting") return <LightingScreen />;
-  if (screen === "order-builder") return <OrderBuilderScreen />;
   if (screen === "approvals") return <ApprovalsScreen />;
   if (screen === "materials") return <MaterialsScreen />;
   if (screen === "incentives") return <IncentivesScreen />;
   if (screen === "notes") return <NotesScreen />;
-  if (screen === "admin-catalog") return <AdminCatalogScreen />;
   if (screen === "price-list") return <PriceListScreen />;
   if (screen === "service-requests") return <ServiceRequestsScreen />;
   if (screen === "fintech") return <FintechScreen />;

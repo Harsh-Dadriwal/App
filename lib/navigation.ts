@@ -26,6 +26,8 @@ const HANDYMAN_TRADES: AppRole[] = [USER_ROLE.POP_MAN, USER_ROLE.CARPENTER, USER
 export const roleNav: Record<AppRole, NavItem[]> = {
   customer: [
     { href: "/customer", label: "Dashboard" },
+    { href: "/customer/shop", label: "Shop Products", shortLabel: "Shop" },
+    { href: "/customer/orders", label: "My Orders", shortLabel: "Orders" },
     { href: "/customer/requirements", label: "Requirements", shortLabel: "Requirements" },
     { href: "/customer/service-requests", label: "Complaints & Installation", shortLabel: "Service" },
     { href: "/customer/lighting", label: "Lighting Visualizer", shortLabel: "Lighting" },
@@ -46,17 +48,20 @@ export const roleNav: Record<AppRole, NavItem[]> = {
   ],
   electrician: [
     { href: "/electrician", label: "Dashboard" },
+    { href: "/electrician/shop", label: "Order Materials", shortLabel: "Shop" },
+    { href: "/electrician/orders", label: "My Orders", shortLabel: "Orders" },
     { href: "/electrician/requirements", label: "Requirements", shortLabel: "Requirements" },
     { href: "/electrician/service-requests", label: "Service Requests", shortLabel: "Service" },
     { href: "/electrician/projects/new", label: "New Projects" },
     { href: "/electrician/projects/market", label: "Assigned to Others", shortLabel: "Market" },
     { href: "/electrician/projects/ongoing", label: "Ongoing Projects", shortLabel: "Ongoing" },
-    { href: "/electrician/materials", label: "Material Tracker", shortLabel: "Materials" },
     { href: "/electrician/incentives", label: "Partner Incentives", shortLabel: "Incentives" },
     { href: "/electrician/notes", label: "Project Notes", shortLabel: "Notes" }
   ],
   architect: [
     { href: "/architect", label: "Dashboard" },
+    { href: "/architect/shop", label: "Shop Products", shortLabel: "Shop" },
+    { href: "/architect/orders", label: "My Orders", shortLabel: "Orders" },
     { href: "/architect/requirements", label: "Requirements", shortLabel: "Requirements" },
     { href: "/architect/lighting", label: "Lighting Visualizer", shortLabel: "Lighting" },
     { href: "/architect/projects/new", label: "New Projects" },
@@ -93,9 +98,7 @@ export const roleNav: Record<AppRole, NavItem[]> = {
     { href: "/admin/assignments", label: "Site Assignments", shortLabel: "Assignments" },
     { href: "/admin/orders", label: "Orders" },
     { href: "/admin/workflows", label: "Workflow Center", shortLabel: "Workflow" },
-    { href: "/admin/products", label: "Products & Inventory", shortLabel: "Products" },
-    { href: "/admin/price-list", label: "Price List", shortLabel: "Prices" },
-    { href: "/admin/catalog", label: "Categories & Brands", shortLabel: "Catalog" },
+    { href: "/admin/price-list", label: "Price List & Stock", shortLabel: "Prices" },
     { href: "/admin/fintech", label: "Wallets, Savings & Referrals", shortLabel: "Fintech" },
     { href: "/admin/credit", label: "Contractor Credit", shortLabel: "Credit" },
     { href: "/admin/incentives", label: "Partner Incentives", shortLabel: "Incentives" },

@@ -10,3 +10,4 @@ export { createPaymentsGateway } from "./payments-gateway";
 export * from "./service-requests-gateway";
 
 export * from "./partner-incentives-gateway";
+export * from "./shop-gateway";

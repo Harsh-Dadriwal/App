@@ -180,6 +180,40 @@ export function AdminPriceListPage() {
         hasData={allItems.length > 0}
         empty={{ title: "No price list yet", description: "Select Update from Tally to load the latest prices and stock." }}
       >
+        {showCost ? (
+          <details className="pl-hero pl-images-panel">
+            <summary>
+              <strong>Category pictures</strong>
+              <span className="shop-muted"> · customers see these in the shop ({Object.keys(categoryImages).length} of {categories.length} added)</span>
+            </summary>
+            <div className="pl-images">
+              {categories.map(([name]) => (
+                <label key={name} className={`pl-image-tile${imageUpload.isSubmitting ? " is-disabled" : ""}`}>
+                  {categoryImages[name] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="shop-category-art" src={getServeUrl(categoryImages[name])} alt="" loading="lazy" />
+                  ) : (
+                    <span className="shop-category-art pl-image-empty">+ Add picture</span>
+                  )}
+                  <span>{name}</span>
+                  <span className="text-link-button">{categoryImages[name] ? "Change" : "Upload"}</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    hidden
+                    disabled={imageUpload.isSubmitting}
+                    onChange={(event) => {
+                      void handleCategoryImage(name, event.target.files?.[0]);
+                      event.target.value = "";
+                    }}
+                  />
+                </label>
+              ))}
+            </div>
+            <FormNotice error={imageUpload.error} success={imageUpload.success} />
+          </details>
+        ) : null}
+
         <div className="pl-chips" role="tablist" aria-label="Categories">
           <button type="button" role="tab" aria-selected={!category} className={`pl-chip${!category ? " is-active" : ""}`} onClick={() => chooseCategory(null)}>
             All <span>{allItems.length.toLocaleString("en-IN")}</span>

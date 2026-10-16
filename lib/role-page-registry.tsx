@@ -6,13 +6,11 @@ import {
   ProjectNotesPage,
   ArchitectProductRequestsPage,
   AdminProductRequestsPage,
-  AdminCatalogPage,
   AdminAssignmentsPage
 } from "@/components/pages/collaboration-pages";
 import {
   ElectricianDashboardPage,
   ElectricianProjectsPage,
-  ElectricianMaterialsPage,
   ArchitectDashboardPage,
   ArchitectProjectsPage,
   ArchitectMaterialsPage,
@@ -20,7 +18,6 @@ import {
   SupplierDashboardPage,
   AdminUsersPage,
   AdminOrdersPage,
-  AdminProductsPage,
   AdminPriceListPage,
   AdminSubstitutionsPage,
   AdminContentPage
@@ -46,6 +43,7 @@ import {
   CustomerServiceRequestsPage,
   ElectricianServiceRequestsPage
 } from "@/components/pages/service-requests-pages";
+import { AdminOrderRequestsPage, MyOrdersPage, ShopPage } from "@/components/pages/shop-pages";
 import { LightingVisualizerPage } from "@/components/pages/lighting-pages";
 import { AdminWorkflowHubPage } from "@/components/order-workflow";
 import {
@@ -71,6 +69,8 @@ type RolePageRegistry = Partial<Record<AppRole, Record<string, RolePageEntry>>>;
 export const rolePageRegistry: RolePageRegistry = {
   customer: {
     "": { title: "Dashboard", component: <CustomerDashboardPage /> },
+    shop: { title: "Shop Products", component: <ShopPage ordersHref="/customer/orders" /> },
+    orders: { title: "My Orders", component: <MyOrdersPage shopHref="/customer/shop" /> },
     requirements: { title: "Requirements", component: <RequirementIntakePage role="customer" /> },
     "service-requests": { title: "Complaints & Installation", component: <CustomerServiceRequestsPage /> },
     lighting: { title: "Lighting Visualizer", component: <LightingVisualizerPage role="customer" /> },
@@ -119,6 +119,8 @@ export const rolePageRegistry: RolePageRegistry = {
   },
   electrician: {
     "": { title: "Dashboard", component: <ElectricianDashboardPage /> },
+    shop: { title: "Order Materials", component: <ShopPage ordersHref="/electrician/orders" /> },
+    orders: { title: "My Orders", component: <MyOrdersPage shopHref="/electrician/shop" /> },
     requirements: { title: "Requirements", component: <RequirementIntakePage role="electrician" /> },
     "service-requests": { title: "Service Requests", component: <ElectricianServiceRequestsPage /> },
     "projects/new": { title: "New Projects", component: <ElectricianProjectsPage mode="new" /> },
@@ -130,12 +132,15 @@ export const rolePageRegistry: RolePageRegistry = {
       title: "Ongoing Projects",
       component: <ElectricianProjectsPage mode="ongoing" />
     },
-    materials: { title: "Material Tracker", component: <ElectricianMaterialsPage /> },
+    // The old product-based order builder; ordering is now from the price list.
+    materials: { title: "Order Materials", component: <ShopPage ordersHref="/electrician/orders" /> },
     incentives: { title: "Partner Incentives", component: <PartnerIncentivesPage /> },
     notes: { title: "Project Notes", component: <ProjectNotesPage role="electrician" /> }
   },
   architect: {
     "": { title: "Dashboard", component: <ArchitectDashboardPage /> },
+    shop: { title: "Shop Products", component: <ShopPage ordersHref="/architect/orders" /> },
+    orders: { title: "My Orders", component: <MyOrdersPage shopHref="/architect/shop" /> },
     requirements: { title: "Requirements", component: <RequirementIntakePage role="architect" /> },
     lighting: { title: "Lighting Visualizer", component: <LightingVisualizerPage role="architect" /> },
     "projects/new": { title: "New Projects", component: <ArchitectProjectsPage mode="new" /> },
@@ -155,11 +160,10 @@ export const rolePageRegistry: RolePageRegistry = {
     lighting: { title: "Lighting Leads", component: <LightingVisualizerPage role="admin" /> },
     users: { title: "Users & Verification", component: <AdminUsersPage /> },
     assignments: { title: "Site Assignments", component: <AdminAssignmentsPage /> },
-    orders: { title: "Orders", component: <AdminOrdersPage /> },
+    orders: { title: "Orders", component: <AdminOrderRequestsPage /> },
+    "site-orders": { title: "Site Orders", component: <AdminOrdersPage /> },
     workflows: { title: "Workflow Center", component: <AdminWorkflowHubPage /> },
-    products: { title: "Products & Inventory", component: <AdminProductsPage /> },
-    "price-list": { title: "Price List", component: <AdminPriceListPage /> },
-    catalog: { title: "Categories & Brands", component: <AdminCatalogPage /> },
+    "price-list": { title: "Price List & Stock", component: <AdminPriceListPage /> },
     fintech: { title: "Wallets, Savings & Referrals", component: <AdminFintechPage /> },
     credit: { title: "Contractor Credit Engine", component: <AdminCreditPage /> },
     incentives: { title: "Partner Incentives", component: <AdminPartnerIncentivesPage /> },

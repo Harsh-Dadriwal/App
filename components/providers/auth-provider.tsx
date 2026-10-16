@@ -12,6 +12,7 @@ import { fetchProfileWithRetry } from "@mahalaxmi/core/auth";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@mahalaxmi/core/supabase/client";
 import type { ActiveTenant, TenantMembership, UserProfile } from "@mahalaxmi/core/types/domain";
 import { clearQueryCache, configureQueryCacheStorage, setQueryCacheScope } from "@mahalaxmi/core/hooks/query-cache";
+import { configureShopStorage } from "@mahalaxmi/core/hooks/shop-store";
 import {
   fetchAppProfile,
   fetchTenantMemberships,
@@ -44,6 +45,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 if (typeof window !== "undefined") {
   try {
     configureQueryCacheStorage(window.sessionStorage);
+    // The catalogue and cart outlive the tab so the shop opens instantly next time.
+    configureShopStorage(window.localStorage);
   } catch {
     // Storage blocked: the in-memory cache still works.
   }
