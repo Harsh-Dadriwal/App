@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutationAction, useRows } from "@/components/data-view";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useTheme } from "@/components/theme-provider";
-import { roleLabels, roleNav } from "@/lib/navigation";
+import { getRoleNav, roleLabels } from "@/lib/navigation";
 import type { AppRole } from "@mahalaxmi/core/types/domain";
 import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
 import {
@@ -228,7 +228,7 @@ export function AppFrame({
         ) : null}
 
         <nav className="sidebar-nav">
-          {roleNav[role].map((item) => (
+          {getRoleNav(role).map((item) => (
             <Link
               key={item.href}
               href={item.href}

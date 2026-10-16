@@ -1,4 +1,4 @@
-import type { AppRole } from "@mahalaxmi/core/types/domain";
+import { isRoleEnabled, type AppRole } from "@mahalaxmi/core/types/domain";
 
 export function matchesQuery(value: string, query: string) {
   return value.toLowerCase().includes(query.trim().toLowerCase());
@@ -19,7 +19,8 @@ export const ELECTRICIAN_BID_STEPS = [
   { label: "Details", description: "Timeline and notes" }
 ] as const;
 
-export const ADMIN_MANAGED_USER_ROLES: AppRole[] = [
+// Roles switched off in ENABLED_ROLES are left out, so admins cannot assign them for now.
+export const ADMIN_MANAGED_USER_ROLES: AppRole[] = ([
   "customer",
   "electrician",
   "architect",
@@ -29,7 +30,7 @@ export const ADMIN_MANAGED_USER_ROLES: AppRole[] = [
   "tiles_man",
   "plumber",
   "supplier"
-];
+] as AppRole[]).filter(isRoleEnabled);
 
 export const ADMIN_PRODUCT_STEPS = [
   { label: "Category", description: "Where it belongs" },

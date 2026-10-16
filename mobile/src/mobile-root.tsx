@@ -2,6 +2,8 @@ import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { palette } from "@/lib/theme";
+import { AppButton } from "@/components/ui";
+import { isRoleEnabled, roleLabels } from "@mahalaxmi/core/types/domain";
 import { AuthProvider, useAuth } from "@/providers/auth-provider";
 import { NavigationProvider, useMobileNavigation } from "@/providers/navigation-provider";
 import { AuthScreen } from "@/screens/auth-screen";
@@ -31,7 +33,7 @@ function Splash({ title, message, busy }: { title?: string; message: string; bus
 }
 
 function AppBody() {
-  const { configured, loading, session, profile } = useAuth();
+  const { configured, loading, session, profile, signOut } = useAuth();
   const { screen } = useMobileNavigation();
 
   if (!configured) {
@@ -53,6 +55,23 @@ function AppBody() {
         <StatusBar style="light" />
         <AuthScreen />
       </>
+    );
+  }
+
+  // Roles switched off in ENABLED_ROLES (supplier, handyman trades) are not available yet.
+  if (!isRoleEnabled(profile.role)) {
+    return (
+      <View style={styles.splash}>
+        <StatusBar style="light" />
+        <Image source={require("../assets/splash-icon.png")} style={styles.splashLogo} />
+        <Text style={styles.splashTitle}>{roleLabels[profile.role] ?? "This"} accounts are not available yet</Text>
+        <Text style={styles.splashMessage}>
+          We are only opening the app to customers, electricians and architects for now. Please contact Mahalaxmi Electricals if you need access.
+        </Text>
+        <View style={{ marginTop: 24, alignSelf: "stretch" }}>
+          <AppButton label="Log out" icon="log-out" onPress={() => void signOut()} />
+        </View>
+      </View>
     );
   }
 

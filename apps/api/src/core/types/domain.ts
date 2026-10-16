@@ -13,6 +13,22 @@ export const USER_ROLE = {
 
 export type AppRole = (typeof USER_ROLE)[keyof typeof USER_ROLE];
 
+/**
+ * Roles switched on in the web and mobile apps. The others (supplier and the handyman
+ * trades) stay in the database, types and code, and are only hidden from menus, signup,
+ * admin role assignment and directories. To bring one back, add it to this list.
+ */
+export const ENABLED_ROLES: readonly AppRole[] = [
+  USER_ROLE.ADMIN,
+  USER_ROLE.CUSTOMER,
+  USER_ROLE.ELECTRICIAN,
+  USER_ROLE.ARCHITECT
+];
+
+export function isRoleEnabled(role: string | null | undefined): role is AppRole {
+  return Boolean(role && (ENABLED_ROLES as readonly string[]).includes(role));
+}
+
 export const HANDYMAN_SERVICE_ROLES = [
   USER_ROLE.POP_MAN,
   USER_ROLE.CARPENTER,

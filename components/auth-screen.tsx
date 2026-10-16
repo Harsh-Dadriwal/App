@@ -552,7 +552,7 @@ export function AuthScreen() {
           <span className="eyebrow" style={{ color: '#93c5fd' }}>Secure Access</span>
           <h1>Customer onboarding & secure professional workspace access.</h1>
           <p>
-            New accounts start as Customers. Platform Administrators can search your profile, verify your username, and promote you into electrician, architect, supplier, or specialized handyman roles like POP, painting, tiles, carpentry, and plumbing.
+            New accounts start as Customers. Platform Administrators can search your profile, verify your username, and promote you into an electrician or architect account.
           </p>
         </div>
 

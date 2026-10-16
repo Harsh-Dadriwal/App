@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { USER_ROLE, type AppRole } from "@mahalaxmi/core/types/domain";
+import { USER_ROLE, isRoleEnabled, type AppRole } from "@mahalaxmi/core/types/domain";
 import {
   ProjectNotesPage,
   ArchitectProductRequestsPage,
@@ -60,7 +60,11 @@ import {
 type RolePageEntry = {
   title: string;
   component: ReactNode;
+  /** Page exists only while at least one of these roles is enabled (see ENABLED_ROLES). */
+  showsRoles?: AppRole[];
 };
+
+const HANDYMAN_TRADES: AppRole[] = [USER_ROLE.POP_MAN, USER_ROLE.CARPENTER, USER_ROLE.PAINTER, USER_ROLE.TILES_MAN, USER_ROLE.PLUMBER];
 
 type RolePageRegistry = Partial<Record<AppRole, Record<string, RolePageEntry>>>;
 
@@ -80,6 +84,7 @@ export const rolePageRegistry: RolePageRegistry = {
     },
     handymen: {
       title: "Handymen & Trades",
+      showsRoles: HANDYMAN_TRADES,
       component: (
         <DirectoryPage
           roles={[
@@ -95,6 +100,7 @@ export const rolePageRegistry: RolePageRegistry = {
     },
     suppliers: {
       title: "Suppliers",
+      showsRoles: [USER_ROLE.SUPPLIER],
       component: <DirectoryPage roles={[USER_ROLE.SUPPLIER]} />
     },
     sites: { title: "Sites", component: <CustomerSitesPage /> },
@@ -168,5 +174,8 @@ export const rolePageRegistry: RolePageRegistry = {
 };
 
 export function getRolePage(role: AppRole, pathPart: string) {
-  return rolePageRegistry[role]?.[pathPart] ?? null;
+  if (!isRoleEnabled(role)) return null;
+  const page = rolePageRegistry[role]?.[pathPart] ?? null;
+  if (page?.showsRoles && !page.showsRoles.some(isRoleEnabled)) return null;
+  return page;
 }

@@ -1,4 +1,4 @@
-import type { AppRole } from "@mahalaxmi/core/types/domain";
+import { USER_ROLE, isRoleEnabled, type AppRole } from "@mahalaxmi/core/types/domain";
 
 export const roleLabels: Record<AppRole, string> = {
   admin: "Admin",
@@ -40,10 +40,17 @@ export const authRoleOptions = [
   }
 ] as const;
 
-export const roleNav: Record<
-  AppRole,
-  Array<{ href: string; label: string; shortLabel?: string }>
-> = {
+type NavItem = {
+  href: string;
+  label: string;
+  shortLabel?: string;
+  /** Shown only while at least one of these roles is enabled (see ENABLED_ROLES). */
+  showsRoles?: AppRole[];
+};
+
+const HANDYMAN_TRADES: AppRole[] = [USER_ROLE.POP_MAN, USER_ROLE.CARPENTER, USER_ROLE.PAINTER, USER_ROLE.TILES_MAN, USER_ROLE.PLUMBER];
+
+export const roleNav: Record<AppRole, NavItem[]> = {
   customer: [
     { href: "/customer", label: "Dashboard" },
     { href: "/customer/requirements", label: "Requirements", shortLabel: "Requirements" },
@@ -51,8 +58,8 @@ export const roleNav: Record<
     { href: "/customer/lighting", label: "Lighting Visualizer", shortLabel: "Lighting" },
     { href: "/customer/electricians", label: "Electricians" },
     { href: "/customer/architects", label: "Architects" },
-    { href: "/customer/handymen", label: "Handymen & Trades", shortLabel: "Handymen" },
-    { href: "/customer/suppliers", label: "Suppliers" },
+    { href: "/customer/handymen", label: "Handymen & Trades", shortLabel: "Handymen", showsRoles: HANDYMAN_TRADES },
+    { href: "/customer/suppliers", label: "Suppliers", showsRoles: [USER_ROLE.SUPPLIER] },
     { href: "/customer/sites", label: "Sites" },
     { href: "/customer/tips/electrical", label: "Electrical Tips", shortLabel: "Elec Tips" },
     { href: "/customer/tips/home", label: "Home Tips" },
@@ -125,3 +132,8 @@ export const roleNav: Record<
     { href: "/admin/notes", label: "Project Notes", shortLabel: "Notes" }
   ]
 };
+
+/** The menu for a role, without items for roles that are switched off. */
+export function getRoleNav(role: AppRole) {
+  return (roleNav[role] ?? []).filter((item) => !item.showsRoles || item.showsRoles.some(isRoleEnabled));
+}

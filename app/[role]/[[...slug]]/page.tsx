@@ -3,7 +3,8 @@
 import { use } from "react";
 import { notFound } from "next/navigation";
 import { AppFrame } from "@/components/app-frame";
-import type { AppRole } from "@mahalaxmi/core/types/domain";
+import { isRoleEnabled, type AppRole } from "@mahalaxmi/core/types/domain";
+import { RoleUnavailable } from "@/components/role-unavailable";
 import { roleLabels } from "@/lib/navigation";
 import { getRolePage } from "@/lib/role-page-registry";
 
@@ -19,6 +20,11 @@ export default function RolePage({
 
   if (!roleLabels[role]) {
     notFound();
+  }
+
+  // Accounts with a role that is switched off (see ENABLED_ROLES) land here after login.
+  if (!isRoleEnabled(role)) {
+    return <RoleUnavailable role={role} />;
   }
 
   const page = getRolePage(role, pathPart);
