@@ -49,9 +49,11 @@ export function createBackendRequester({ getBaseUrl, isConfigured, getAuthHeader
 
     try {
       const baseUrl = getBaseUrl();
+      // Browsers block http API calls from an https page. React Native has a `window`
+      // but no `window.location`, so read it optionally.
       if (
         typeof window !== "undefined" &&
-        window.location.protocol === "https:" &&
+        window.location?.protocol === "https:" &&
         baseUrl.startsWith("http://")
       ) {
         return {
