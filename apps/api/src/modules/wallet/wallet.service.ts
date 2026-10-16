@@ -172,17 +172,49 @@ export class WalletService {
   }
 
   async paySavingsInstallment(actor: RequestActor, accessToken: string, args: Record<string, unknown>) {
-    await this.tenantAccess.assertTenantAccess(actor, String(args.target_tenant_id));
-    const data = await this.rpc(accessToken, "pay_savings_installment", args);
+    const installmentId = typeof args.target_installment_id === "string" ? args.target_installment_id : "";
+    if (!installmentId) throw new BadRequestException("Choose an instalment to pay.");
+
+    const db = this.supabaseAdmin.getClient();
+    const installment = await db
+      .from("savings_installments")
+      .select("id, tenant_id, subscription_id, installment_number")
+      .eq("id", installmentId)
+      .maybeSingle();
+    if (installment.error) throw new Error(installment.error.message);
+    if (!installment.data) throw new NotFoundException("This instalment could not be found.");
+    await this.tenantAccess.assertTenantAccess(actor, installment.data.tenant_id);
+
+    // Instalments are paid in order: an earlier one still open blocks this payment.
+    const earlier = await db
+      .from("savings_installments")
+      .select("installment_number")
+      .eq("subscription_id", installment.data.subscription_id)
+      .lt("installment_number", installment.data.installment_number)
+      .in("status", ["pending", "late"])
+      .order("installment_number", { ascending: true })
+      .limit(1);
+    if (earlier.error) throw new Error(earlier.error.message);
+    if (earlier.data?.length) {
+      throw new BadRequestException(
+        `Please pay instalment ${earlier.data[0].installment_number} first. Instalments are paid one after another.`
+      );
+    }
+
+    const data = await this.rpc(accessToken, "pay_savings_installment", {
+      target_installment_id: installmentId,
+      payment_amount: args.payment_amount ?? null,
+      note_text: args.note_text ?? null
+    });
     const accountId = String((data as any)?.wallet_account_id ?? "");
     if (accountId) {
       await this.reconcileWalletAccount(actor, accountId);
     }
     await this.domainEvents.publish("wallet.savings_installment.paid", {
       actorUserId: actor.appUserId,
-      tenantId: args.target_tenant_id,
-      subscriptionId: args.target_subscription_id ?? null,
-      installmentId: args.target_installment_id ?? null
+      tenantId: installment.data.tenant_id,
+      subscriptionId: installment.data.subscription_id,
+      installmentId
     });
     return data;
   }

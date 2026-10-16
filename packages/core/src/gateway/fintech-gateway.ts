@@ -28,6 +28,24 @@ function callRpcFallback(
   return runRpcFallback(fn, args);
 }
 
+const OPEN_INSTALLMENT_STATUSES = ["pending", "late"];
+
+type InstallmentLike = { id: string; subscription_id: string; installment_number: number; status: string };
+
+/**
+ * Savings instalments are paid strictly in order: per subscription, only the lowest-numbered
+ * unpaid (pending or late) instalment can be paid. Returns that instalment for each subscription.
+ */
+export function nextPayableInstallments<T extends InstallmentLike>(rows: T[]) {
+  const next = new Map<string, T>();
+  for (const row of rows) {
+    if (!OPEN_INSTALLMENT_STATUSES.includes(row.status)) continue;
+    const current = next.get(row.subscription_id);
+    if (!current || Number(row.installment_number) < Number(current.installment_number)) next.set(row.subscription_id, row);
+  }
+  return next;
+}
+
 export function createFintechGateway({
   isBackendApiConfigured,
   backendRequest,
@@ -61,15 +79,14 @@ export function createFintechGateway({
   }
 
   async function paySavingsInstallment(args: Record<string, unknown>) {
+    // The API checks that instalments are paid in order, so its answer is final; only fall
+    // back to the database function when no API is configured at all.
     if (isBackendApiConfigured()) {
-      const result = await backendRequest(`/api/v1/savings/installments/pay`, {
+      return backendRequest(`/api/v1/savings/installments/pay`, {
         method: "POST",
-        body: args
+        body: args,
+        timeoutMs: 20_000
       });
-
-      if (result.data || !result.error) {
-        return result;
-      }
     }
 
     return callRpcFallback(runRpcFallback, "pay_savings_installment", args);

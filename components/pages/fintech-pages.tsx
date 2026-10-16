@@ -17,6 +17,7 @@ import {
 } from "@/components/data-view";
 import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
 import { getBackendApiBaseUrl } from "@/lib/backend/config";
+import { nextPayableInstallments } from "@mahalaxmi/core/gateway/fintech-gateway";
 import {
   ensureWalletAccount,
   joinSavingsPlan,
@@ -537,6 +538,7 @@ export function CustomerSavingsPage() {
   }
 
   const nextPendingInstallment = installments.data.find((row: any) => row.status === "pending");
+  const nextPayable = nextPayableInstallments(installments.data as any[]);
 
   return (
     <div className="page-stack">
@@ -634,16 +636,22 @@ export function CustomerSavingsPage() {
               .filter((row: any) => ["pending", "late"].includes(row.status))
               .map((row: any) => {
                 const subscription = subscriptions.data.find((item: any) => item.id === row.subscription_id);
+                // Instalments are paid in order: only the next open one per plan can be paid.
+                const next = nextPayable.get(row.subscription_id);
+                const isNext = next?.id === row.id;
                 return (
                   <DataCard
                     key={row.id}
                     title={`Installment ${row.installment_number}`}
                     subtitle={subscription?.subscription_number ?? row.subscription_id}
-                    meta={row.status}
+                    meta={isNext ? row.status : "upcoming"}
                   >
                     <p>Due date: {row.due_date}</p>
                     <p>Expected amount: ₹{Number(row.expected_amount ?? 0).toLocaleString("en-IN")}</p>
                     <p>Paid so far: ₹{Number(row.paid_amount ?? 0).toLocaleString("en-IN")}</p>
+                    {!isNext ? (
+                      <p className="form-field-hint">🔒 Opens after instalment {next?.installment_number} is paid.</p>
+                    ) : (
                     <div className="inline-actions">
                       <RazorpayCheckoutButton
                         amount={Math.max(
@@ -688,6 +696,7 @@ export function CustomerSavingsPage() {
                         }}
                       />
                     </div>
+                    )}
                   </DataCard>
                 );
               })}

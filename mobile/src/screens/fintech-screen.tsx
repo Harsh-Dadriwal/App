@@ -5,6 +5,7 @@ import { AppButton, Card, Chip, Notice, QueryState, ScreenShell, SectionTitle } 
 import { useAuth } from "@/providers/auth-provider";
 import { supabase } from "@/lib/supabase";
 import { paySavingsInstallment } from "@/lib/backend/fintech-gateway";
+import { nextPayableInstallments } from "@mahalaxmi/core/gateway/fintech-gateway";
 
 import { palette } from "@/lib/theme";
 
@@ -334,6 +335,9 @@ export function FintechScreen() {
           .filter((i: any) => i.status === "pending" || i.status === "late")
           .map((installment: any) => {
             const sub = subscriptions.data.find((s: any) => s.id === installment.subscription_id);
+            // Instalments are paid in order: only the next open one per plan can be paid.
+            const next = nextPayableInstallments(installments.data as any[]).get(installment.subscription_id);
+            const isNext = next?.id === installment.id;
             const isPaying = mutation.loading && payingInstallmentId === installment.id;
             const isLate = installment.status === "late";
             
@@ -363,12 +367,22 @@ export function FintechScreen() {
                 </View>
                 
                 <View style={{ marginTop: 16 }}>
-                  <AppButton
-                    label={isPaying ? "Processing Verification..." : "Pay Installment Now"}
-                    icon="credit-card"
-                    onPress={() => void payInstallment(installment.id)}
-                    disabled={mutation.loading}
-                  />
+                  {isNext ? (
+                    <AppButton
+                      label={isPaying ? "Processing Verification..." : "Pay Installment Now"}
+                      icon="credit-card"
+                      onPress={() => void payInstallment(installment.id)}
+                      disabled={mutation.loading}
+                    />
+                  ) : (
+                    <AppButton
+                      label={`Opens after instalment ${next?.installment_number ?? ""} is paid`}
+                      icon="lock"
+                      kind="secondary"
+                      onPress={() => undefined}
+                      disabled
+                    />
+                  )}
                 </View>
               </Card>
             );
