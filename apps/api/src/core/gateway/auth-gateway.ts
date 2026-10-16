@@ -47,6 +47,11 @@ export function resolveActiveTenant(
   };
 }
 
+export type PhoneSignupProfile = { full_name: string; username: string; email?: string; role?: string };
+type PhoneSession = { access_token: string; refresh_token: string };
+export type PhoneSignedIn = { status: "signed_in"; isNewUser: boolean; session: PhoneSession };
+export type PhoneVerifyResult = PhoneSignedIn | { status: "needs_profile"; phone: string; signupToken: string };
+
 export function createAuthGateway({
   isBackendApiConfigured,
   backendRequest,
@@ -236,19 +241,36 @@ export function createAuthGateway({
   }
 
   /**
-   * Checks the code and returns a Supabase session to store with supabase.auth.setSession.
-   * `profile` (name, username, role) is used only when the number has no account yet.
+   * Checks the code. An existing number is signed in (store the session with
+   * supabase.auth.setSession); a new number gets { status: "needs_profile", signupToken }
+   * and finishes with completePhoneSignup.
    */
-  async function verifyPhoneOtp(
-    phone: string,
-    code: string,
-    profile?: { full_name?: string; username?: string; role?: string }
-  ) {
-    return backendRequest<{ isNewUser: boolean; session: { access_token: string; refresh_token: string } }>("/api/v1/auth/otp/verify", {
+  async function verifyPhoneOtp(phone: string, code: string) {
+    return backendRequest<PhoneVerifyResult>("/api/v1/auth/otp/verify", {
       method: "POST",
-      body: { phone, code, profile },
+      body: { phone, code },
       requireAuth: false,
       timeoutMs: 20_000
+    });
+  }
+
+  /** Creates the account for a just-verified new number and signs it in. */
+  async function completePhoneSignup(signupToken: string, profile: PhoneSignupProfile) {
+    return backendRequest<PhoneSignedIn>("/api/v1/auth/otp/complete-signup", {
+      method: "POST",
+      body: { signupToken, profile },
+      requireAuth: false,
+      timeoutMs: 20_000
+    });
+  }
+
+  /** Which of a username, email or phone number are still free (for sign-up forms). */
+  async function checkSignupAvailability(values: { username?: string; email?: string; phone?: string }) {
+    return backendRequest<Record<"username" | "email" | "phone", { available: boolean }>>("/api/v1/auth/otp/availability", {
+      method: "POST",
+      body: values,
+      requireAuth: false,
+      timeoutMs: 15_000
     });
   }
 
@@ -258,6 +280,8 @@ export function createAuthGateway({
     resolveActiveTenant,
     switchDefaultTenant,
     sendPhoneOtp,
-    verifyPhoneOtp
+    verifyPhoneOtp,
+    completePhoneSignup,
+    checkSignupAvailability
   };
 }

@@ -1,67 +1,38 @@
 "use client";
 
-import { useState, useEffect, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
-import { authRoleOptions } from "@/lib/navigation";
-import { sendPhoneOtp, verifyPhoneOtp } from "@/lib/backend/modules/auth-gateway";
+import {
+  checkSignupAvailability,
+  completePhoneSignup,
+  sendPhoneOtp,
+  verifyPhoneOtp
+} from "@/lib/backend/modules/auth-gateway";
 import type { AppRole } from "@mahalaxmi/core/types/domain";
 
-type AuthMethod = "email" | "phone";
-type AuthMode = "login" | "signup" | "forgot_password" | "reset_password";
+type Step = "phone" | "otp" | "profile" | "email" | "forgot" | "reset";
+type EmailMode = "login" | "signup";
+type SignupRole = "customer" | "electrician" | "architect";
 
-type EmailFormState = {
-  fullName: string;
-  username: string;
-  email: string;
-  phone: string;
-  password: string;
-  role: AppRole;
-  referralCode: string;
-};
+const ROLES: Array<{ id: SignupRole; title: string; text: string; icon: string }> = [
+  { id: "customer", title: "Customer", text: "Buy materials, raise complaints and installations", icon: "🏠" },
+  { id: "electrician", title: "Electrician", text: "Take jobs, order for sites and earn rewards", icon: "⚡" },
+  { id: "architect", title: "Architect", text: "Plan lighting and review site materials", icon: "📐" }
+];
 
-type PhoneFormState = {
-  fullName: string;
-  username: string;
-  phone: string;
-  otp: string;
-  role: AppRole;
-  referralCode: string;
-};
-
-const defaultEmailForm: EmailFormState = {
-  fullName: "",
-  username: "",
-  email: "",
-  phone: "",
-  password: "",
-  role: "customer",
-  referralCode: ""
-};
-
-const defaultPhoneForm: PhoneFormState = {
-  fullName: "",
-  username: "",
-  phone: "",
-  otp: "",
-  role: "customer",
-  referralCode: ""
-};
+const PERKS = [
+  "Live prices and stock from the shop",
+  "Raise complaints and book installations",
+  "Track orders, approvals and savings"
+];
 
 function normalizeUsername(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9._]/g, "")
-    .slice(0, 24);
+  return value.trim().toLowerCase().replace(/[^a-z0-9._]/g, "").slice(0, 24);
 }
 
-function normalizeEmail(value: string) {
-  return value.trim().toLowerCase();
-}
-
-/** The API expects +<country code>; 10-digit Indian mobile numbers get +91 added. */
+/** "+919876543210" from a 10-digit Indian mobile number or an already-international one. */
 function toE164(value: string) {
   const digits = value.replace(/[^0-9+]/g, "");
   if (digits.startsWith("+")) return digits;
@@ -69,773 +40,544 @@ function toE164(value: string) {
   return digits;
 }
 
-function normalizePhone(value: string) {
-  return value.replace(/[^0-9+]/g, "");
+function isValidMobile(value: string) {
+  return /^\+[1-9][0-9]{7,14}$/.test(toE164(value));
 }
 
-function mapAuthErrorMessage(error: unknown) {
-  const message = error instanceof Error ? error.message : "Unable to continue.";
+function prettyPhone(e164: string) {
+  const match = e164.match(/^\+91(\d{5})(\d{5})$/);
+  return match ? `+91 ${match[1]} ${match[2]}` : e164;
+}
 
-  if (message.toLowerCase().includes("database error saving new user")) {
-    return "We could not finish creating your account. Please try again or contact support.";
+function friendlyError(error: unknown) {
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "Something went wrong. Please try again.";
+  const lower = message.toLowerCase();
+  if (lower.includes("invalid login credentials")) return "That email and password don't match.";
+  if (lower.includes("email not confirmed")) return "Please confirm your email first. Open the link we sent you, then log in.";
+  if (lower.includes("user already registered")) return "This email already has an account. Log in instead.";
+  if (lower.includes("password should be at least")) return "Use a password with at least 6 characters.";
+  if (lower.includes("error sending confirmation email") || message.includes("535 5.7.8")) {
+    return "We could not send the confirmation email right now. Please try again shortly.";
   }
-
-  if (
-    message.toLowerCase().includes("error sending confirmation email") ||
-    message.includes("535 5.7.8")
-  ) {
-    return "We could not send the confirmation email right now. Please try again shortly or contact support.";
-  }
-
-  if (message.toLowerCase().includes("user already registered")) {
-    return "This email is already registered. Log in instead or use another email address.";
-  }
-
   return message;
+}
+
+/**
+ * The SMS code as six boxes. One real input sits over the boxes and holds all six digits,
+ * so typing, backspace, paste and the phone's SMS autofill all work without moving focus.
+ */
+function OtpBoxes({ value, onChange, disabled }: { value: string; onChange: (value: string) => void; disabled?: boolean }) {
+  const [focused, setFocused] = useState(false);
+  const activeIndex = Math.min(value.length, 5);
+
+  return (
+    <div className="otp-boxes">
+      <input
+        className="otp-input"
+        value={value}
+        onChange={(event) => onChange(event.target.value.replace(/\D/g, "").slice(0, 6))}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        maxLength={6}
+        autoFocus
+        disabled={disabled}
+        aria-label="6-digit code"
+      />
+      {Array.from({ length: 6 }, (_, index) => (
+        <span
+          key={index}
+          aria-hidden="true"
+          className={`otp-box${value[index] ? " is-filled" : ""}${focused && index === activeIndex ? " is-active" : ""}`}
+        >
+          {value[index] ?? ""}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** Live "is this username free?" hint, checked after the user stops typing. */
+function useUsernameCheck(username: string) {
+  const [state, setState] = useState<"idle" | "checking" | "free" | "taken">("idle");
+  useEffect(() => {
+    if (username.length < 3) {
+      setState("idle");
+      return;
+    }
+    setState("checking");
+    const timer = window.setTimeout(async () => {
+      const result = await checkSignupAvailability({ username });
+      setState(result.data ? (result.data.username.available ? "free" : "taken") : "idle");
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [username]);
+  return state;
+}
+
+function UsernameHint({ state }: { state: ReturnType<typeof useUsernameCheck> }) {
+  if (state === "checking") return <span className="field-status">Checking…</span>;
+  if (state === "free") return <span className="field-status is-ok">✓ Available</span>;
+  if (state === "taken") return <span className="field-status is-bad">Already taken</span>;
+  return <span className="field-status">Letters, numbers, dots and underscores</span>;
+}
+
+function RolePicker({ value, onChange }: { value: SignupRole; onChange: (role: SignupRole) => void }) {
+  return (
+    <div className="role-picker" role="radiogroup" aria-label="I am a">
+      {ROLES.map((role) => (
+        <button
+          key={role.id}
+          type="button"
+          role="radio"
+          aria-checked={value === role.id}
+          className={`role-option${value === role.id ? " is-active" : ""}`}
+          onClick={() => onChange(role.id)}
+        >
+          <span className="role-option-icon" aria-hidden="true">{role.icon}</span>
+          <span>
+            <strong>{role.title}</strong>
+            <small>{role.text}</small>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export function AuthScreen() {
   const router = useRouter();
   const { refreshProfile } = useAuth();
-  const [authMethod, setAuthMethod] = useState<AuthMethod>("email");
-  const [authMode, setAuthMode] = useState<AuthMode>("login");
-  const [emailForm, setEmailForm] = useState(defaultEmailForm);
-  const [phoneForm, setPhoneForm] = useState(defaultPhoneForm);
-  const [otpSent, setOtpSent] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [step, setStep] = useState<Step>("phone");
+  const [emailMode, setEmailMode] = useState<EmailMode>("login");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
+  // Phone flow
+  const [phone, setPhone] = useState("");
+  const [sentTo, setSentTo] = useState("");
+  const [code, setCode] = useState("");
+  const [resendIn, setResendIn] = useState(0);
+  const [signupToken, setSignupToken] = useState("");
+
+  // Profile (phone sign-up) and email forms
+  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [role, setRole] = useState<SignupRole>("customer");
+  const [referralCode, setReferralCode] = useState("");
+  const usernameState = useUsernameCheck(step === "profile" || (step === "email" && emailMode === "signup") ? username : "");
+
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const searchParams = new URLSearchParams(window.location.search);
-      const isReset = searchParams.get("reset") === "true";
-      const hash = window.location.hash;
-      const isRecovery = hash.includes("type=recovery") || hash.includes("access_token=");
-      
-      if (isReset || isRecovery) {
-        setAuthMode("reset_password");
-        setNotice("Reset session active. Please enter your new secure password.");
-      }
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("reset") === "true" || window.location.hash.includes("type=recovery")) {
+      setStep("reset");
     }
   }, []);
 
-  async function handleForgotPasswordSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const supabase = await getSupabaseBrowserClient();
-    if (!supabase) return;
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = window.setTimeout(() => setResendIn((seconds) => seconds - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendIn]);
 
-    setIsSubmitting(true);
-    setErrorMessage("");
+  function go(next: Step) {
+    setError("");
     setNotice("");
+    setStep(next);
+  }
 
+  async function openWorkspace(expectedRole?: AppRole) {
+    const supabase = await getSupabaseBrowserClient();
+    const { data } = (await supabase?.auth.getSession()) ?? { data: { session: null } };
+    const loaded = data.session?.user?.id ? await refreshProfile(data.session.user.id) : null;
+    const target = loaded?.role ?? expectedRole;
+    router.replace(target ? `/${target}` : "/");
+  }
+
+  async function storeSession(session: { access_token: string; refresh_token: string }) {
+    const supabase = await getSupabaseBrowserClient();
+    if (!supabase) throw new Error("Sign-in is not available right now. Please try again shortly.");
+    const { error: sessionError } = await supabase.auth.setSession(session);
+    if (sessionError) throw sessionError;
+  }
+
+  async function run(task: () => Promise<void>) {
+    setBusy(true);
+    setError("");
+    setNotice("");
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(emailForm.email, {
-        redirectTo: `${window.location.origin}/auth?reset=true`,
-      });
-
-      if (error) throw error;
-
-      setNotice("A password reset link has been sent to your email.");
-    } catch (error) {
-      setErrorMessage(mapAuthErrorMessage(error));
+      await task();
+    } catch (caught) {
+      setError(friendlyError(caught));
     } finally {
-      setIsSubmitting(false);
+      setBusy(false);
     }
   }
 
-  async function handleResetPasswordSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const supabase = await getSupabaseBrowserClient();
-    if (!supabase) return;
+  // ---- Phone: send, verify, complete profile ----
 
-    setIsSubmitting(true);
-    setErrorMessage("");
-    setNotice("");
-
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: emailForm.password,
-      });
-
-      if (error) throw error;
-
-      setNotice("Your password has been updated successfully. Redirecting...");
-      setTimeout(() => {
-        router.replace("/");
-      }, 1500);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Password update failed.");
-    } finally {
-      setIsSubmitting(false);
+  function sendCode(event?: FormEvent) {
+    event?.preventDefault();
+    if (!isValidMobile(phone)) {
+      setError("Enter a valid 10-digit mobile number.");
+      return;
     }
+    void run(async () => {
+      const result = await sendPhoneOtp(toE164(phone));
+      if (result.error) throw new Error(result.error);
+      setSentTo(result.data?.phone ?? toE164(phone));
+      setResendIn(result.data?.resendInSeconds ?? 45);
+      setCode("");
+      setStep("otp");
+    });
   }
 
-  async function completeLoginRedirect(expectedRole?: AppRole, directUserId?: string) {
-    const supabase = await getSupabaseBrowserClient();
+  function verifyCode(value = code) {
+    if (value.length !== 6) return;
+    void run(async () => {
+      const result = await verifyPhoneOtp(sentTo, value);
+      if (result.error || !result.data) throw new Error(result.error ?? "We could not check the code. Please try again.");
+      if (result.data.status === "needs_profile") {
+        setSignupToken(result.data.signupToken);
+        setStep("profile");
+        return;
+      }
+      await storeSession(result.data.session);
+      await openWorkspace();
+    });
+  }
 
-    if (!supabase) {
-      return;
-    }
+  function completeProfile(event: FormEvent) {
+    event.preventDefault();
+    if (fullName.trim().length < 2) return setError("Enter your full name.");
+    if (username.length < 3) return setError("Choose a username with at least 3 characters.");
+    if (usernameState === "taken") return setError("This username is already taken. Please choose another one.");
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setError("Enter a valid email address, or leave it empty.");
+    void run(async () => {
+      const result = await completePhoneSignup(signupToken, { full_name: fullName.trim(), username, email: email || undefined, role });
+      if (result.error || !result.data) throw new Error(result.error ?? "We could not create your account. Please try again.");
+      await storeSession(result.data.session);
+      await openWorkspace(role);
+    });
+  }
 
-    if (directUserId) {
-      const loadedProfile = await refreshProfile(directUserId);
-      const role = loadedProfile?.role ?? expectedRole;
-      router.replace(role ? `/${role}` : "/");
-      return;
-    }
+  // ---- Email: log in, sign up (phone required), forgot and reset password ----
 
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      const {
-        data: { session }
-      } = await supabase.auth.getSession();
+  function submitEmail(event: FormEvent) {
+    event.preventDefault();
+    void run(async () => {
+      const supabase = await getSupabaseBrowserClient();
+      if (!supabase) throw new Error("Sign-in is not available right now. Please try again shortly.");
 
-      if (session?.user?.id) {
-        const loadedProfile = await refreshProfile(session.user.id);
-        const role = loadedProfile?.role ?? expectedRole;
-        router.replace(role ? `/${role}` : "/");
+      if (emailMode === "login") {
+        const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+        if (loginError) throw loginError;
+        await openWorkspace();
         return;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+      if (fullName.trim().length < 2) throw new Error("Enter your full name.");
+      if (username.length < 3) throw new Error("Choose a username with at least 3 characters.");
+      if (!isValidMobile(phone)) throw new Error("Enter a valid 10-digit mobile number.");
+      if (password.length < 6) throw new Error("Use a password with at least 6 characters.");
 
-    if (expectedRole) {
-      router.replace(`/${expectedRole}`);
-    } else {
-      router.replace("/");
-    }
-  }
+      const mobile = toE164(phone);
+      const availability = await checkSignupAvailability({ username, email, phone: mobile });
+      if (availability.data) {
+        if (!availability.data.username.available) throw new Error("This username is already taken. Please choose another one.");
+        if (!availability.data.email.available) throw new Error("This email already has an account. Log in instead.");
+        if (!availability.data.phone.available) throw new Error("This mobile number already has an account. Continue with your phone number instead.");
+      }
 
-  function onEmailChange(event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
-    const { name, value } = event.target;
-    setEmailForm((current) => ({
-      ...current,
-      [name]:
-        name === "username"
-          ? normalizeUsername(value)
-          : name === "email"
-            ? normalizeEmail(value)
-            : name === "phone"
-              ? normalizePhone(value)
-              : value
-    }));
-  }
-
-  function onPhoneChange(event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
-    const { name, value } = event.target;
-    setPhoneForm((current) => ({
-      ...current,
-      [name]:
-        name === "username"
-          ? normalizeUsername(value)
-          : name === "phone"
-            ? normalizePhone(value)
-            : value
-    }));
-  }
-
-  async function validateSignupAvailability(values: {
-    username: string;
-    email?: string;
-    phone?: string;
-  }) {
-    const response = await fetch("/api/auth/check-availability", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(values)
-    });
-
-    const payload = (await response.json().catch(() => null)) as
-      | {
-          error?: string;
-          checks?: {
-            username?: { available: boolean };
-            email?: { available: boolean };
-            phone?: { available: boolean };
-          };
+      const { data, error: signupError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth`,
+          data: { full_name: fullName.trim(), username, role, phone: mobile, referral_code: referralCode || undefined }
         }
-      | null;
-
-    if (!response.ok) {
-      throw new Error(payload?.error ?? "Unable to validate your signup details right now.");
-    }
-
-    if (!payload?.checks?.username?.available) {
-      throw new Error("This username is already taken. Please choose another one.");
-    }
-
-    if (values.email && payload?.checks?.email?.available === false) {
-      throw new Error("This email address is already being used by another user.");
-    }
-
-    if (values.phone && payload?.checks?.phone?.available === false) {
-      throw new Error("This mobile number is already being used by another user.");
-    }
-  }
-
-  async function handleEmailSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const supabase = await getSupabaseBrowserClient();
-
-    if (!supabase) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    setErrorMessage("");
-    setNotice("");
-
-    try {
-      if (authMode === "signup" && emailForm.role === "admin") {
-        throw new Error("Admin accounts are created manually by the platform owner.");
-      }
-
-      if (authMode === "signup") {
-        if (!emailForm.username) {
-          throw new Error("Username is required.");
-        }
-
-        await validateSignupAvailability({
-          username: emailForm.username,
-          email: emailForm.email,
-          phone: emailForm.phone
-        });
-
-        const { error, data } = await supabase.auth.signUp({
-          email: emailForm.email,
-          password: emailForm.password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth`,
-            data: {
-              full_name: emailForm.fullName,
-              username: emailForm.username,
-              role: emailForm.role,
-              phone: emailForm.phone,
-              referral_code: emailForm.referralCode
-            }
-          }
-        });
-
-        if (error) {
-          throw error;
-        }
-
-        setNotice(
-          data?.session
-            ? "Account created successfully."
-            : "Account created. Check your email to confirm your address."
-        );
-
-        if (data?.session) {
-          await completeLoginRedirect(emailForm.role, data.session.user.id);
-        } else {
-          setAuthMode("login");
-        }
-      } else {
-        const { error, data } = await supabase.auth.signInWithPassword({
-          email: emailForm.email,
-          password: emailForm.password
-        });
-
-        if (error) {
-          throw error;
-        }
-
-        setNotice("Logged in. Opening your workspace...");
-        await completeLoginRedirect(undefined, data?.session?.user?.id);
-      }
-    } catch (error) {
-      setErrorMessage(mapAuthErrorMessage(error));
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handlePhoneOtpSend(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const supabase = await getSupabaseBrowserClient();
-
-    if (!supabase) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    setErrorMessage("");
-    setNotice("");
-
-    try {
-      if (authMode === "signup" && phoneForm.role === "admin") {
-        throw new Error("Admin accounts are created manually by the platform owner.");
-      }
-
-      if (authMode === "signup" && !phoneForm.username) {
-        throw new Error("Username is required.");
-      }
-
-      if (authMode === "signup") {
-        await validateSignupAvailability({
-          username: phoneForm.username,
-          phone: phoneForm.phone
-        });
-      }
-
-      // The API creates the code and texts it from the shop's SMS phone (TextBee).
-      const result = await sendPhoneOtp(toE164(phoneForm.phone));
-      if (result.error) {
-        throw new Error(result.error);
-      }
-
-      setOtpSent(true);
-      setNotice(`We sent a 6-digit code to ${result.data?.phone ?? phoneForm.phone}. It expires in 5 minutes.`);
-    } catch (error) {
-      setErrorMessage(mapAuthErrorMessage(error));
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handlePhoneVerify(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const supabase = await getSupabaseBrowserClient();
-
-    if (!supabase) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    setErrorMessage("");
-    setNotice("");
-
-    try {
-      // Name, username and role are only used if this number has no account yet.
-      const result = await verifyPhoneOtp(
-        toE164(phoneForm.phone),
-        phoneForm.otp,
-        authMode === "signup"
-          ? { full_name: phoneForm.fullName, username: phoneForm.username, role: phoneForm.role }
-          : undefined
-      );
-      const session = result.data?.session;
-      if (result.error || !session?.access_token) {
-        throw new Error(result.error ?? "Sign-in could not be completed. Please try again.");
-      }
-
-      const { error: sessionError } = await supabase.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token
       });
-      if (sessionError) {
-        throw sessionError;
+      if (signupError) throw signupError;
+      if (data.session) {
+        await openWorkspace(role);
+        return;
       }
-
-      setNotice("Phone verified.");
-      await completeLoginRedirect(phoneForm.role);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "OTP verification failed.");
-    } finally {
-      setIsSubmitting(false);
-    }
+      setEmailMode("login");
+      setPassword("");
+      setNotice(`Account created. We sent a confirmation link to ${email}. Open it, then log in.`);
+    });
   }
+
+  function sendReset(event: FormEvent) {
+    event.preventDefault();
+    void run(async () => {
+      const supabase = await getSupabaseBrowserClient();
+      const { error: resetError } = (await supabase?.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth?reset=true`
+      })) ?? { error: null };
+      if (resetError) throw resetError;
+      setNotice(`If ${email} has an account, a reset link is on its way.`);
+    });
+  }
+
+  function saveNewPassword(event: FormEvent) {
+    event.preventDefault();
+    if (password.length < 6) return setError("Use a password with at least 6 characters.");
+    void run(async () => {
+      const supabase = await getSupabaseBrowserClient();
+      const { error: updateError } = (await supabase?.auth.updateUser({ password })) ?? { error: null };
+      if (updateError) throw updateError;
+      setNotice("Password updated. Opening your workspace…");
+      await openWorkspace();
+    });
+  }
+
+  const passwordField = (autoComplete: string, label = "Password") => (
+    <label className="auth-field">
+      <span>{label}</span>
+      <div className="auth-input-wrap">
+        <input
+          type={showPassword ? "text" : "password"}
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          autoComplete={autoComplete}
+          placeholder={autoComplete === "new-password" ? "At least 6 characters" : "Your password"}
+          required
+        />
+        <button type="button" className="auth-input-action" onClick={() => setShowPassword((shown) => !shown)}>
+          {showPassword ? "Hide" : "Show"}
+        </button>
+      </div>
+    </label>
+  );
+
+  const phoneField = (label: string) => (
+    <label className="auth-field">
+      <span>{label}</span>
+      <div className="auth-phone">
+        <span className="auth-phone-prefix">🇮🇳 +91</span>
+        <input
+          value={phone}
+          onChange={(event) => setPhone(event.target.value.replace(/[^0-9+ ]/g, ""))}
+          inputMode="tel"
+          autoComplete="tel-national"
+          placeholder="98765 43210"
+          maxLength={16}
+          required
+        />
+      </div>
+    </label>
+  );
 
   return (
-    <main className="auth-shell">
-      <section className="auth-hero">
-        <div style={{ paddingBottom: '2rem' }}>
-          <div className="brand-row" style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
-            <span className="brand-mark" style={{
-              background: 'linear-gradient(135deg, white, rgba(255,255,255,0.7))',
-              color: '#1e3a8a',
-              width: 48,
-              height: 48,
-              borderRadius: 12,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700
-            }}>ME</span>
-            <div>
-              <p className="brand-name" style={{ color: 'white', fontSize: '1.25rem', marginBottom: 0 }}>Mahalaxmi Electricals</p>
-              <small style={{ color: 'rgba(255,255,255,0.8)' }}>B2B & B2C Platform</small>
-            </div>
-          </div>
-          <span className="eyebrow" style={{ color: '#93c5fd' }}>Secure Access</span>
-          <h1>Customer onboarding & secure professional workspace access.</h1>
-          <p>
-            New accounts start as Customers. Platform Administrators can search your profile, verify your username, and promote you into an electrician or architect account.
-          </p>
+    <main className="auth2-shell">
+      <section className="auth2-hero" aria-hidden="true">
+        <div className="auth2-hero-glow" />
+        <div className="auth2-brand">
+          <span className="auth2-logo">⚡</span>
+          <span>Mahalaxmi Electricals</span>
         </div>
-
-        <div className="role-grid">
-          {authRoleOptions.map((role) => (
-            <article
-              key={role.value}
-              className={`role-card ${role.value === "customer" ? "" : "role-card--locked"}`}
-            >
-              <strong>{role.label}</strong>
-              <p>{role.description}</p>
-              {role.value === "customer" ? <small style={{ color: '#6ee7b7' }}>Default signup role</small> : <small>Admin promotion only</small>}
-            </article>
+        <h1>Everything electrical, one app.</h1>
+        <ul>
+          {PERKS.map((perk) => (
+            <li key={perk}>
+              <span>✓</span>
+              {perk}
+            </li>
           ))}
-        </div>
+        </ul>
       </section>
 
-      <section className="auth-panel">
-        <div className="auth-panel-inner">
-          <aside className="mobile-auth-context" aria-label="About Mahalaxmi Electricals">
-            <span className="eyebrow">Mahalaxmi Electricals</span>
-            <h1>Manage your construction projects in one place.</h1>
-            <p>
-              Create sites, approve materials, track budgets, and manage project purchases. New accounts start as Customers.
-            </p>
-          </aside>
-          <div className="auth-panel-header" style={{ marginBottom: '2.5rem' }}>
-            <span className="eyebrow">
-              {authMode === "login"
-                ? "Welcome Back"
-                : authMode === "signup"
-                  ? "Create Account"
-                  : authMode === "forgot_password"
-                    ? "Reset Password Request"
-                    : "Set New Password"}
-            </span>
-            <h2>
-              {authMode === "login"
-                ? "Access your workspace"
-                : authMode === "signup"
-                  ? "Set up your role-based account"
-                  : authMode === "forgot_password"
-                    ? "Recover your account password"
-                    : "Secure your account"}
-            </h2>
-            <p>
-              {authMode === "forgot_password"
-                ? "Enter your email to receive a secure recovery link."
-                : authMode === "reset_password"
-                  ? "Enter your new strong password below."
-                  : authMethod === "email"
-                    ? "Use your email securely. No fuss."
-                    : "Use SMS OTP for mobile-first rapid access."}
-            </p>
+      <section className="auth2-panel">
+        <div className="auth2-card">
+          <div className="auth2-mobile-brand">
+            <span className="auth2-logo">⚡</span> Mahalaxmi Electricals
           </div>
 
-          {authMode !== "forgot_password" && authMode !== "reset_password" ? (
-            <div className="toggle-row">
-              <div className="segmented-control">
-                <button
-                  type="button"
-                  className={authMode === "login" ? "is-active" : ""}
-                  onClick={() => setAuthMode("login")}
-                >
-                  Log in
-                </button>
-                <button
-                  type="button"
-                  className={authMode === "signup" ? "is-active" : ""}
-                  onClick={() => setAuthMode("signup")}
-                >
-                  Sign up
-                </button>
-              </div>
-              <div className="segmented-control">
-                <button
-                  type="button"
-                  className={authMethod === "email" ? "is-active" : ""}
-                  onClick={() => {
-                    setAuthMethod("email");
-                    setOtpSent(false);
-                  }}
-                >
-                  Email
-                </button>
-                <button
-                  type="button"
-                  className={authMethod === "phone" ? "is-active" : ""}
-                  onClick={() => setAuthMethod("phone")}
-                >
-                  Phone
-                </button>
-              </div>
-            </div>
+          {step === "phone" ? (
+            <form onSubmit={sendCode} className="auth2-form">
+              <header>
+                <h2>Log in or sign up</h2>
+                <p>Enter your mobile number. We will text you a 6-digit code.</p>
+              </header>
+              {phoneField("Mobile number")}
+              <button type="submit" className="primary-button auth2-submit" disabled={busy}>
+                {busy ? "Sending code…" : "Continue"}
+              </button>
+              <div className="auth2-divider"><span>or</span></div>
+              <button type="button" className="secondary-button auth2-submit" onClick={() => go("email")}>
+                ✉️ Continue with email
+              </button>
+            </form>
           ) : null}
 
-          {authMode === "forgot_password" ? (
-            <form className="auth-form fade-in" onSubmit={handleForgotPasswordSubmit}>
-              <label>
-                Email address
-                <input
-                  className="input"
-                  type="email"
-                  name="email"
-                  value={emailForm.email}
-                  onChange={onEmailChange}
-                  placeholder="name@example.com"
-                  required
-                />
-              </label>
-              <button type="submit" className="primary-button" disabled={isSubmitting} style={{ marginTop: '1rem' }}>
-                {isSubmitting ? "Sending reset link..." : "Send Reset Link"}
-              </button>
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => setAuthMode("login")}
-                style={{ marginTop: '0.5rem', background: 'transparent', border: 'none', color: '#60a5fa', cursor: 'pointer' }}
-              >
-                Back to log in
-              </button>
-            </form>
-          ) : authMode === "reset_password" ? (
-            <form className="auth-form fade-in" onSubmit={handleResetPasswordSubmit}>
-              <label>
-                New Password
-                <input
-                  className="input"
-                  type="password"
-                  name="password"
-                  value={emailForm.password}
-                  onChange={onEmailChange}
-                  placeholder="Enter your new password"
-                  required
-                  minLength={6}
-                />
-              </label>
-              <button type="submit" className="primary-button" disabled={isSubmitting} style={{ marginTop: '1rem' }}>
-                {isSubmitting ? "Updating password..." : "Update Password"}
-              </button>
-            </form>
-          ) : authMethod === "email" ? (
-            <form className="auth-form fade-in" onSubmit={handleEmailSubmit}>
-              {authMode === "signup" ? (
-                <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <label style={{ gridColumn: '1 / -1' }}>
-                    Full name
-                    <input
-                      className="input"
-                      name="fullName"
-                      value={emailForm.fullName}
-                      onChange={onEmailChange}
-                      placeholder="John Doe"
-                      required
-                    />
-                  </label>
-                  <label>
-                    Username
-                    <input
-                      className="input"
-                      name="username"
-                      value={emailForm.username}
-                      onChange={onEmailChange}
-                      placeholder="username"
-                      pattern="[a-z0-9._]{3,24}"
-                      minLength={3}
-                      maxLength={24}
-                      required
-                    />
-                  </label>
-                  <label>
-                    Phone number
-                    <input
-                      className="input"
-                      name="phone"
-                      value={emailForm.phone}
-                      onChange={onEmailChange}
-                      placeholder="+91 XXXXXXXXXX"
-                    />
-                  </label>
-                  <label>
-                    Assigned Role
-                    <div style={{
-                      padding: '0.625rem 0.75rem',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: 'var(--radius)',
-                      color: 'var(--text-color)',
-                      fontSize: '0.875rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between'
-                    }}>
-                      <span>Customer</span>
-                      <span style={{ fontSize: '0.75rem', color: '#6ee7b7', background: 'rgba(110, 231, 183, 0.1)', padding: '2px 6px', borderRadius: 4 }}>Default</span>
-                    </div>
-                  </label>
-                  <label style={{ gridColumn: '1 / -1' }}>
-                    Referral Code (Optional)
-                    <input
-                      className="input"
-                      name="referralCode"
-                      value={emailForm.referralCode}
-                      onChange={onEmailChange}
-                      placeholder="ME-XXXXXX"
-                    />
-                  </label>
-                </div>
-              ) : null}
-
-              <label>
-                Email address
-                <input
-                  className="input"
-                  type="email"
-                  name="email"
-                  value={emailForm.email}
-                  onChange={onEmailChange}
-                  placeholder="name@example.com"
-                  required
-                />
-              </label>
-              <label>
-                Password
-                <input
-                  className="input"
-                  type="password"
-                  name="password"
-                  value={emailForm.password}
-                  onChange={onEmailChange}
-                  placeholder="••••••••"
-                  required
-                  minLength={6}
-                />
-              </label>
-              {authMode === "login" ? (
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-0.5rem', marginBottom: '0.5rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => setAuthMode("forgot_password")}
-                    className="text-link-button"
-                  >
-                    Forgot password?
-                  </button>
-                </div>
-              ) : null}
-              <button type="submit" className="primary-button" disabled={isSubmitting} style={{ marginTop: '0.5rem' }}>
-                {isSubmitting
-                  ? "Please wait..."
-                  : authMode === "login"
-                    ? "Log in securely"
-                    : "Create Account"}
-              </button>
-            </form>
-          ) : otpSent ? (
-            <form className="auth-form fade-in" onSubmit={handlePhoneVerify}>
-              <label>
-                Phone number
-                <input
-                  className="input"
-                  name="phone"
-                  value={phoneForm.phone}
-                  onChange={onPhoneChange}
-                  disabled
-                />
-              </label>
-              <label>
-                Secure OTP code
-                <input
-                  className="input"
-                  name="otp"
-                  value={phoneForm.otp}
-                  onChange={onPhoneChange}
-                  placeholder="123456"
-                  required
-                  autoFocus
-                />
-              </label>
-              <button type="submit" className="primary-button" disabled={isSubmitting} style={{ marginTop: '1rem' }}>
-                {isSubmitting ? "Verifying Token..." : "Verify OTP"}
-              </button>
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => {
-                  setOtpSent(false);
-                  setPhoneForm((current) => ({ ...current, otp: "" }));
+          {step === "otp" ? (
+            <form
+              className="auth2-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                verifyCode();
+              }}
+            >
+              <header>
+                <button type="button" className="auth2-back" onClick={() => go("phone")}>← Back</button>
+                <h2>Enter the code</h2>
+                <p>
+                  Sent by SMS to <strong>{prettyPhone(sentTo)}</strong>{" "}
+                  <button type="button" className="text-link-button" onClick={() => go("phone")}>Change</button>
+                </p>
+              </header>
+              <OtpBoxes
+                value={code}
+                disabled={busy}
+                onChange={(next) => {
+                  setCode(next);
+                  if (next.length === 6) verifyCode(next);
                 }}
-              >
-                Change phone number
+              />
+              <button type="submit" className="primary-button auth2-submit" disabled={busy || code.length !== 6}>
+                {busy ? "Checking…" : "Verify"}
               </button>
-            </form>
-          ) : (
-            <form className="auth-form fade-in" onSubmit={handlePhoneOtpSend}>
-              {authMode === "signup" ? (
-                <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <label style={{ gridColumn: '1 / -1' }}>
-                    Full name
-                    <input
-                      className="input"
-                      name="fullName"
-                      value={phoneForm.fullName}
-                      onChange={onPhoneChange}
-                      placeholder="John Doe"
-                      required
-                    />
-                  </label>
-                  <label style={{ gridColumn: '1 / -1' }}>
-                    Username
-                    <input
-                      className="input"
-                      name="username"
-                      value={phoneForm.username}
-                      onChange={onPhoneChange}
-                      placeholder="username"
-                      pattern="[a-z0-9._]{3,24}"
-                      minLength={3}
-                      maxLength={24}
-                      required
-                    />
-                  </label>
-                  <label style={{ gridColumn: '1 / -1' }}>
-                    Assigned Role
-                    <div style={{
-                      padding: '0.625rem 0.75rem',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: 'var(--radius)',
-                      color: 'var(--text-color)',
-                      fontSize: '0.875rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between'
-                    }}>
-                      <span>Customer</span>
-                      <span style={{ fontSize: '0.75rem', color: '#6ee7b7', background: 'rgba(110, 231, 183, 0.1)', padding: '2px 6px', borderRadius: 4 }}>Default</span>
-                    </div>
-                  </label>
-                  <label style={{ gridColumn: '1 / -1' }}>
-                    Referral Code (Optional)
-                    <input
-                      className="input"
-                      name="referralCode"
-                      value={phoneForm.referralCode}
-                      onChange={onPhoneChange}
-                      placeholder="ME-XXXXXX"
-                    />
-                  </label>
-                </div>
-              ) : null}
-
-              <label>
-                Phone number
-                <input
-                  className="input"
-                  name="phone"
-                  value={phoneForm.phone}
-                  onChange={onPhoneChange}
-                  placeholder="+919876543210"
-                  required
-                />
-              </label>
-              <button type="submit" className="primary-button" disabled={isSubmitting} style={{ marginTop: '1rem' }}>
-                {isSubmitting ? "Sending..." : "Send OTP Request"}
-              </button>
-              <p className="helper-copy" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-                Standard message and data rates may apply.
+              <p className="auth2-resend">
+                {resendIn > 0 ? (
+                  <>Resend code in <strong>0:{String(resendIn).padStart(2, "0")}</strong></>
+                ) : (
+                  <button type="button" className="text-link-button" disabled={busy} onClick={() => sendCode()}>
+                    Resend code
+                  </button>
+                )}
               </p>
             </form>
-          )}
+          ) : null}
 
-          {notice ? <div className="notice success fade-in">{notice}</div> : null}
-          {errorMessage ? <div className="notice error fade-in">{errorMessage}</div> : null}
+          {step === "profile" ? (
+            <form onSubmit={completeProfile} className="auth2-form">
+              <header>
+                <span className="auth2-badge">✓ {prettyPhone(sentTo)} verified</span>
+                <h2>Complete your profile</h2>
+                <p>Just a few details to create your account.</p>
+              </header>
+              <label className="auth-field">
+                <span>Full name <em>*</em></span>
+                <input value={fullName} onChange={(event) => setFullName(event.target.value)} autoComplete="name" placeholder="e.g. Ravi Kumar" required />
+              </label>
+              <label className="auth-field">
+                <span>Username <em>*</em></span>
+                <input value={username} onChange={(event) => setUsername(normalizeUsername(event.target.value))} autoComplete="username" placeholder="e.g. ravi.kumar" required />
+                <UsernameHint state={usernameState} />
+              </label>
+              <label className="auth-field">
+                <span>Email <small>(optional)</small></span>
+                <input type="email" value={email} onChange={(event) => setEmail(event.target.value.trim().toLowerCase())} autoComplete="email" placeholder="you@example.com" />
+              </label>
+              <div className="auth-field">
+                <span>I am a</span>
+                <RolePicker value={role} onChange={setRole} />
+              </div>
+              <button type="submit" className="primary-button auth2-submit" disabled={busy}>
+                {busy ? "Creating your account…" : "Create account"}
+              </button>
+            </form>
+          ) : null}
+
+          {step === "email" ? (
+            <form onSubmit={submitEmail} className="auth2-form">
+              <header>
+                <button type="button" className="auth2-back" onClick={() => go("phone")}>← Use mobile number</button>
+                <h2>{emailMode === "login" ? "Log in with email" : "Create your account"}</h2>
+              </header>
+              <div className="auth2-tabs" role="tablist">
+                {(["login", "signup"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="tab"
+                    aria-selected={emailMode === mode}
+                    className={emailMode === mode ? "is-active" : ""}
+                    onClick={() => {
+                      setEmailMode(mode);
+                      setError("");
+                      setNotice("");
+                    }}
+                  >
+                    {mode === "login" ? "Log in" : "Sign up"}
+                  </button>
+                ))}
+              </div>
+              {emailMode === "signup" ? (
+                <>
+                  <label className="auth-field">
+                    <span>Full name <em>*</em></span>
+                    <input value={fullName} onChange={(event) => setFullName(event.target.value)} autoComplete="name" placeholder="e.g. Ravi Kumar" required />
+                  </label>
+                  <label className="auth-field">
+                    <span>Username <em>*</em></span>
+                    <input value={username} onChange={(event) => setUsername(normalizeUsername(event.target.value))} autoComplete="username" placeholder="e.g. ravi.kumar" required />
+                    <UsernameHint state={usernameState} />
+                  </label>
+                </>
+              ) : null}
+              <label className="auth-field">
+                <span>Email {emailMode === "signup" ? <em>*</em> : null}</span>
+                <input type="email" value={email} onChange={(event) => setEmail(event.target.value.trim().toLowerCase())} autoComplete="email" placeholder="you@example.com" required />
+              </label>
+              {emailMode === "signup" ? phoneField("Mobile number *") : null}
+              {passwordField(emailMode === "login" ? "current-password" : "new-password")}
+              {emailMode === "login" ? (
+                <button type="button" className="text-link-button auth2-forgot" onClick={() => go("forgot")}>Forgot password?</button>
+              ) : (
+                <>
+                  <div className="auth-field">
+                    <span>I am a</span>
+                    <RolePicker value={role} onChange={setRole} />
+                  </div>
+                  <label className="auth-field">
+                    <span>Referral code <small>(optional)</small></span>
+                    <input value={referralCode} onChange={(event) => setReferralCode(event.target.value.trim().toUpperCase())} placeholder="e.g. ME-ABC123" />
+                  </label>
+                </>
+              )}
+              <button type="submit" className="primary-button auth2-submit" disabled={busy}>
+                {busy ? "Please wait…" : emailMode === "login" ? "Log in" : "Create account"}
+              </button>
+            </form>
+          ) : null}
+
+          {step === "forgot" ? (
+            <form onSubmit={sendReset} className="auth2-form">
+              <header>
+                <button type="button" className="auth2-back" onClick={() => go("email")}>← Back to log in</button>
+                <h2>Reset your password</h2>
+                <p>We will email you a link to set a new password.</p>
+              </header>
+              <label className="auth-field">
+                <span>Email</span>
+                <input type="email" value={email} onChange={(event) => setEmail(event.target.value.trim().toLowerCase())} autoComplete="email" required />
+              </label>
+              <button type="submit" className="primary-button auth2-submit" disabled={busy}>{busy ? "Sending…" : "Send reset link"}</button>
+            </form>
+          ) : null}
+
+          {step === "reset" ? (
+            <form onSubmit={saveNewPassword} className="auth2-form">
+              <header>
+                <h2>Set a new password</h2>
+                <p>Choose a password you have not used here before.</p>
+              </header>
+              {passwordField("new-password", "New password")}
+              <button type="submit" className="primary-button auth2-submit" disabled={busy}>{busy ? "Saving…" : "Save password"}</button>
+            </form>
+          ) : null}
+
+          {error ? <p className="notice error" role="alert">{error}</p> : null}
+          {notice ? <p className="notice success" role="status">{notice}</p> : null}
+
+          <p className="auth2-legal">By continuing you agree to Mahalaxmi Electricals&apos; terms and privacy policy.</p>
         </div>
       </section>
     </main>

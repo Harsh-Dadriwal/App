@@ -6,7 +6,7 @@ import {
   Logger,
   ServiceUnavailableException
 } from "@nestjs/common";
-import { createHash, randomInt, timingSafeEqual } from "crypto";
+import { createHash, createHmac, randomInt, timingSafeEqual } from "crypto";
 import { SupabaseAdminService } from "../../common/supabase/supabase-admin.service";
 import { TextBeeSmsService } from "./textbee-sms.service";
 
@@ -19,6 +19,8 @@ const SIGNUP_ROLES = ["customer", "electrician", "architect"];
 const PHONE_LOGIN_EMAIL_DOMAIN = "phone.mahalaxmi-electricals.app";
 
 const CODE_TTL_MS = 5 * 60 * 1000;
+/** How long a new user has to fill in the profile step after verifying their number. */
+const SIGNUP_TOKEN_TTL_MS = 15 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 45 * 1000;
 const MAX_VERIFY_ATTEMPTS = 5;
 const MAX_SENDS_PER_NUMBER_PER_DAY = 5;
@@ -129,20 +131,116 @@ export class PhoneAuthService {
 
     // One use only.
     await db.from("phone_otp_codes").delete().eq("phone", phone);
-    return this.signInVerifiedPhone(phone, signup);
+
+    const digits = phone.replace(/[^0-9]/g, "");
+    const existing = await this.findAccount(digits);
+    if (existing) {
+      return { status: "signed_in" as const, isNewUser: false, session: await this.issueSession(existing.authUserId, digits, existing.profileId) };
+    }
+
+    // Older app versions send their sign-up details together with the code.
+    const profile = signup ? this.parseProfile(signup, { lenient: true }) : null;
+    if (profile) {
+      return { status: "signed_in" as const, isNewUser: true, session: await this.createAccountAndSignIn(digits, profile) };
+    }
+
+    // New number: no account yet. The app asks for name, username and email, then calls
+    // completeSignup with this short-lived proof that the number was verified.
+    return { status: "needs_profile" as const, phone, signupToken: this.makeSignupToken(phone) };
   }
 
-  /**
-   * Returns a real Supabase session for a verified phone number, creating the account on
-   * first sign-in. Supabase issues the session itself: the API asks for a one-time
-   * magic-link token for the user's email and redeems it straight away, so no email is sent
-   * and no JWT secret is needed. Phone-only accounts get an internal placeholder address for
-   * this, which is kept off their visible profile.
-   */
-  async signInVerifiedPhone(phone: string, signup?: SignupProfile) {
+  /** Creates the account for a number verified moments ago (see verifyCode) and signs in. */
+  async completeSignup(signupToken: unknown, rawProfile: unknown) {
+    const phone = this.readSignupToken(signupToken);
     const digits = phone.replace(/[^0-9]/g, "");
-    const admin = this.supabaseAdmin.getClient();
 
+    const existing = await this.findAccount(digits);
+    if (existing) {
+      return { status: "signed_in" as const, isNewUser: false, session: await this.issueSession(existing.authUserId, digits, existing.profileId) };
+    }
+
+    const profile = this.parseProfile(rawProfile, { lenient: false })!;
+    const availability = await this.checkAvailability({ username: profile.username, email: profile.email ?? undefined });
+    if (!availability.username.available) throw new BadRequestException("This username is already taken. Please choose another one.");
+    if (profile.email && !availability.email.available) throw new BadRequestException("This email is already linked to another account. Log in with it instead.");
+
+    return { status: "signed_in" as const, isNewUser: true, session: await this.createAccountAndSignIn(digits, profile) };
+  }
+
+  /** Whether a username, email or phone number is free, for sign-up forms. */
+  async checkAvailability(values: { username?: unknown; email?: unknown; phone?: unknown }) {
+    const db = this.supabaseAdmin.getClient();
+    const username = cleanText(values.username, 24).toLowerCase();
+    const email = cleanText(values.email, 255).toLowerCase();
+    const phone = toE164(values.phone);
+    const isTaken = async (column: string, candidates: string[]) => {
+      if (!candidates.length) return false;
+      const query = column === "phone"
+        ? db.from("users").select("id").in("phone", candidates).limit(1)
+        : db.from("users").select("id").ilike(column, candidates[0]).limit(1);
+      const result = await query;
+      if (result.error) throw new Error(result.error.message);
+      return Boolean(result.data?.length);
+    };
+    const phoneDigits = phone ? phone.slice(1) : "";
+    const [usernameTaken, emailTaken, phoneTaken] = await Promise.all([
+      isTaken("username", username ? [username] : []),
+      isTaken("email", email ? [email] : []),
+      isTaken("phone", phone ? [phone, phoneDigits] : [])
+    ]);
+    return {
+      username: { available: !usernameTaken },
+      email: { available: !emailTaken },
+      phone: { available: !phoneTaken }
+    };
+  }
+
+  private makeSignupToken(phone: string) {
+    const body = Buffer.from(JSON.stringify({ phone, exp: Date.now() + SIGNUP_TOKEN_TTL_MS })).toString("base64url");
+    return `${body}.${this.sign(body)}`;
+  }
+
+  private readSignupToken(token: unknown) {
+    const [body, signature] = typeof token === "string" ? token.split(".") : [];
+    const expected = body ? this.sign(body) : "";
+    const valid =
+      Boolean(body && signature) &&
+      signature.length === expected.length &&
+      timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+    const payload = valid ? (JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as { phone?: string; exp?: number }) : null;
+    if (!payload?.phone || !payload.exp || payload.exp < Date.now()) {
+      throw new BadRequestException("Your verification has expired. Please verify your number again.");
+    }
+    return payload.phone;
+  }
+
+  private sign(value: string) {
+    const secret = process.env.OTP_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+    return createHmac("sha256", secret).update(`signup:${value}`).digest("base64url");
+  }
+
+  /** Name and username are required; email is optional; role defaults to customer. */
+  private parseProfile(raw: unknown, options: { lenient: boolean }) {
+    const source = (raw && typeof raw === "object" ? raw : {}) as SignupProfile & { email?: unknown };
+    const fullName = cleanText(source.full_name, 150);
+    const username = cleanText(source.username, 24).toLowerCase().replace(/[^a-z0-9._]/g, "");
+    const email = cleanText(source.email, 255).toLowerCase();
+    const role = SIGNUP_ROLES.includes(String(source.role)) ? String(source.role) : "customer";
+
+    const problem =
+      fullName.length < 2 ? "Enter your full name."
+        : username.length < 3 ? "Choose a username with at least 3 letters or numbers."
+          : email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? "Enter a valid email address, or leave it empty."
+            : null;
+    if (problem) {
+      if (options.lenient) return null;
+      throw new BadRequestException(problem);
+    }
+    return { fullName, username, email: email || null, role };
+  }
+
+  private async findAccount(digits: string) {
+    const admin = this.supabaseAdmin.getClient();
     // Profiles may store the number with or without "+"; Supabase Auth stores it without.
     const profileLookup = await admin
       .from("users")
@@ -154,28 +252,42 @@ export class PhoneAuthService {
       throw new BadRequestException("We could not sign you in right now. Please try again.");
     }
     const profile = profileLookup.data as { id: string; auth_user_id: string | null } | null;
+    const authUserId = profile?.auth_user_id ?? (await this.findAuthUserIdByPhone(digits));
+    return authUserId ? { authUserId, profileId: profile && !profile.auth_user_id ? profile.id : null } : null;
+  }
 
-    let authUserId = profile?.auth_user_id ?? (await this.findAuthUserIdByPhone(digits));
-    let isNewUser = false;
-
-    if (!authUserId) {
-      const role = SIGNUP_ROLES.includes(String(signup?.role)) ? String(signup?.role) : "customer";
-      const fullName = cleanText(signup?.full_name, 150) || `Customer ${digits.slice(-4)}`;
-      const username = cleanText(signup?.username, 24).toLowerCase().replace(/[^a-z0-9._]/g, "");
-      const created = await admin.auth.admin.createUser({
-        phone: digits,
-        phone_confirm: true,
-        user_metadata: { role, full_name: fullName, phone: `+${digits}`, ...(username ? { username } : {}) }
-      });
-      if (created.error || !created.data.user) {
-        throw new BadRequestException("We could not create your account right now. Please try again.");
-      }
-      authUserId = created.data.user.id;
-      isNewUser = true;
+  private async createAccountAndSignIn(
+    digits: string,
+    profile: { fullName: string; username: string; email: string | null; role: string }
+  ) {
+    const admin = this.supabaseAdmin.getClient();
+    const created = await admin.auth.admin.createUser({
+      phone: digits,
+      phone_confirm: true,
+      user_metadata: { role: profile.role, full_name: profile.fullName, username: profile.username, phone: `+${digits}` }
+    });
+    if (created.error || !created.data.user) {
+      throw new BadRequestException("We could not create your account right now. Please try again.");
     }
+    const authUserId = created.data.user.id;
+    // The contact email lives on the profile; the login itself is by phone.
+    if (profile.email) {
+      await admin.from("users").update({ email: profile.email }).eq("auth_user_id", authUserId);
+    }
+    return this.issueSession(authUserId, digits, null);
+  }
 
-    if (profile && !profile.auth_user_id) {
-      const linked = await admin.from("users").update({ auth_user_id: authUserId }).eq("id", profile.id);
+  /**
+   * Returns a real Supabase session for an account. Supabase issues it itself: the API asks
+   * for a one-time magic-link token for the login email and redeems it straight away, so no
+   * email is sent and no JWT secret is needed. Phone-only logins get an internal placeholder
+   * address for this, which never appears on the profile (see sync_auth_user_profile).
+   */
+  private async issueSession(authUserId: string, digits: string, unlinkedProfileId: string | null) {
+    const admin = this.supabaseAdmin.getClient();
+
+    if (unlinkedProfileId) {
+      const linked = await admin.from("users").update({ auth_user_id: authUserId }).eq("id", unlinkedProfileId);
       if (linked.error) {
         throw new BadRequestException("We could not sign you in right now. Please try again.");
       }
@@ -189,12 +301,13 @@ export class PhoneAuthService {
     let email = authUser.data.user.email ?? "";
     if (!email) {
       email = `${digits}@${PHONE_LOGIN_EMAIL_DOMAIN}`;
+      const contactEmail = await admin.from("users").select("email").eq("auth_user_id", authUserId).maybeSingle();
       const updated = await admin.auth.admin.updateUserById(authUserId, { email, email_confirm: true });
       if (updated.error) {
         throw new BadRequestException("We could not sign you in right now. Please try again.");
       }
-      // The auth -> profile sync trigger copies email changes; keep the placeholder off the profile.
-      await admin.from("users").update({ email: null }).eq("auth_user_id", authUserId).eq("email", email);
+      // Restore the profile's own contact email if the sync trigger replaced it.
+      await admin.from("users").update({ email: contactEmail.data?.email ?? null }).eq("auth_user_id", authUserId).eq("email", email);
     }
 
     const link = await admin.auth.admin.generateLink({ type: "magiclink", email });
@@ -210,15 +323,12 @@ export class PhoneAuthService {
     }
 
     return {
-      isNewUser,
-      session: {
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-        token_type: session.token_type,
-        expires_in: session.expires_in,
-        expires_at: session.expires_at,
-        user: { id: session.user.id, phone: `+${digits}` }
-      }
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+      token_type: session.token_type,
+      expires_in: session.expires_in,
+      expires_at: session.expires_at,
+      user: { id: session.user.id, phone: `+${digits}` }
     };
   }
 

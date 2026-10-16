@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Image,
   KeyboardAvoidingView,
@@ -8,26 +8,30 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppButton, Field, Notice } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
-import { sendPhoneOtp, verifyPhoneOtp } from "@/lib/backend/auth-gateway";
 import { palette, radii, shadow } from "@/lib/theme";
-import { roleLabels, type AppRole } from "@mahalaxmi/core/types/domain";
+import {
+  checkSignupAvailability,
+  completePhoneSignup,
+  sendPhoneOtp,
+  verifyPhoneOtp
+} from "@/lib/backend/auth-gateway";
 import { useAuth } from "@/providers/auth-provider";
 import { useMobileNavigation } from "@/providers/navigation-provider";
 
-type AuthMode = "login" | "signup";
-type LoginMethod = "email" | "phone";
-// Phone codes are texted by the API through TextBee, so phone login works in every build.
-const PHONE_LOGIN = true;
+type Step = "phone" | "otp" | "profile" | "email" | "forgot";
+type EmailMode = "login" | "signup";
+type SignupRole = "customer" | "electrician" | "architect";
 
-const ROLE_OPTIONS: Array<{ role: AppRole; icon: keyof typeof Feather.glyphMap; description: string }> = [
-  { role: "customer", icon: "home", description: "Buy materials, raise complaints and installation requests" },
-  { role: "electrician", icon: "zap", description: "Take jobs, order materials and earn rewards" },
-  { role: "architect", icon: "pen-tool", description: "Plan lighting and review material for your sites" }
+const ROLES: Array<{ id: SignupRole; title: string; text: string; icon: keyof typeof Feather.glyphMap }> = [
+  { id: "customer", title: "Customer", text: "Buy materials, raise complaints and installations", icon: "home" },
+  { id: "electrician", title: "Electrician", text: "Take jobs, order for sites and earn rewards", icon: "zap" },
+  { id: "architect", title: "Architect", text: "Plan lighting and review site materials", icon: "pen-tool" }
 ];
 
 // Optional: the web app's address, so password-reset and confirmation emails open its /auth page.
@@ -37,15 +41,7 @@ function normalizeUsername(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9._]/g, "").slice(0, 24);
 }
 
-function normalizeEmail(value: string) {
-  return value.trim().toLowerCase();
-}
-
-function normalizePhone(value: string) {
-  return value.replace(/[^0-9+]/g, "");
-}
-
-/** Accepts 10-digit Indian numbers without a country code. */
+/** "+919876543210" from a 10-digit Indian mobile number or an already-international one. */
 function toE164(value: string) {
   const digits = value.replace(/[^0-9+]/g, "");
   if (digits.startsWith("+")) return digits;
@@ -53,429 +49,493 @@ function toE164(value: string) {
   return digits;
 }
 
+function isValidMobile(value: string) {
+  return /^\+[1-9][0-9]{7,14}$/.test(toE164(value));
+}
+
+function prettyPhone(e164: string) {
+  const match = e164.match(/^\+91(\d{5})(\d{5})$/);
+  return match ? `+91 ${match[1]} ${match[2]}` : e164;
+}
+
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function mapAuthErrorMessage(error: unknown) {
-  const message = error instanceof Error ? error.message : "Unable to continue.";
+function friendlyError(error: unknown) {
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "Something went wrong. Please try again.";
   const lower = message.toLowerCase();
-
-  if (lower.includes("invalid login credentials")) {
-    return "That email and password don't match. Check them and try again.";
-  }
-  if (lower.includes("email not confirmed")) {
-    return "Please confirm your email first. Open the link we sent you, then log in.";
-  }
-  if (lower.includes("database error saving new user")) {
-    return "We could not finish creating your account. Please try again or contact support.";
-  }
-  if (lower.includes("error sending confirmation email") || message.includes("535 5.7.8")) {
-    return "We could not send the confirmation email right now. Please try again shortly or contact support.";
-  }
-  if (lower.includes("user already registered")) {
-    return "This email is already registered. Log in instead or use another email address.";
-  }
-  if (lower.includes("password should be at least")) {
-    return "Use a password with at least 6 characters.";
-  }
-  if (lower.includes("rate limit") || lower.includes("too many")) {
-    return "Too many attempts. Please wait a minute and try again.";
-  }
-  if (lower.includes("network request failed") || lower.includes("failed to fetch")) {
-    return "No internet connection. Check your network and try again.";
-  }
+  if (lower.includes("invalid login credentials")) return "That email and password don't match.";
+  if (lower.includes("email not confirmed")) return "Please confirm your email first. Open the link we sent you, then log in.";
+  if (lower.includes("user already registered")) return "This email already has an account. Log in instead.";
+  if (lower.includes("password should be at least")) return "Use a password with at least 6 characters.";
+  if (lower.includes("network request failed") || lower.includes("failed to fetch")) return "No internet connection. Check your network and try again.";
   return message;
+}
+
+/**
+ * The SMS code as six boxes. One real input holds all six digits, so typing, backspace,
+ * paste and Android/iOS SMS-code autofill all work without moving focus between boxes.
+ */
+function OtpBoxes({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const inputRef = useRef<TextInput>(null);
+  const [focused, setFocused] = useState(true);
+  const active = Math.min(value.length, 5);
+  return (
+    <Pressable onPress={() => inputRef.current?.focus()} style={styles.otpRow} accessibilityLabel="6-digit code">
+      {Array.from({ length: 6 }, (_, index) => {
+        const filled = Boolean(value[index]);
+        const isActive = focused && index === active;
+        return (
+          <View key={index} style={[styles.otpBox, filled && styles.otpBoxFilled, isActive && styles.otpBoxActive]}>
+            <Text style={styles.otpDigit}>{value[index] ?? (isActive ? "|" : "")}</Text>
+          </View>
+        );
+      })}
+      <TextInput
+        ref={inputRef}
+        value={value}
+        onChangeText={(text) => onChange(text.replace(/\D/g, "").slice(0, 6))}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        keyboardType="number-pad"
+        textContentType="oneTimeCode"
+        autoComplete="sms-otp"
+        maxLength={6}
+        autoFocus
+        caretHidden
+        style={styles.otpHiddenInput}
+      />
+    </Pressable>
+  );
+}
+
+function RolePicker({ value, onChange }: { value: SignupRole; onChange: (role: SignupRole) => void }) {
+  return (
+    <View style={{ gap: 10 }}>
+      <Text style={styles.groupLabel}>I am a</Text>
+      {ROLES.map((option) => {
+        const active = value === option.id;
+        return (
+          <Pressable
+            key={option.id}
+            style={[styles.roleCard, active && styles.roleCardActive]}
+            onPress={() => onChange(option.id)}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: active }}
+          >
+            <View style={[styles.roleIcon, active && styles.roleIconActive]}>
+              <Feather name={option.icon} size={18} color={active ? "#ffffff" : palette.brand} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.roleTitle}>{option.title}</Text>
+              <Text style={styles.roleText}>{option.text}</Text>
+            </View>
+            <Feather name={active ? "check-circle" : "circle"} size={20} color={active ? palette.brand : palette.lineStrong} />
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Live "is this username free?" hint, checked after the user stops typing. */
+function useUsernameCheck(username: string) {
+  const [state, setState] = useState<"idle" | "checking" | "free" | "taken">("idle");
+  useEffect(() => {
+    if (username.length < 3) {
+      setState("idle");
+      return;
+    }
+    setState("checking");
+    const timer = setTimeout(async () => {
+      const result = await checkSignupAvailability({ username });
+      setState(result.data ? (result.data.username.available ? "free" : "taken") : "idle");
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [username]);
+  return state;
+}
+
+function usernameHint(state: ReturnType<typeof useUsernameCheck>) {
+  if (state === "checking") return "Checking…";
+  if (state === "free") return "✓ Available";
+  if (state === "taken") return "Already taken — try another";
+  return "Letters, numbers, dots and underscores";
+}
+
+function PhoneInput({ value, onChange, label }: { value: string; onChange: (value: string) => void; label: string }) {
+  return (
+    <View style={{ gap: 7 }}>
+      <Text style={styles.groupLabel}>{label}</Text>
+      <View style={styles.phoneShell}>
+        <Text style={styles.phonePrefix}>🇮🇳 +91</Text>
+        <TextInput
+          value={value}
+          onChangeText={(text) => onChange(text.replace(/[^0-9+ ]/g, ""))}
+          keyboardType="phone-pad"
+          textContentType="telephoneNumber"
+          autoComplete="tel"
+          placeholder="98765 43210"
+          placeholderTextColor="#a89c8d"
+          maxLength={16}
+          style={styles.phoneInput}
+          accessibilityLabel={label}
+        />
+      </View>
+    </View>
+  );
 }
 
 export function AuthScreen() {
   const { replace } = useMobileNavigation();
   const { session, errorMessage: profileError, signOut } = useAuth();
-  const [authMode, setAuthMode] = useState<AuthMode>("login");
-  const [role, setRole] = useState<AppRole>("customer");
+  const [step, setStep] = useState<Step>("phone");
+  const [emailMode, setEmailMode] = useState<EmailMode>("login");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const [phone, setPhone] = useState("");
+  const [sentTo, setSentTo] = useState("");
+  const [code, setCode] = useState("");
+  const [resendIn, setResendIn] = useState(0);
+  const [signupToken, setSignupToken] = useState("");
+
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [notice, setNotice] = useState("");
-  const [canResend, setCanResend] = useState(false);
-  const [loginMethod, setLoginMethod] = useState<LoginMethod>("email");
-  const [code, setCode] = useState("");
-  /** The number a code was sent to; the code field shows once this is set. */
-  const [verification, setVerification] = useState<string | null>(null);
+  const [role, setRole] = useState<SignupRole>("customer");
+  const usernameState = useUsernameCheck(step === "profile" || (step === "email" && emailMode === "signup") ? username : "");
 
-  async function handleSendCode() {
-    setErrorMessage("");
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = setTimeout(() => setResendIn((seconds) => seconds - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendIn]);
+
+  function go(next: Step) {
+    setError("");
     setNotice("");
-    if (authMode === "signup" && (!fullName.trim() || !username)) {
-      setErrorMessage("Add your full name and a username.");
-      return;
-    }
-    const number = toE164(phone);
-    if (!/^\+[1-9][0-9]{7,14}$/.test(number)) {
-      setErrorMessage("Enter your mobile number, e.g. 98765 43210 or +91 98765 43210.");
-      return;
-    }
+    setStep(next);
+  }
+
+  async function run(task: () => Promise<void>) {
     setBusy(true);
+    setError("");
+    setNotice("");
     try {
-      const result = await sendPhoneOtp(number);
+      await task();
+    } catch (caught) {
+      setError(friendlyError(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function storeSession(next: { access_token: string; refresh_token: string }) {
+    if (!supabase) throw new Error("Sign-in is not available right now. Please try again shortly.");
+    const { error: sessionError } = await supabase.auth.setSession(next);
+    if (sessionError) throw sessionError;
+    replace("dashboard");
+  }
+
+  function sendCode() {
+    if (!isValidMobile(phone)) {
+      setError("Enter a valid 10-digit mobile number.");
+      return;
+    }
+    void run(async () => {
+      const result = await sendPhoneOtp(toE164(phone));
       if (result.error) throw new Error(result.error);
-      setVerification(result.data?.phone ?? number);
+      setSentTo(result.data?.phone ?? toE164(phone));
+      setResendIn(result.data?.resendInSeconds ?? 45);
       setCode("");
-      setNotice(`We sent a 6-digit code to ${result.data?.phone ?? number}. It expires in 5 minutes.`);
-    } catch (error) {
-      setErrorMessage(mapAuthErrorMessage(error));
-    } finally {
-      setBusy(false);
-    }
+      setStep("otp");
+    });
   }
 
-  async function handleVerifyCode() {
-    if (!supabase || !verification) return;
-    setErrorMessage("");
-    if (!/^[0-9]{6}$/.test(code)) {
-      setErrorMessage("Enter the 6-digit code from the SMS.");
-      return;
-    }
-    setBusy(true);
-    try {
-      // Name, username and role are only used if this number has no account yet.
-      const result = await verifyPhoneOtp(
-        verification,
-        code,
-        authMode === "signup" ? { full_name: fullName.trim(), username, role } : undefined
-      );
-      const session = result.data?.session;
-      if (result.error || !session?.access_token) {
-        throw new Error(result.error ?? "We could not sign you in right now. Please try again.");
+  function verifyCode(value = code) {
+    if (value.length !== 6) return;
+    void run(async () => {
+      const result = await verifyPhoneOtp(sentTo, value);
+      if (result.error || !result.data) throw new Error(result.error ?? "We could not check the code. Please try again.");
+      if (result.data.status === "needs_profile") {
+        setSignupToken(result.data.signupToken);
+        setStep("profile");
+        return;
       }
-      const { error } = await supabase.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token
+      await storeSession(result.data.session);
+    });
+  }
+
+  function completeProfile() {
+    if (fullName.trim().length < 2) return setError("Enter your full name.");
+    if (username.length < 3) return setError("Choose a username with at least 3 characters.");
+    if (usernameState === "taken") return setError("This username is already taken. Please choose another one.");
+    if (email && !isValidEmail(email)) return setError("Enter a valid email address, or leave it empty.");
+    void run(async () => {
+      const result = await completePhoneSignup(signupToken, { full_name: fullName.trim(), username, email: email || undefined, role });
+      if (result.error || !result.data) throw new Error(result.error ?? "We could not create your account. Please try again.");
+      await storeSession(result.data.session);
+    });
+  }
+
+  function submitEmail() {
+    void run(async () => {
+      if (!supabase) throw new Error("Sign-in is not available right now. Please try again shortly.");
+      if (!isValidEmail(email)) throw new Error("Enter a valid email address.");
+
+      if (emailMode === "login") {
+        const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+        if (loginError) throw loginError;
+        replace("dashboard");
+        return;
+      }
+
+      if (fullName.trim().length < 2) throw new Error("Enter your full name.");
+      if (username.length < 3) throw new Error("Choose a username with at least 3 characters.");
+      if (!isValidMobile(phone)) throw new Error("Enter a valid 10-digit mobile number.");
+      if (password.length < 6) throw new Error("Use a password with at least 6 characters.");
+
+      const mobile = toE164(phone);
+      const availability = await checkSignupAvailability({ username, email, phone: mobile });
+      if (availability.data) {
+        if (!availability.data.username.available) throw new Error("This username is already taken. Please choose another one.");
+        if (!availability.data.email.available) throw new Error("This email already has an account. Log in instead.");
+        if (!availability.data.phone.available) throw new Error("This mobile number already has an account. Continue with your phone number instead.");
+      }
+
+      const { data, error: signupError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: fullName.trim(), username, role, phone: mobile },
+          ...(WEB_APP_URL ? { emailRedirectTo: `${WEB_APP_URL}/auth` } : {})
+        }
       });
-      if (error) throw error;
-      setVerification(null);
-      replace("dashboard");
-    } catch (error) {
-      setErrorMessage(mapAuthErrorMessage(error));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function switchMode(next: AuthMode) {
-    setAuthMode(next);
-    setVerification(null);
-    setErrorMessage("");
-    setNotice("");
-    setCanResend(false);
-  }
-
-  async function handleSubmit() {
-    if (!supabase) return;
-    setErrorMessage("");
-    setNotice("");
-    setCanResend(false);
-
-    if (!isValidEmail(email)) {
-      setErrorMessage("Enter a valid email address.");
-      return;
-    }
-    if (password.length < 6) {
-      setErrorMessage("Use a password with at least 6 characters.");
-      return;
-    }
-    if (authMode === "signup" && (!fullName.trim() || !username)) {
-      setErrorMessage("Add your full name and a username.");
-      return;
-    }
-
-    setBusy(true);
-    try {
-      if (authMode === "signup") {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: fullName.trim(), username, role, phone },
-            ...(WEB_APP_URL ? { emailRedirectTo: `${WEB_APP_URL}/auth` } : {})
-          }
-        });
-        if (error) throw error;
-
-        if (!data.session) {
-          // Email confirmation is required before the first login.
-          setAuthMode("login");
-          setPassword("");
-          setCanResend(true);
-          setNotice(`Account created. We sent a confirmation link to ${email}. Open it, then come back and log in.`);
-          return;
-        }
+      if (signupError) throw signupError;
+      if (data.session) {
         replace("dashboard");
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) {
-          if (error.message.toLowerCase().includes("email not confirmed")) setCanResend(true);
-          throw error;
-        }
-        replace("dashboard");
+        return;
       }
-    } catch (error) {
-      setErrorMessage(mapAuthErrorMessage(error));
-    } finally {
-      setBusy(false);
-    }
+      setEmailMode("login");
+      setPassword("");
+      setNotice(`Account created. We sent a confirmation link to ${email}. Open it, then log in.`);
+    });
   }
 
-  async function handleForgotPassword() {
-    if (!supabase) return;
-    setErrorMessage("");
-    setNotice("");
-    if (!isValidEmail(email)) {
-      setErrorMessage("Enter your email above, then tap Forgot password again.");
-      return;
-    }
-    setBusy(true);
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(
+  function sendReset() {
+    if (!isValidEmail(email)) return setError("Enter your email address.");
+    void run(async () => {
+      if (!supabase) return;
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         email,
         WEB_APP_URL ? { redirectTo: `${WEB_APP_URL}/auth?reset=true` } : undefined
       );
-      if (error) throw error;
-      setNotice(`If ${email} has an account, a password reset link is on its way.`);
-    } catch (error) {
-      setErrorMessage(mapAuthErrorMessage(error));
-    } finally {
-      setBusy(false);
-    }
+      if (resetError) throw resetError;
+      setNotice(`If ${email} has an account, a reset link is on its way.`);
+    });
   }
 
-  async function handleResend() {
-    if (!supabase || !isValidEmail(email)) return;
-    setBusy(true);
-    setErrorMessage("");
-    try {
-      const { error } = await supabase.auth.resend({ type: "signup", email });
-      if (error) throw error;
-      setNotice(`We sent a new confirmation link to ${email}.`);
-    } catch (error) {
-      setErrorMessage(mapAuthErrorMessage(error));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const isSignup = authMode === "signup";
-  const usePhone = PHONE_LOGIN && loginMethod === "phone";
+  const backLink = (label: string, target: Step) => (
+    <Pressable onPress={() => go(target)} hitSlop={10} style={styles.backLink} accessibilityRole="button">
+      <Feather name="arrow-left" size={16} color={palette.muted} />
+      <Text style={styles.backText}>{label}</Text>
+    </Pressable>
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right", "bottom"]}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={styles.brandPanel}>
-            <View style={styles.glowLarge} />
-            <View style={styles.glowSmall} />
-            <Image source={require("../../assets/splash-icon.png")} style={styles.logo} accessibilityIgnoresInvertColors />
+            <View style={styles.glow} />
+            <Image source={require("../../assets/splash-icon.png")} style={styles.logo} />
             <Text style={styles.brandName}>Mahalaxmi Electricals</Text>
-            <Text style={styles.brandTagline}>
-              {isSignup ? "Create your account in under a minute." : "Welcome back. Log in to continue."}
-            </Text>
+            <Text style={styles.brandTagline}>Everything electrical, one app.</Text>
           </View>
 
           <View style={styles.sheet}>
-            <View style={styles.segment} accessibilityRole="tablist">
-              {(["login", "signup"] as const).map((mode) => {
-                const active = authMode === mode;
-                return (
-                  <Pressable
-                    key={mode}
-                    style={[styles.segmentButton, active && styles.segmentButtonActive]}
-                    onPress={() => switchMode(mode)}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: active }}
-                  >
-                    <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
-                      {mode === "login" ? "Log in" : "Sign up"}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
             {session && profileError ? (
-              <View style={styles.block}>
-                <Notice message={`${profileError} Please check your connection, or sign out and log in again.`} tone="error" />
+              <View style={{ gap: 10 }}>
+                <Notice message={`${profileError} Please check your connection, or sign out and try again.`} tone="error" />
                 <AppButton label="Sign out" kind="secondary" icon="log-out" onPress={() => void signOut()} />
               </View>
             ) : null}
 
-            {isSignup ? (
+            {step === "phone" ? (
               <View style={styles.block}>
-                <Text style={styles.groupLabel}>I am a</Text>
-                {ROLE_OPTIONS.map((option) => {
-                  const active = role === option.role;
-                  return (
-                    <Pressable
-                      key={option.role}
-                      style={[styles.roleCard, active && styles.roleCardActive]}
-                      onPress={() => setRole(option.role)}
-                      accessibilityRole="radio"
-                      accessibilityState={{ checked: active }}
-                    >
-                      <View style={[styles.roleIcon, active && styles.roleIconActive]}>
-                        <Feather name={option.icon} size={18} color={active ? "#ffffff" : palette.brand} />
-                      </View>
-                      <View style={styles.flex}>
-                        <Text style={styles.roleTitle}>{roleLabels[option.role]}</Text>
-                        <Text style={styles.roleDescription}>{option.description}</Text>
-                      </View>
-                      <Feather name={active ? "check-circle" : "circle"} size={20} color={active ? palette.brand : palette.lineStrong} />
-                    </Pressable>
-                  );
-                })}
-                <Field label="Full name" value={fullName} onChangeText={setFullName} icon="user" autoComplete="name" placeholder="Your name" />
+                <Text style={styles.title}>Log in or sign up</Text>
+                <Text style={styles.subtitle}>Enter your mobile number. We will text you a 6-digit code.</Text>
+                <PhoneInput value={phone} onChange={setPhone} label="Mobile number" />
+                <AppButton label="Continue" icon="arrow-right" loading={busy} onPress={sendCode} />
+                <View style={styles.divider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>or</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+                <AppButton label="Continue with email" icon="mail" kind="secondary" onPress={() => go("email")} />
+              </View>
+            ) : null}
+
+            {step === "otp" ? (
+              <View style={styles.block}>
+                {backLink("Back", "phone")}
+                <Text style={styles.title}>Enter the code</Text>
+                <Text style={styles.subtitle}>
+                  Sent by SMS to <Text style={styles.strong}>{prettyPhone(sentTo)}</Text>
+                  {"  "}
+                  <Text style={styles.link} onPress={() => go("phone")}>Change</Text>
+                </Text>
+                <OtpBoxes
+                  value={code}
+                  onChange={(next) => {
+                    setCode(next);
+                    if (next.length === 6) verifyCode(next);
+                  }}
+                />
+                <AppButton label="Verify" icon="check" loading={busy} disabled={code.length !== 6} onPress={() => verifyCode()} />
+                <Text style={styles.resend}>
+                  {resendIn > 0 ? (
+                    <>Resend code in <Text style={styles.strong}>0:{String(resendIn).padStart(2, "0")}</Text></>
+                  ) : (
+                    <Text style={styles.link} onPress={busy ? undefined : sendCode}>Resend code</Text>
+                  )}
+                </Text>
+              </View>
+            ) : null}
+
+            {step === "profile" ? (
+              <View style={styles.block}>
+                <View style={styles.verifiedBadge}>
+                  <Feather name="check-circle" size={14} color={palette.success} />
+                  <Text style={styles.verifiedText}>{prettyPhone(sentTo)} verified</Text>
+                </View>
+                <Text style={styles.title}>Complete your profile</Text>
+                <Text style={styles.subtitle}>Just a few details to create your account.</Text>
+                <Field label="Full name *" value={fullName} onChangeText={setFullName} icon="user" autoComplete="name" placeholder="e.g. Ravi Kumar" />
                 <Field
-                  label="Username"
+                  label="Username *"
                   value={username}
                   onChangeText={(value) => setUsername(normalizeUsername(value))}
                   icon="at-sign"
                   autoCapitalize="none"
                   placeholder="e.g. ravi.kumar"
+                  hint={usernameHint(usernameState)}
                 />
-              </View>
-            ) : null}
-
-            {PHONE_LOGIN ? (
-              <View style={styles.methodRow}>
-                {(["email", "phone"] as const).map((method) => {
-                  const active = loginMethod === method;
-                  return (
-                    <Pressable
-                      key={method}
-                      style={[styles.methodButton, active && styles.methodButtonActive]}
-                      onPress={() => {
-                        setLoginMethod(method);
-                        setErrorMessage("");
-                        setNotice("");
-                      }}
-                      accessibilityRole="radio"
-                      accessibilityState={{ checked: active }}
-                    >
-                      <Feather name={method === "email" ? "mail" : "smartphone"} size={15} color={active ? palette.brand : palette.muted} />
-                      <Text style={[styles.methodText, active && styles.methodTextActive]}>{method === "email" ? "Email" : "Phone"}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
-
-            {usePhone ? (
-              <View style={styles.block}>
                 <Field
-                  label="Mobile number"
-                  value={phone}
-                  onChangeText={(value) => {
-                    setPhone(normalizePhone(value));
-                    setVerification(null);
-                  }}
-                  placeholder="98765 43210"
-                  icon="smartphone"
-                  keyboardType="phone-pad"
-                  autoComplete="tel"
-                  hint={verification || isSignup ? undefined : "New number? We'll create a customer account for you."}
+                  label="Email (optional)"
+                  value={email}
+                  onChangeText={(value) => setEmail(value.trim().toLowerCase())}
+                  icon="mail"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  placeholder="you@example.com"
                 />
-                {verification ? (
+                <RolePicker value={role} onChange={setRole} />
+                <AppButton label="Create account" icon="user-plus" loading={busy} onPress={completeProfile} />
+              </View>
+            ) : null}
+
+            {step === "email" ? (
+              <View style={styles.block}>
+                {backLink("Use mobile number", "phone")}
+                <Text style={styles.title}>{emailMode === "login" ? "Log in with email" : "Create your account"}</Text>
+                <View style={styles.segment}>
+                  {(["login", "signup"] as const).map((mode) => {
+                    const active = emailMode === mode;
+                    return (
+                      <Pressable
+                        key={mode}
+                        style={[styles.segmentButton, active && styles.segmentButtonActive]}
+                        onPress={() => {
+                          setEmailMode(mode);
+                          setError("");
+                          setNotice("");
+                        }}
+                        accessibilityRole="tab"
+                        accessibilityState={{ selected: active }}
+                      >
+                        <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{mode === "login" ? "Log in" : "Sign up"}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {emailMode === "signup" ? (
                   <>
+                    <Field label="Full name *" value={fullName} onChangeText={setFullName} icon="user" autoComplete="name" placeholder="e.g. Ravi Kumar" />
                     <Field
-                      label="6-digit code"
-                      value={code}
-                      onChangeText={(value) => setCode(value.replace(/[^0-9]/g, "").slice(0, 6))}
-                      placeholder="123456"
-                      icon="key"
-                      keyboardType="number-pad"
-                      autoComplete="sms-otp"
+                      label="Username *"
+                      value={username}
+                      onChangeText={(value) => setUsername(normalizeUsername(value))}
+                      icon="at-sign"
+                      autoCapitalize="none"
+                      placeholder="e.g. ravi.kumar"
+                      hint={usernameHint(usernameState)}
                     />
-                    <Pressable onPress={() => void handleSendCode()} disabled={busy} style={styles.linkButton} hitSlop={8} accessibilityRole="button">
-                      <Text style={styles.linkText}>Resend code</Text>
-                    </Pressable>
                   </>
                 ) : null}
+                <Field
+                  label={emailMode === "signup" ? "Email *" : "Email"}
+                  value={email}
+                  onChangeText={(value) => setEmail(value.trim().toLowerCase())}
+                  icon="mail"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                />
+                {emailMode === "signup" ? <PhoneInput value={phone} onChange={setPhone} label="Mobile number *" /> : null}
+                <Field
+                  label={emailMode === "signup" ? "Password *" : "Password"}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                  icon="lock"
+                  placeholder={emailMode === "signup" ? "At least 6 characters" : "Your password"}
+                  autoComplete={emailMode === "signup" ? "new-password" : "current-password"}
+                />
+                {emailMode === "login" ? (
+                  <Pressable onPress={() => go("forgot")} style={{ alignSelf: "flex-end" }} hitSlop={8} accessibilityRole="button">
+                    <Text style={styles.link}>Forgot password?</Text>
+                  </Pressable>
+                ) : (
+                  <RolePicker value={role} onChange={setRole} />
+                )}
+                <AppButton
+                  label={emailMode === "login" ? "Log in" : "Create account"}
+                  icon={emailMode === "login" ? "log-in" : "user-plus"}
+                  loading={busy}
+                  onPress={submitEmail}
+                />
               </View>
-            ) : (
-            <View style={styles.block}>
+            ) : null}
+
+            {step === "forgot" ? (
+              <View style={styles.block}>
+                {backLink("Back to log in", "email")}
+                <Text style={styles.title}>Reset your password</Text>
+                <Text style={styles.subtitle}>We will email you a link to set a new password.</Text>
                 <Field
                   label="Email"
                   value={email}
-                  onChangeText={(value) => setEmail(normalizeEmail(value))}
-                  placeholder="you@example.com"
+                  onChangeText={(value) => setEmail(value.trim().toLowerCase())}
                   icon="mail"
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoComplete="email"
                 />
-                {isSignup ? (
-                  <Field
-                    label="Phone (optional)"
-                    value={phone}
-                    onChangeText={(value) => setPhone(normalizePhone(value))}
-                    placeholder="+91 98765 43210"
-                    icon="phone"
-                    keyboardType="phone-pad"
-                    autoComplete="tel"
-                  />
-                ) : null}
-                <Field
-                  label="Password"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                  icon="lock"
-                  placeholder={isSignup ? "At least 6 characters" : "Your password"}
-                  autoComplete={isSignup ? "new-password" : "current-password"}
-                />
-                {!isSignup ? (
-                  <Pressable onPress={() => void handleForgotPassword()} disabled={busy} style={styles.linkButton} hitSlop={8} accessibilityRole="button">
-                    <Text style={styles.linkText}>Forgot password?</Text>
-                  </Pressable>
-                ) : null}
+                <AppButton label="Send reset link" icon="send" loading={busy} onPress={sendReset} />
               </View>
-  
-            )}
-
-            {errorMessage ? <Notice message={errorMessage} tone="error" /> : null}
-            {notice ? <Notice message={notice} tone="success" /> : null}
-
-            {usePhone ? (
-              <AppButton
-                label={verification ? "Verify and log in" : "Send code"}
-                icon={verification ? "check" : "message-square"}
-                loading={busy}
-                onPress={() => void (verification ? handleVerifyCode() : handleSendCode())}
-              />
-            ) : (
-              <AppButton
-                label={isSignup ? "Create account" : "Log in"}
-                icon={isSignup ? "user-plus" : "log-in"}
-                loading={busy}
-                onPress={() => void handleSubmit()}
-              />
-            )}
-
-            {canResend ? (
-              <Pressable onPress={() => void handleResend()} disabled={busy} style={styles.centerLink} accessibilityRole="button">
-                <Text style={styles.linkText}>Didn&apos;t get the email? Send it again</Text>
-              </Pressable>
             ) : null}
 
-            <Pressable onPress={() => switchMode(isSignup ? "login" : "signup")} style={styles.centerLink} accessibilityRole="button">
-              <Text style={styles.switchText}>
-                {isSignup ? "Already have an account? " : "New here? "}
-                <Text style={styles.linkText}>{isSignup ? "Log in" : "Create an account"}</Text>
-              </Text>
-            </Pressable>
+            {error ? <Notice message={error} tone="error" /> : null}
+            {notice ? <Notice message={notice} tone="success" /> : null}
+
+            <Text style={styles.legal}>By continuing you agree to Mahalaxmi Electricals&apos; terms and privacy policy.</Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -485,16 +545,9 @@ export function AuthScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: palette.night },
-  flex: { flex: 1 },
   scroll: { flexGrow: 1 },
-  brandPanel: {
-    overflow: "hidden",
-    alignItems: "center",
-    paddingTop: 36,
-    paddingBottom: 56,
-    paddingHorizontal: 24
-  },
-  glowLarge: {
+  brandPanel: { overflow: "hidden", alignItems: "center", paddingTop: 28, paddingBottom: 48, paddingHorizontal: 24 },
+  glow: {
     position: "absolute",
     right: -80,
     top: -60,
@@ -503,47 +556,75 @@ const styles = StyleSheet.create({
     borderRadius: 130,
     backgroundColor: "rgba(194, 87, 12, 0.35)"
   },
-  glowSmall: {
-    position: "absolute",
-    left: -60,
-    bottom: -40,
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: "rgba(224, 163, 58, 0.12)"
-  },
-  logo: { width: 96, height: 96, marginBottom: 14 },
-  brandName: { color: "#ffffff", fontSize: 26, fontWeight: "900", letterSpacing: -0.3, textAlign: "center" },
-  brandTagline: { color: palette.nightMuted, fontSize: 15, marginTop: 8, textAlign: "center", lineHeight: 21 },
+  logo: { width: 76, height: 76, marginBottom: 10 },
+  brandName: { color: "#ffffff", fontSize: 22, fontWeight: "900", letterSpacing: -0.3 },
+  brandTagline: { color: palette.nightMuted, fontSize: 14, marginTop: 4 },
   sheet: {
     flexGrow: 1,
-    marginTop: -28,
+    marginTop: -24,
+    gap: 16,
+    paddingHorizontal: 20,
+    paddingTop: 26,
+    paddingBottom: 32,
     backgroundColor: palette.bg,
     borderTopLeftRadius: radii.xl,
-    borderTopRightRadius: radii.xl,
-    paddingHorizontal: 20,
-    paddingTop: 22,
-    paddingBottom: 32,
-    gap: 16
+    borderTopRightRadius: radii.xl
   },
-  segment: {
+  block: { gap: 14 },
+  title: { fontSize: 26, fontWeight: "900", color: palette.ink, letterSpacing: -0.4 },
+  subtitle: { fontSize: 15, color: palette.muted, lineHeight: 21, marginTop: -6 },
+  strong: { fontWeight: "800", color: palette.ink },
+  link: { color: palette.brand, fontWeight: "800" },
+  groupLabel: { fontWeight: "700", color: palette.ink, fontSize: 13.5 },
+  backLink: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start" },
+  backText: { color: palette.muted, fontWeight: "700" },
+  phoneShell: {
     flexDirection: "row",
-    padding: 4,
-    borderRadius: radii.md,
-    backgroundColor: "#efe6da"
-  },
-  segmentButton: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: 12,
     alignItems: "center",
-    justifyContent: "center"
+    minHeight: 54,
+    paddingLeft: 14,
+    borderWidth: 1.5,
+    borderColor: palette.line,
+    borderRadius: radii.md,
+    backgroundColor: palette.surfaceSoft
   },
+  phonePrefix: { fontWeight: "800", color: palette.muted, paddingRight: 12, marginRight: 12, borderRightWidth: 1, borderRightColor: palette.line },
+  phoneInput: { flex: 1, minHeight: 50, fontSize: 17, letterSpacing: 0.6, color: palette.ink },
+  divider: { flexDirection: "row", alignItems: "center", gap: 12 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: palette.line },
+  dividerText: { color: palette.muted, fontSize: 13 },
+  otpRow: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
+  otpBox: {
+    flex: 1,
+    aspectRatio: 0.86,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: palette.line,
+    borderRadius: 14,
+    backgroundColor: palette.surface
+  },
+  otpBoxFilled: { borderColor: palette.brand, backgroundColor: palette.brandSoft },
+  otpBoxActive: { borderColor: palette.brand, ...shadow, shadowColor: palette.brand, shadowOpacity: 0.25 },
+  otpDigit: { fontSize: 24, fontWeight: "900", color: palette.ink },
+  otpHiddenInput: { position: "absolute", width: 1, height: 1, opacity: 0 },
+  resend: { textAlign: "center", color: palette.muted, fontSize: 14 },
+  verifiedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: palette.successSoft
+  },
+  verifiedText: { color: palette.success, fontWeight: "800", fontSize: 12.5 },
+  segment: { flexDirection: "row", padding: 4, borderRadius: radii.md, backgroundColor: "#efe6da" },
+  segmentButton: { flex: 1, minHeight: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   segmentButtonActive: { backgroundColor: palette.surface, ...shadow },
   segmentText: { fontWeight: "700", color: palette.muted, fontSize: 15 },
   segmentTextActive: { color: palette.ink },
-  block: { gap: 12 },
-  groupLabel: { fontWeight: "800", color: palette.ink, fontSize: 15 },
   roleCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -555,35 +636,9 @@ const styles = StyleSheet.create({
     backgroundColor: palette.surface
   },
   roleCardActive: { borderColor: palette.brand, backgroundColor: palette.brandSoft },
-  roleIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: palette.brandSoft
-  },
+  roleIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: palette.brandSoft },
   roleIconActive: { backgroundColor: palette.brand },
   roleTitle: { fontWeight: "800", color: palette.ink, fontSize: 15 },
-  roleDescription: { color: palette.muted, fontSize: 12.5, marginTop: 2, lineHeight: 17 },
-  linkButton: { alignSelf: "flex-end", paddingVertical: 4 },
-  methodRow: { flexDirection: "row", gap: 10 },
-  methodButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    minHeight: 44,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: palette.line,
-    backgroundColor: palette.surface
-  },
-  methodButtonActive: { borderColor: palette.brand, backgroundColor: palette.brandSoft },
-  methodText: { fontWeight: "700", color: palette.muted },
-  methodTextActive: { color: palette.brandDeep },
-  centerLink: { alignSelf: "center", paddingVertical: 6 },
-  linkText: { color: palette.brand, fontWeight: "800", fontSize: 14 },
-  switchText: { color: palette.muted, fontSize: 14 }
+  roleText: { color: palette.muted, fontSize: 12.5, marginTop: 2, lineHeight: 17 },
+  legal: { textAlign: "center", fontSize: 12, color: palette.muted, marginTop: 8 }
 });

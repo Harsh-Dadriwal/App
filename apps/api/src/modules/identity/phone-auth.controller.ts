@@ -13,11 +13,28 @@ export class PhoneAuthController {
     return { data: await this.phoneAuthService.sendCode(body?.phone) };
   }
 
-  /** Body: { phone, code, profile?: { full_name, username, role } } - profile is used only for new accounts. */
+  /**
+   * Body: { phone, code }. Signs in an existing number, or for a new number returns
+   * { status: "needs_profile", signupToken } so the app can ask for name and username.
+   */
   @Post("/verify")
   @HttpCode(HttpStatus.OK)
   async verify(@Body() body: Record<string, unknown>) {
     const profile = body?.profile && typeof body.profile === "object" ? (body.profile as SignupProfile) : undefined;
     return { data: await this.phoneAuthService.verifyCode(body?.phone, body?.code, profile) };
+  }
+
+  /** Body: { signupToken, profile: { full_name, username, email?, role? } } - creates the account and signs in. */
+  @Post("/complete-signup")
+  @HttpCode(HttpStatus.OK)
+  async completeSignup(@Body() body: Record<string, unknown>) {
+    return { data: await this.phoneAuthService.completeSignup(body?.signupToken, body?.profile) };
+  }
+
+  /** Body: { username?, email?, phone? } - which of them are still free, for sign-up forms. */
+  @Post("/availability")
+  @HttpCode(HttpStatus.OK)
+  async availability(@Body() body: Record<string, unknown>) {
+    return { data: await this.phoneAuthService.checkAvailability(body ?? {}) };
   }
 }

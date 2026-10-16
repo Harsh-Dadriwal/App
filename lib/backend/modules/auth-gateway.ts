@@ -15,3 +15,5 @@ export const resolveActiveTenant = authGateway.resolveActiveTenant;
 export const switchDefaultTenant = authGateway.switchDefaultTenant;
 export const sendPhoneOtp = authGateway.sendPhoneOtp;
 export const verifyPhoneOtp = authGateway.verifyPhoneOtp;
+export const completePhoneSignup = authGateway.completePhoneSignup;
+export const checkSignupAvailability = authGateway.checkSignupAvailability;

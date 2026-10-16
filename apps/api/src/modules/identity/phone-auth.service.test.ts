@@ -35,7 +35,8 @@ function setup(options: { profiles?: Row[]; authUsers?: Row[]; smsFails?: boolea
       const matched = rows().filter((row) => filters.every((filter) => filter(row)));
       if (action === "update") matched.forEach((row) => Object.assign(row, payload));
       if (action === "delete") tables[name] = rows().filter((row) => !matched.includes(row));
-      return matched;
+      // Like the real client, return copies rather than the stored rows.
+      return matched.map((row) => ({ ...row }));
     };
     const builder: any = {
       select: () => builder,
@@ -43,6 +44,7 @@ function setup(options: { profiles?: Row[]; authUsers?: Row[]; smsFails?: boolea
       delete: () => ((action = "delete"), builder),
       upsert: (value: Row) => ((action = "upsert"), (payload = value), builder),
       in: (column: string, values: unknown[]) => (filters.push((row) => values.includes(row[column])), builder),
+      ilike: (column: string, value: string) => (filters.push((row) => String(row[column] ?? "").toLowerCase() === value.toLowerCase()), builder),
       eq: (column: string, value: unknown) => (filters.push((row) => row[column] === value), builder),
       limit: () => builder,
       maybeSingle: async () => ({ data: run()[0] ?? null, error: null }),
@@ -168,19 +170,72 @@ describe("Phone OTP via TextBee", () => {
     assert.equal(tables.phone_otp_codes.length, 0);
   });
 
-  it("signs up a new number with the code, name and role, and the code works only once", async () => {
-    const { service, tables, lastCode } = setup();
+  it("asks a new number for its profile instead of creating an account, and the code works only once", async () => {
+    const { service, tables, authUsers, lastCode } = setup();
     await service.sendCode("9000000001");
     const code = lastCode();
 
-    const result = await service.verifyCode("9000000001", code, { full_name: "Ravi Kumar", username: "ravi.k", role: "electrician" });
+    const result = await service.verifyCode("9000000001", code);
 
+    assert.equal(result.status, "needs_profile");
+    assert.ok("signupToken" in result && result.signupToken);
+    assert.equal(authUsers.length, 0);
+    assert.equal(tables.users.length, 0);
+    await assert.rejects(service.verifyCode("9000000001", code), /expired/);
+  });
+
+  it("creates the account from the profile step with name, username, email and role", async () => {
+    const { service, tables, lastCode } = setup();
+    await service.sendCode("9000000001");
+    const pending = await service.verifyCode("9000000001", lastCode());
+    assert.equal(pending.status, "needs_profile");
+
+    const result = await service.completeSignup((pending as any).signupToken, {
+      full_name: "Ravi Kumar",
+      username: "Ravi.K",
+      email: "Ravi@Example.com",
+      role: "electrician"
+    });
+
+    assert.equal(result.status, "signed_in");
     assert.equal(result.isNewUser, true);
     assert.equal(result.session.refresh_token, "refresh-auth-1");
     assert.equal(tables.users[0].role, "electrician");
     assert.equal(tables.users[0].full_name, "Ravi Kumar");
-    assert.equal(tables.users[0].email, null);
-    await assert.rejects(service.verifyCode("9000000001", code), /expired/);
+    assert.equal(tables.users[0].email, "ravi@example.com");
+  });
+
+  it("requires a name and a free username, and an unknown role becomes customer", async () => {
+    const { service, tables, lastCode } = setup({
+      profiles: [{ id: "p-other", auth_user_id: "auth-other", phone: "+919111111111", username: "taken.name", email: null }],
+      authUsers: [{ id: "auth-other", phone: "919111111111", email: "other@example.com" }]
+    });
+    await service.sendCode("9000000002");
+    const { signupToken } = (await service.verifyCode("9000000002", lastCode())) as any;
+
+    await assert.rejects(service.completeSignup(signupToken, { username: "someone" }), /full name/);
+    await assert.rejects(service.completeSignup(signupToken, { full_name: "Asha", username: "ab" }), /username/);
+    await assert.rejects(service.completeSignup(signupToken, { full_name: "Asha", username: "Taken.Name" }), /already taken/);
+
+    await service.completeSignup(signupToken, { full_name: "Asha Sharma", username: "asha", role: "admin" });
+    const created = tables.users.find((row) => row.full_name === "Asha Sharma")!;
+    assert.equal(created.role, "customer");
+    assert.equal(created.email, null);
+  });
+
+  it("refuses a forged or expired sign-up pass", async () => {
+    const { service } = setup();
+    await assert.rejects(service.completeSignup("bogus.token", { full_name: "A B", username: "abc" }), /expired/);
+    const body = Buffer.from(JSON.stringify({ phone: "+919000000003", exp: Date.now() - 1 })).toString("base64url");
+    await assert.rejects(service.completeSignup(`${body}.not-the-signature`, { full_name: "A B", username: "abc" }), /expired/);
+  });
+
+  it("reports which sign-up details are already taken", async () => {
+    const { service } = setup({
+      profiles: [{ id: "p1", auth_user_id: "auth-a", phone: "919876543210", username: "asha", email: "asha@example.com" }]
+    });
+    const result = await service.checkAvailability({ username: "ASHA", email: "new@example.com", phone: "9876543210" });
+    assert.deepEqual(result, { username: { available: false }, email: { available: true }, phone: { available: false } });
   });
 
   it("signs in a returning user without changing their real email", async () => {
@@ -190,8 +245,9 @@ describe("Phone OTP via TextBee", () => {
     });
     await service.sendCode("+91 98765 43210");
     const result = await service.verifyCode("9876543210", lastCode());
-    assert.equal(result.isNewUser, false);
-    assert.equal(result.session.access_token, "access-auth-a");
+    assert.equal(result.status, "signed_in");
+    assert.equal((result as any).isNewUser, false);
+    assert.equal((result as any).session.access_token, "access-auth-a");
     assert.ok(!calls.some((call) => call.startsWith("updateUser")));
   });
 
@@ -208,11 +264,4 @@ describe("Phone OTP via TextBee", () => {
     assert.equal(tables.phone_otp_codes.length, 0);
   });
 
-  it("creates a customer when the requested role is not one people can sign up as", async () => {
-    const { service, tables, lastCode } = setup();
-    await service.sendCode("9000000002");
-    await service.verifyCode("9000000002", lastCode(), { role: "admin" });
-    assert.equal(tables.users[0].role, "customer");
-    assert.equal(tables.users[0].full_name, "Customer 0002");
-  });
 });
