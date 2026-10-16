@@ -44,6 +44,26 @@ const BRANDS = [
 
 export const OTHER_CATEGORY = "Other";
 
+/**
+ * Built-in pictures for each category, served by the web app from public/categories
+ * (drawn by scripts/generate-category-images.mjs). Admin uploads replace them.
+ */
+export const DEFAULT_CATEGORY_IMAGE_FILES: Record<string, string> = {
+  Lighting: "lighting.png",
+  Fans: "fans.png",
+  "Switches & Sockets": "switches.png",
+  "Wires & Cables": "wires.png",
+  "MCB & Distribution": "mcb.png",
+  "Inverters & Power": "inverters.png",
+  Coolers: "coolers.png",
+  "Water Heaters": "heaters.png",
+  "Home & Kitchen Appliances": "appliances.png",
+  "Tools & Hardware": "tools.png",
+  "Boxes, Pipes & Fittings": "pipes.png",
+  "Motors, Pumps & Capacitors": "motors.png",
+  [OTHER_CATEGORY]: "other.png"
+};
+
 export function categoryFromName(itemName: string) {
   return CATEGORY_RULES.find((rule) => rule.pattern.test(itemName))?.category ?? OTHER_CATEGORY;
 }

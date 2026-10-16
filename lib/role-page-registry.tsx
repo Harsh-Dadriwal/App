@@ -28,7 +28,6 @@ import {
   CustomerSitesPage,
   TipsPage,
   CustomerBudgetPage,
-  CustomerFinancePage,
   CustomerApprovalsPage
 } from "@/components/pages/customer-pages";
 import {
@@ -110,7 +109,6 @@ export const rolePageRegistry: RolePageRegistry = {
     },
     "tips/home": { title: "Home Tips", component: <TipsPage category="home_tips" /> },
     budget: { title: "Budget Tracker", component: <CustomerBudgetPage /> },
-    finance: { title: "Finance Facility", component: <CustomerFinancePage /> },
     wallet: { title: "Wallet", component: <CustomerWalletPage /> },
     savings: { title: "Savings Plans", component: <CustomerSavingsPage /> },
     referrals: { title: "Referrals", component: <CustomerReferralsPage /> },

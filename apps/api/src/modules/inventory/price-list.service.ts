@@ -2,7 +2,7 @@ import { BadGatewayException, BadRequestException, Injectable, Logger, ServiceUn
 import { createHash } from "node:crypto";
 import { sign } from "jsonwebtoken";
 import { SupabaseAdminService } from "../../common/supabase/supabase-admin.service";
-import { indexPriceList, type IndexedPriceListItem } from "../../core/gateway/price-list-taxonomy";
+import { DEFAULT_CATEGORY_IMAGE_FILES, indexPriceList, type IndexedPriceListItem } from "../../core/gateway/price-list-taxonomy";
 import { parsePriceListDocument } from "./price-list.parser";
 
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -10,6 +10,13 @@ const DRIVE_READONLY_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
 const DOWNLOAD_FAILED = "The price list could not be downloaded right now. Please try again shortly.";
 const PAGE_SIZE = 1000;
 const DEFAULT_TENANT_SLUG = "mahalaxmi-electricals";
+const DEFAULT_WEB_APP_URL = "https://app-rho-one-49.vercel.app";
+
+/** Built-in category pictures, as absolute links so the phone app can load them too. */
+function defaultCategoryImages() {
+  const base = (process.env.WEB_APP_URL || DEFAULT_WEB_APP_URL).replace(/\/$/, "");
+  return Object.fromEntries(Object.entries(DEFAULT_CATEGORY_IMAGE_FILES).map(([category, file]) => [category, `${base}/categories/${file}`]));
+}
 
 export type PriceListView = "full" | "prices" | "catalog";
 
@@ -266,7 +273,8 @@ export class PriceListService {
     if (images.error) throw new Error(images.error.message);
     const rows = (images.data ?? []) as Array<{ category: string; image_url: string; updated_at: string }>;
     return {
-      images: Object.fromEntries(rows.map((row) => [row.category, row.image_url])) as Record<string, string>,
+      // Uploaded pictures win over the built-in ones.
+      images: { ...defaultCategoryImages(), ...Object.fromEntries(rows.map((row) => [row.category, row.image_url])) } as Record<string, string>,
       version: rows.map((row) => row.updated_at).sort().pop() ?? "0"
     };
   }

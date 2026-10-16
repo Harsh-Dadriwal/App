@@ -39,7 +39,6 @@ export const roleNav: Record<AppRole, NavItem[]> = {
     { href: "/customer/tips/electrical", label: "Electrical Tips", shortLabel: "Elec Tips" },
     { href: "/customer/tips/home", label: "Home Tips" },
     { href: "/customer/budget", label: "Budget Tracker", shortLabel: "Budget" },
-    { href: "/customer/finance", label: "Finance Facility", shortLabel: "Finance" },
     { href: "/customer/wallet", label: "Wallet", shortLabel: "Wallet" },
     { href: "/customer/savings", label: "Savings Plans", shortLabel: "Savings" },
     { href: "/customer/referrals", label: "Referrals", shortLabel: "Referrals" },

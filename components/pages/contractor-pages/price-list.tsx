@@ -184,7 +184,7 @@ export function AdminPriceListPage() {
           <details className="pl-hero pl-images-panel">
             <summary>
               <strong>Category pictures</strong>
-              <span className="shop-muted"> · customers see these in the shop ({Object.keys(categoryImages).length} of {categories.length} added)</span>
+              <span className="shop-muted"> · customers see these in the shop. Every category has a built-in picture; upload a photo to replace it.</span>
             </summary>
             <div className="pl-images">
               {categories.map(([name]) => (

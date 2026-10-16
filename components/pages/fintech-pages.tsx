@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import {
   CardGrid,
@@ -195,71 +195,6 @@ function RazorpayCheckoutButton({
       </button>
       {error ? <p className="form-error">{error}</p> : null}
     </>
-  );
-}
-
-export function CustomerCreditPage() {
-  const { profile, activeTenant } = useAuth();
-  const customerId = profile?.id ?? "";
-  const tenantId = activeTenant?.id ?? "";
-  const mutation = useMutationAction();
-
-  const creditInfo = useRows(
-    async (client) => {
-      const { data, error } = await client
-        .from("users")
-        .select("credit_limit, credit_balance, credit_score")
-        .eq("id", customerId)
-        .single();
-      return { data: data ? [data as any] : [], error: error?.message ?? null };
-    },
-    [customerId]
-  );
-
-  const loans = useRows(
-    async (client) => {
-      const { data, error } = await client
-        .from("credit_loans")
-        .select("*")
-        .eq("user_id", customerId)
-        .eq("tenant_id", tenantId)
-        .order("created_at", { ascending: false });
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
-    },
-    [customerId, tenantId]
-  );
-
-  return (
-    <div className="page-stack">
-      <StatsGrid
-        items={[
-          { label: "Credit limit", value: `₹${Number(creditInfo.data[0]?.credit_limit ?? 0).toLocaleString("en-IN")}` },
-          { label: "Available credit", value: `₹${Number(creditInfo.data[0]?.credit_balance ?? 0).toLocaleString("en-IN")}` },
-          { label: "Credit score", value: creditInfo.data[0]?.credit_score ?? "N/A" },
-          { label: "Active loans", value: loans.data.filter(l => l.status === "active").length }
-        ]}
-      />
-
-      <PageSection title="Buy Now Pay Later" description="Manage your project financing and credit lines.">
-        <QueryState
-          loading={loans.loading}
-          error={loans.error}
-          hasData={loans.data.length > 0}
-          empty={{ title: "No active credit lines", description: "Your credit limit can be used for material purchases once verified." }}
-        >
-          <DataTable
-            columns={["Order Ref", "Amount", "Tenure", "Next EMI", "Status"]}
-            rows={loans.data.map((loan: any) => [
-              loan.reference_number,
-              `₹${Number(loan.principal_amount).toLocaleString("en-IN")}`,
-              `${loan.tenure_months} months`,
-              loan.next_due_date ? new Date(loan.next_due_date).toLocaleDateString() : "-",
-              loan.status
-            ])}
-          />
-        </QueryState>
-      </PageSection>
-    </div>
   );
 }
 
@@ -754,22 +689,49 @@ export function CustomerReferralsPage() {
     [tenantId, customerId]
   );
 
+  const myCode = codes.data[0] as { code: string; is_active: boolean; created_at: string } | undefined;
+  const [copied, setCopied] = useState(false);
+
+  // Each person gets exactly one referral code (the database allows one per workspace).
   async function createReferralCode() {
     const client = await getSupabaseBrowserClient();
-    if (!client || !tenantId || !customerId) return;
+    if (!client || !tenantId || !customerId || myCode) return;
 
-    const ok = await mutation.run(
-      async () =>
-        client.from("referral_codes").insert({
-          tenant_id: tenantId,
-          user_id: customerId,
-          code: makeCode("ME")
-        }),
-      "Referral code created."
-    );
+    const ok = await mutation.run(async () => {
+      const result = await client.from("referral_codes").insert({
+        tenant_id: tenantId,
+        user_id: customerId,
+        code: makeCode("ME")
+      });
+      if (result.error?.code === "23505") {
+        return { error: "You already have a referral code. Refresh the page to see it." };
+      }
+      return result;
+    }, "Your referral code is ready. Share it with friends.");
 
     if (ok) {
       codes.refetch?.();
+    }
+  }
+
+  async function copyCode() {
+    if (!myCode) return;
+    try {
+      await navigator.clipboard.writeText(myCode.code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard blocked: the code is on screen to copy by hand.
+    }
+  }
+
+  async function shareCode() {
+    if (!myCode) return;
+    const text = `Join Mahalaxmi Electricals with my referral code ${myCode.code}`;
+    if (typeof navigator.share === "function") {
+      await navigator.share({ title: "Mahalaxmi Electricals", text }).catch(() => undefined);
+    } else {
+      await copyCode();
     }
   }
 
@@ -781,42 +743,47 @@ export function CustomerReferralsPage() {
     <div className="page-stack">
       <StatsGrid
         items={[
-          { label: "Referral codes", value: codes.data.length },
+          { label: "Your code", value: myCode?.code ?? "Not created" },
           { label: "Referral events", value: events.data.length },
           { label: "Rewards", value: rewards.data.length },
           { label: "Earned value", value: `₹${totalEarned.toLocaleString("en-IN")}` }
         ]}
       />
       <FormCard
-        title="Referral wallet growth"
-        description="Use this to drive acquisition into savings plans, the app, and later financing."
+        title="My referral code"
+        description="You get one personal code. Share it with friends and family; you earn rewards when they join."
       >
-        <div className="form-actions">
-          <button className="primary-button" type="button" onClick={() => void createReferralCode()} disabled={mutation.isSubmitting}>
-            {mutation.isSubmitting ? "Creating..." : "Create my referral code"}
-          </button>
-        </div>
-        <FormNotice error={mutation.error} success={mutation.success} />
-      </FormCard>
-      <PageSection title="My referral codes" description="Share these codes with neighbors and customers.">
         <QueryState
           loading={codes.loading}
           error={codes.error}
-          hasData={codes.data.length > 0}
-          empty={{
-            title: "No referral code yet",
-            description: "Create one from the form above."
-          }}
+          hasData
+          empty={{ title: "", description: "" }}
         >
-          <CardGrid>
-            {codes.data.map((code: any) => (
-              <DataCard key={code.id} title={code.code} subtitle="Active referral code" meta={code.is_active ? "active" : "inactive"}>
-                <p>Created: {new Date(code.created_at).toLocaleString("en-IN")}</p>
-              </DataCard>
-            ))}
-          </CardGrid>
+          {myCode ? (
+            <div className="referral-code-card">
+              <span className="referral-code">{myCode.code}</span>
+              <span className="shop-muted">
+                {myCode.is_active ? "Active" : "Inactive"} · created {new Date(myCode.created_at).toLocaleDateString("en-IN")}
+              </span>
+              <div className="form-actions">
+                <button className="primary-button" type="button" onClick={() => void shareCode()}>
+                  Share code
+                </button>
+                <button className="secondary-button" type="button" onClick={() => void copyCode()}>
+                  {copied ? "Copied" : "Copy"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="form-actions">
+              <button className="primary-button" type="button" onClick={() => void createReferralCode()} disabled={mutation.isSubmitting}>
+                {mutation.isSubmitting ? "Creating..." : "Create my referral code"}
+              </button>
+            </div>
+          )}
         </QueryState>
-      </PageSection>
+        <FormNotice error={mutation.error} success={mutation.success} />
+      </FormCard>
       <PageSection title="Referral history" description="Reward and event trail for your customer growth loop.">
         <QueryState
           loading={events.loading || rewards.loading}
