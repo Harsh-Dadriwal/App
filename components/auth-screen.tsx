@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
 import { authRoleOptions } from "@/lib/navigation";
-import { getBackendApiBaseUrl } from "@/lib/backend/config";
+import { sendPhoneOtp, verifyPhoneOtp } from "@/lib/backend/modules/auth-gateway";
 import type { AppRole } from "@mahalaxmi/core/types/domain";
 
 type AuthMethod = "email" | "phone";
@@ -61,7 +61,7 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
-/** Firebase needs +<country code>; 10-digit Indian mobile numbers get +91 added. */
+/** The API expects +<country code>; 10-digit Indian mobile numbers get +91 added. */
 function toE164(value: string) {
   const digits = value.replace(/[^0-9+]/g, "");
   if (digits.startsWith("+")) return digits;
@@ -92,32 +92,6 @@ function mapAuthErrorMessage(error: unknown) {
   }
 
   return message;
-}
-
-let firebaseScriptPromise: Promise<void> | null = null;
-
-function loadFirebaseScripts() {
-  if (typeof window === "undefined") return Promise.resolve();
-  if ((window as any).firebase) return Promise.resolve();
-  if (firebaseScriptPromise) return firebaseScriptPromise;
-
-  firebaseScriptPromise = new Promise((resolve, reject) => {
-    const appScript = document.createElement("script");
-    appScript.src = "https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js";
-    appScript.async = true;
-    appScript.onload = () => {
-      const authScript = document.createElement("script");
-      authScript.src = "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js";
-      authScript.async = true;
-      authScript.onload = () => resolve();
-      authScript.onerror = () => reject(new Error("Failed to load Firebase Auth Script"));
-      document.body.appendChild(authScript);
-    };
-    appScript.onerror = () => reject(new Error("Failed to load Firebase App Script"));
-    document.body.appendChild(appScript);
-  });
-
-  return firebaseScriptPromise;
 }
 
 export function AuthScreen() {
@@ -406,61 +380,14 @@ export function AuthScreen() {
         });
       }
 
-      const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-
-      if (firebaseApiKey) {
-        await loadFirebaseScripts();
-        const fb = (window as any).firebase;
-
-        if (fb.apps.length === 0) {
-          fb.initializeApp({
-            apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-            authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-            projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-            appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
-          });
-        }
-
-        let verifier = (window as any).recaptchaVerifier;
-        if (!verifier) {
-          verifier = new fb.auth.RecaptchaVerifier("recaptcha-container", {
-            size: "invisible",
-            callback: () => {}
-          });
-          (window as any).recaptchaVerifier = verifier;
-        }
-
-        const confirmationResult = await fb.auth().signInWithPhoneNumber(toE164(phoneForm.phone), verifier);
-        (window as any).firebaseConfirmationResult = confirmationResult;
-
-        setOtpSent(true);
-        setNotice("OTP sent via Firebase. Enter the code to continue.");
-        return;
-      }
-
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: phoneForm.phone,
-        options: {
-          shouldCreateUser: authMode === "signup",
-          data:
-            authMode === "signup"
-              ? {
-                full_name: phoneForm.fullName,
-                username: phoneForm.username,
-                role: phoneForm.role,
-                phone: phoneForm.phone,
-                referral_code: phoneForm.referralCode
-              }
-              : undefined
-        }
-      });
-
-      if (error) {
-        throw error;
+      // The API creates the code and texts it from the shop's SMS phone (TextBee).
+      const result = await sendPhoneOtp(toE164(phoneForm.phone));
+      if (result.error) {
+        throw new Error(result.error);
       }
 
       setOtpSent(true);
-      setNotice("OTP sent. Enter the code to continue.");
+      setNotice(`We sent a 6-digit code to ${result.data?.phone ?? phoneForm.phone}. It expires in 5 minutes.`);
     } catch (error) {
       setErrorMessage(mapAuthErrorMessage(error));
     } finally {
@@ -481,61 +408,29 @@ export function AuthScreen() {
     setNotice("");
 
     try {
-      const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-
-      if (firebaseApiKey) {
-        const confirmationResult = (window as any).firebaseConfirmationResult;
-        if (!confirmationResult) {
-          throw new Error("No pending Firebase verification found. Try resending the code.");
-        }
-
-        const result = await confirmationResult.confirm(phoneForm.otp);
-        const idToken = await result.user.getIdToken();
-
-        const response = await fetch(`${getBackendApiBaseUrl()}/api/v1/auth/firebase-login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          // Name, username and role are only used if this number has no account yet.
-          body: JSON.stringify({
-            idToken,
-            profile:
-              authMode === "signup"
-                ? { full_name: phoneForm.fullName, username: phoneForm.username, role: phoneForm.role }
-                : undefined
-          })
-        });
-
-        const payload = await response.json();
-        if (!response.ok || !payload?.session?.access_token) {
-          throw new Error(payload?.message || "Sign-in could not be completed. Please try again.");
-        }
-
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token: payload.session.access_token,
-          refresh_token: payload.session.refresh_token ?? payload.session.access_token
-        });
-
-        if (sessionError) {
-          throw sessionError;
-        }
-
-        setNotice("Phone verified successfully via Firebase.");
-        await completeLoginRedirect(phoneForm.role);
-        return;
+      // Name, username and role are only used if this number has no account yet.
+      const result = await verifyPhoneOtp(
+        toE164(phoneForm.phone),
+        phoneForm.otp,
+        authMode === "signup"
+          ? { full_name: phoneForm.fullName, username: phoneForm.username, role: phoneForm.role }
+          : undefined
+      );
+      const session = result.data?.session;
+      if (result.error || !session?.access_token) {
+        throw new Error(result.error ?? "Sign-in could not be completed. Please try again.");
       }
 
-      const { error, data } = await supabase.auth.verifyOtp({
-        phone: phoneForm.phone,
-        token: phoneForm.otp,
-        type: "sms"
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token
       });
-
-      if (error) {
-        throw error;
+      if (sessionError) {
+        throw sessionError;
       }
 
-      setNotice("Phone verified successfully.");
-      await completeLoginRedirect(phoneForm.role, data?.session?.user?.id);
+      setNotice("Phone verified.");
+      await completeLoginRedirect(phoneForm.role);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "OTP verification failed.");
     } finally {
@@ -941,7 +836,6 @@ export function AuthScreen() {
 
           {notice ? <div className="notice success fade-in">{notice}</div> : null}
           {errorMessage ? <div className="notice error fade-in">{errorMessage}</div> : null}
-          <div id="recaptcha-container"></div>
         </div>
       </section>
     </main>

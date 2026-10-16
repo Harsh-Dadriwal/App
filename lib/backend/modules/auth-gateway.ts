@@ -13,3 +13,5 @@ export const fetchAppProfile: (authUserId: string) => Promise<BackendResult<any>
 export const fetchTenantMemberships = authGateway.fetchTenantMemberships;
 export const resolveActiveTenant = authGateway.resolveActiveTenant;
 export const switchDefaultTenant = authGateway.switchDefaultTenant;
+export const sendPhoneOtp = authGateway.sendPhoneOtp;
+export const verifyPhoneOtp = authGateway.verifyPhoneOtp;

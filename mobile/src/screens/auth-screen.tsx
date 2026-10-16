@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   Image,
   KeyboardAvoidingView,
@@ -13,14 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppButton, Field, Notice } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
-import { backendRequest } from "@/lib/backend/http";
-import {
-  isPhoneLoginAvailable,
-  onPhoneAutoVerified,
-  resetPhoneVerification,
-  startPhoneVerification,
-  type PhoneVerification
-} from "@/lib/phone-auth";
+import { sendPhoneOtp, verifyPhoneOtp } from "@/lib/backend/auth-gateway";
 import { palette, radii, shadow } from "@/lib/theme";
 import { roleLabels, type AppRole } from "@mahalaxmi/core/types/domain";
 import { useAuth } from "@/providers/auth-provider";
@@ -28,7 +21,8 @@ import { useMobileNavigation } from "@/providers/navigation-provider";
 
 type AuthMode = "login" | "signup";
 type LoginMethod = "email" | "phone";
-const PHONE_LOGIN = isPhoneLoginAvailable();
+// Phone codes are texted by the API through TextBee, so phone login works in every build.
+const PHONE_LOGIN = true;
 
 const ROLE_OPTIONS: Array<{ role: AppRole; icon: keyof typeof Feather.glyphMap; description: string }> = [
   { role: "customer", icon: "home", description: "Buy materials, raise complaints and installation requests" },
@@ -110,47 +104,8 @@ export function AuthScreen() {
   const [canResend, setCanResend] = useState(false);
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("email");
   const [code, setCode] = useState("");
-  const [verification, setVerification] = useState<PhoneVerification | null>(null);
-  const finishingPhoneLogin = useRef(false);
-
-  // Android may verify the number from the SMS by itself; finish the login when it does.
-  useEffect(() => {
-    if (!verification) return;
-    return onPhoneAutoVerified((idToken) => void completePhoneLogin(idToken));
-  }, [verification]);
-
-  async function completePhoneLogin(idToken: string) {
-    if (!supabase || finishingPhoneLogin.current) return;
-    finishingPhoneLogin.current = true;
-    setBusy(true);
-    setErrorMessage("");
-    try {
-      const result = await backendRequest<{ session?: { access_token: string; refresh_token?: string } }>("/api/v1/auth/firebase-login", {
-        method: "POST",
-        // Name, username and role are only used if this number has no account yet.
-        body: { idToken, profile: authMode === "signup" ? { full_name: fullName.trim(), username, role } : undefined },
-        requireAuth: false,
-        timeoutMs: 20_000
-      });
-      const accessToken = result.data?.session?.access_token;
-      if (result.error || !accessToken) {
-        throw new Error(result.error ?? "We could not sign you in right now. Please try again.");
-      }
-      const { error } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: result.data?.session?.refresh_token ?? accessToken
-      });
-      if (error) throw error;
-      await resetPhoneVerification();
-      setVerification(null);
-      replace("dashboard");
-    } catch (error) {
-      setErrorMessage(mapAuthErrorMessage(error));
-    } finally {
-      finishingPhoneLogin.current = false;
-      setBusy(false);
-    }
-  }
+  /** The number a code was sent to; the code field shows once this is set. */
+  const [verification, setVerification] = useState<string | null>(null);
 
   async function handleSendCode() {
     setErrorMessage("");
@@ -166,9 +121,11 @@ export function AuthScreen() {
     }
     setBusy(true);
     try {
-      setVerification(await startPhoneVerification(number));
+      const result = await sendPhoneOtp(number);
+      if (result.error) throw new Error(result.error);
+      setVerification(result.data?.phone ?? number);
       setCode("");
-      setNotice(`We sent a 6-digit code to ${number}.`);
+      setNotice(`We sent a 6-digit code to ${result.data?.phone ?? number}. It expires in 5 minutes.`);
     } catch (error) {
       setErrorMessage(mapAuthErrorMessage(error));
     } finally {
@@ -177,7 +134,7 @@ export function AuthScreen() {
   }
 
   async function handleVerifyCode() {
-    if (!verification) return;
+    if (!supabase || !verification) return;
     setErrorMessage("");
     if (!/^[0-9]{6}$/.test(code)) {
       setErrorMessage("Enter the 6-digit code from the SMS.");
@@ -185,11 +142,26 @@ export function AuthScreen() {
     }
     setBusy(true);
     try {
-      const idToken = await verification.confirm(code);
-      setBusy(false);
-      await completePhoneLogin(idToken);
+      // Name, username and role are only used if this number has no account yet.
+      const result = await verifyPhoneOtp(
+        verification,
+        code,
+        authMode === "signup" ? { full_name: fullName.trim(), username, role } : undefined
+      );
+      const session = result.data?.session;
+      if (result.error || !session?.access_token) {
+        throw new Error(result.error ?? "We could not sign you in right now. Please try again.");
+      }
+      const { error } = await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token
+      });
+      if (error) throw error;
+      setVerification(null);
+      replace("dashboard");
     } catch (error) {
       setErrorMessage(mapAuthErrorMessage(error));
+    } finally {
       setBusy(false);
     }
   }

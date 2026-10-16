@@ -225,10 +225,39 @@ export function createAuthGateway({
     };
   }
 
+  /** Texts a 6-digit sign-in code to the number (sent by the API through TextBee). */
+  async function sendPhoneOtp(phone: string) {
+    return backendRequest<{ phone: string; expiresInSeconds: number; resendInSeconds: number }>("/api/v1/auth/otp/send", {
+      method: "POST",
+      body: { phone },
+      requireAuth: false,
+      timeoutMs: 20_000
+    });
+  }
+
+  /**
+   * Checks the code and returns a Supabase session to store with supabase.auth.setSession.
+   * `profile` (name, username, role) is used only when the number has no account yet.
+   */
+  async function verifyPhoneOtp(
+    phone: string,
+    code: string,
+    profile?: { full_name?: string; username?: string; role?: string }
+  ) {
+    return backendRequest<{ isNewUser: boolean; session: { access_token: string; refresh_token: string } }>("/api/v1/auth/otp/verify", {
+      method: "POST",
+      body: { phone, code, profile },
+      requireAuth: false,
+      timeoutMs: 20_000
+    });
+  }
+
   return {
     fetchAppProfile,
     fetchTenantMemberships,
     resolveActiveTenant,
-    switchDefaultTenant
+    switchDefaultTenant,
+    sendPhoneOtp,
+    verifyPhoneOtp
   };
 }
