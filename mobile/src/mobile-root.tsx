@@ -1,3 +1,4 @@
+// App shell: picks the screen to show. Changes here ship to phones over the air on push.
 import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
