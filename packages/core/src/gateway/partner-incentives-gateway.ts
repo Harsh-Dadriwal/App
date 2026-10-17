@@ -79,3 +79,15 @@ export function createPartnerIncentivesGateway({
     }
   };
 }
+
+/** Ledger entries are stored with internal names ("commission"); people see incentives and points. */
+export function incentiveWording(text: string | null | undefined) {
+  if (!text) return "";
+  const replaced = text
+    .replace(/commissions/g, "incentives")
+    .replace(/Commissions/g, "Incentives")
+    .replace(/commission/g, "incentive")
+    .replace(/Commission/g, "Incentive")
+    .replace(/_/g, " ");
+  return replaced.charAt(0).toUpperCase() + replaced.slice(1);
+}

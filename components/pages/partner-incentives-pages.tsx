@@ -15,6 +15,7 @@ import {
   useRows
 } from "@/components/data-view";
 import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
+import { incentiveWording } from "@mahalaxmi/core/gateway/partner-incentives-gateway";
 import { useAuth } from "@/components/providers/auth-provider";
 import {
   deletePartnerIncentiveScheme,
@@ -83,7 +84,7 @@ export function PartnerIncentivesPage() {
         items={[
           { label: "Current tier", value: summary?.current_tier ?? "Not started" },
           { label: "Business this year", value: formatMoney(summary?.total_business) },
-          { label: "Commission earned", value: formatMoney(summary?.commission_earned) },
+          { label: "Incentives earned", value: formatMoney(summary?.commission_earned) },
           { label: "Current points", value: formatPoints(summary?.current_points) }
         ]}
       />
@@ -100,19 +101,19 @@ export function PartnerIncentivesPage() {
           </CardGrid>
         </QueryState>
       </PageSection>
-      <PageSection title="Bonus history & transactions" description="Commission entries, tier bonuses, points credits, and future redemptions are all ledger-backed.">
+      <PageSection title="Bonus history & transactions" description="Incentives, tier bonuses, points credits and redemptions, all recorded in one history.">
         <QueryState loading={ledger.loading} error={ledger.error} hasData={ledger.data.length > 0} empty={{ title: "No transactions", description: "Transactions are created when completed orders qualify for incentives." }}>
           <DataTable
-            columns={["When", "Type", "Category", "Business", "%", "Commission", "Points", "Description"]}
+            columns={["When", "Type", "Category", "Business", "%", "Incentive", "Points", "Description"]}
             rows={ledger.data.map((row: any) => [
               row.posted_at ? new Date(row.posted_at).toLocaleString("en-IN") : "-",
-              row.entry_type,
+              incentiveWording(row.entry_type),
               row.commission_type ?? "-",
               formatMoney(row.business_amount),
               Number(row.commission_percent ?? 0),
               formatMoney(row.commission_amount),
               formatPoints(row.points),
-              row.description ?? "-"
+              incentiveWording(row.description) || "-"
             ])}
           />
         </QueryState>
@@ -224,7 +225,7 @@ export function AdminPartnerIncentivesPage() {
   async function updateCategoryType(categoryId: string, commissionType: "WIRE" | "OTHER") {
     const client = await getSupabaseBrowserClient();
     if (!client) return;
-    const ok = await mutation.run(async () => client.from("product_categories").update({ commission_type: commissionType }).eq("id", categoryId), "Category commission mapping updated.");
+    const ok = await mutation.run(async () => client.from("product_categories").update({ commission_type: commissionType }).eq("id", categoryId), "Category incentive type updated.");
     if (ok) categories.refetch?.();
   }
 
@@ -235,7 +236,7 @@ export function AdminPartnerIncentivesPage() {
           { label: "Schemes", value: schemes.data.length },
           { label: "Slabs", value: slabs.data.length },
           { label: "Partners earning", value: reports.data.length },
-          { label: "Commission", value: formatMoney(reports.data.reduce((sum: number, row: any) => sum + Number(row.commission_earned ?? 0), 0)) }
+          { label: "Incentives paid", value: formatMoney(reports.data.reduce((sum: number, row: any) => sum + Number(row.commission_earned ?? 0), 0)) }
         ]}
       />
       <FormNotice error={mutation.error} success={mutation.success} />
@@ -263,15 +264,15 @@ export function AdminPartnerIncentivesPage() {
           />
         </QueryState>
       </FormCard>
-      <FormCard title="Slabs" description="Configure business ranges, wire/other commission, bonus points, visuals, and ordering.">
+      <FormCard title="Slabs" description="Set business ranges, wire and other incentive %, bonus points, colours and order.">
         <form onSubmit={saveSlab} className="form-stack">
           <FormGrid>
             <label>Scheme<select value={slabForm.scheme_id || activeSchemeId} onChange={(e) => setSlabForm((f) => ({ ...f, scheme_id: e.target.value }))}>{schemes.data.map((scheme: any) => <option key={scheme.id} value={scheme.id}>{scheme.name}</option>)}</select></label>
             <label>Tier name<input required value={slabForm.tier_name} onChange={(e) => setSlabForm((f) => ({ ...f, tier_name: e.target.value }))} /></label>
             <label>Min business<input type="number" value={slabForm.min_business} onChange={(e) => setSlabForm((f) => ({ ...f, min_business: e.target.value }))} /></label>
             <label>Max business<input type="number" value={slabForm.max_business} onChange={(e) => setSlabForm((f) => ({ ...f, max_business: e.target.value }))} placeholder="Blank for no cap" /></label>
-            <label>Wire %<input type="number" step="0.001" value={slabForm.wire_commission_percent} onChange={(e) => setSlabForm((f) => ({ ...f, wire_commission_percent: e.target.value }))} /></label>
-            <label>Other %<input type="number" step="0.001" value={slabForm.other_commission_percent} onChange={(e) => setSlabForm((f) => ({ ...f, other_commission_percent: e.target.value }))} /></label>
+            <label>Wire incentive %<input type="number" step="0.001" value={slabForm.wire_commission_percent} onChange={(e) => setSlabForm((f) => ({ ...f, wire_commission_percent: e.target.value }))} /></label>
+            <label>Other incentive %<input type="number" step="0.001" value={slabForm.other_commission_percent} onChange={(e) => setSlabForm((f) => ({ ...f, other_commission_percent: e.target.value }))} /></label>
             <label>Bonus points<input type="number" value={slabForm.bonus_points} onChange={(e) => setSlabForm((f) => ({ ...f, bonus_points: e.target.value }))} /></label>
             <label>Sort order<input type="number" value={slabForm.sort_order} onChange={(e) => setSlabForm((f) => ({ ...f, sort_order: e.target.value }))} /></label>
           </FormGrid>
@@ -284,7 +285,7 @@ export function AdminPartnerIncentivesPage() {
         </form>
         <QueryState loading={slabs.loading} error={slabs.error} hasData={slabs.data.length > 0} empty={{ title: "No slabs", description: "Add Bronze, Silver, Gold, Platinum, Diamond, or custom tiers." }}>
           <DataTable
-            columns={["Tier", "Range", "Wire %", "Other %", "Bonus", "Order", "Actions"]}
+            columns={["Tier", "Range", "Wire incentive %", "Other incentive %", "Bonus points", "Order", "Actions"]}
             rows={slabs.data.map((slab: any) => [
               slab.tier_name,
               `${formatMoney(slab.min_business)} – ${slab.max_business ? formatMoney(slab.max_business) : "∞"}`,
@@ -297,15 +298,15 @@ export function AdminPartnerIncentivesPage() {
           />
         </QueryState>
       </FormCard>
-      <PageSection title="Product category commission mapping" description="Classify categories as WIRE or OTHER. Products inherit commission type from their existing category.">
-        <QueryState loading={categories.loading} error={categories.error} hasData={categories.data.length > 0} empty={{ title: "No categories", description: "Create product categories before configuring commission mapping." }}>
-          <DataTable columns={["Category", "Commission type"]} rows={categories.data.map((category: any) => [category.name, <select key={category.id} value={category.commission_type ?? "OTHER"} onChange={(e) => void updateCategoryType(category.id, e.target.value as "WIRE" | "OTHER")}><option value="WIRE">WIRE</option><option value="OTHER">OTHER</option></select>])} />
+      <PageSection title="Product category incentive types" description="Classify categories as WIRE or OTHER. Products get the incentive type of their category.">
+        <QueryState loading={categories.loading} error={categories.error} hasData={categories.data.length > 0} empty={{ title: "No categories", description: "Create product categories before setting incentive types." }}>
+          <DataTable columns={["Category", "Incentive type"]} rows={categories.data.map((category: any) => [category.name, <select key={category.id} value={category.commission_type ?? "OTHER"} onChange={(e) => void updateCategoryType(category.id, e.target.value as "WIRE" | "OTHER")}><option value="WIRE">WIRE</option><option value="OTHER">OTHER</option></select>])} />
         </QueryState>
       </PageSection>
-      <PageSection title="Reports" description="Top partners, paid commission, business, points issued, tier distribution, and growth rollups.">
+      <PageSection title="Reports" description="Top partners, incentives paid, business, points issued, tier distribution and growth.">
         <QueryState loading={reports.loading} error={reports.error} hasData={reports.data.length > 0} empty={{ title: "No incentive reports", description: "Reports appear as completed orders earn incentives." }}>
           <DataTable
-            columns={["Partner", "Type", "Tier", "Business", "Commission", "Points issued", "Current points"]}
+            columns={["Partner", "Type", "Tier", "Business", "Incentives", "Points issued", "Current points"]}
             rows={reports.data.map((row: any) => [row.partner_name, row.partner_type, row.tier_name ?? "-", formatMoney(row.total_business), formatMoney(row.commission_earned), formatPoints(row.bonus_points_earned), formatPoints(row.current_points)])}
           />
         </QueryState>

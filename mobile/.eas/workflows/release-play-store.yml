@@ -1,0 +1,55 @@
+# Play Store release. Same idea as publish-updates.yml for the "production" channel:
+# JavaScript-only changes go over the air to Play Store users; native changes build a
+# new app bundle and upload it to Google Play (internal testing track, see eas.json).
+#
+# Runs on demand for now (expo.dev -> project -> Workflows -> Run). Once the Play
+# Console app and its service account key are set up, add the push trigger below so
+# every push to main releases automatically:
+#   push:
+#     branches: ['main']
+#     paths: ['mobile/**', 'packages/core/**']
+name: Release to Play Store
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  fingerprint:
+    name: Check for native changes
+    type: fingerprint
+    environment: production
+
+  get_build:
+    name: Find a compatible Play Store build
+    needs: [fingerprint]
+    type: get-build
+    params:
+      platform: android
+      profile: production
+      fingerprint_hash: ${{ needs.fingerprint.outputs.android_fingerprint_hash }}
+
+  publish_update:
+    name: Send update to Play Store users
+    needs: [get_build]
+    if: ${{ needs.get_build.outputs.build_id }}
+    type: update
+    environment: production
+    params:
+      channel: production
+      platform: android
+
+  build_bundle:
+    name: Build app bundle (native change)
+    needs: [get_build]
+    if: ${{ !needs.get_build.outputs.build_id }}
+    type: build
+    params:
+      platform: android
+      profile: production
+
+  submit:
+    name: Upload to Google Play
+    needs: [build_bundle]
+    type: submit
+    params:
+      build_id: ${{ needs.build_bundle.outputs.build_id }}

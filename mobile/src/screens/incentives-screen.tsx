@@ -3,6 +3,7 @@ import { useRows } from "@/components/app-state";
 import { Card, QueryState, ScreenShell, SectionTitle } from "@/components/ui";
 import { useAuth } from "@/providers/auth-provider";
 import { palette } from "@/lib/theme";
+import { incentiveWording } from "@mahalaxmi/core/gateway/partner-incentives-gateway";
 
 const money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
 
@@ -51,7 +52,7 @@ export function IncentivesScreen() {
   return (
     <ScreenShell
       title="Partner incentives"
-      subtitle="Track tier, yearly business, commission, points, rewards, and bonus history."
+      subtitle="Track your tier, yearly business, incentives, points, rewards and bonus history."
       currentScreen="incentives"
       showBack
     >
@@ -71,7 +72,7 @@ export function IncentivesScreen() {
         </Card>
         <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
           <Card tone="soft"><Text style={{ color: palette.muted }}>Business</Text><Text style={{ fontSize: 18, fontWeight: "900" }}>{formatMoney(summary?.total_business)}</Text></Card>
-          <Card tone="soft"><Text style={{ color: palette.muted }}>Commission</Text><Text style={{ fontSize: 18, fontWeight: "900" }}>{formatMoney(summary?.commission_earned)}</Text></Card>
+          <Card tone="soft"><Text style={{ color: palette.muted }}>Incentives</Text><Text style={{ fontSize: 18, fontWeight: "900" }}>{formatMoney(summary?.commission_earned)}</Text></Card>
         </View>
         <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
           <Card tone="soft"><Text style={{ color: palette.muted }}>Points</Text><Text style={{ fontSize: 18, fontWeight: "900" }}>{formatPoints(summary?.current_points)}</Text></Card>
@@ -80,15 +81,15 @@ export function IncentivesScreen() {
       </QueryState>
 
       <View style={{ marginTop: 10 }}>
-        <SectionTitle title="Transactions" description="Commission, bonus points, rewards, and adjustments." />
+        <SectionTitle title="Transactions" description="Incentives, bonus points, rewards and adjustments." />
       </View>
       <QueryState loading={ledger.loading} error={ledger.error} hasData={ledger.data.length > 0} empty="No transactions yet.">
         {ledger.data.map((row: any, index) => (
           <Card key={`${row.posted_at}-${index}`} tone="soft">
             <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16, fontWeight: "800", color: palette.ink }}>{row.entry_type}</Text>
-                <Text style={{ color: palette.muted, marginTop: 4 }}>{row.description ?? row.commission_type ?? "Partner incentive"}</Text>
+                <Text style={{ fontSize: 16, fontWeight: "800", color: palette.ink }}>{incentiveWording(row.entry_type)}</Text>
+                <Text style={{ color: palette.muted, marginTop: 4 }}>{incentiveWording(row.description) || row.commission_type || "Partner incentive"}</Text>
               </View>
               <View style={{ alignItems: "flex-end" }}>
                 <Text style={{ fontSize: 16, fontWeight: "900", color: palette.brandDeep }}>{formatMoney(row.commission_amount)}</Text>

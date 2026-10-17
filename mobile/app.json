@@ -12,7 +12,6 @@
     },
     "android": {
       "package": "com.mahalaxmi.electricals",
-      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1f1712"
@@ -47,6 +46,14 @@
         "projectId": "c860b6f8-6321-4a08-9721-2d25c67ce3e8"
       }
     },
-    "icon": "./assets/icon.png"
+    "icon": "./assets/icon.png",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/c860b6f8-6321-4a08-9721-2d25c67ce3e8",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    }
   }
 }

@@ -1,0 +1,47 @@
+# Runs on every push to main that touches the phone app or the shared code.
+# - Only JavaScript/images changed: phones with the current APK get the change over
+#   the air (the "preview" channel) the next time they open the app. No new APK.
+# - Native code or app.json changed: builds a new APK instead (download it from the
+#   build page on expo.dev), because an over-the-air update cannot change native code.
+name: Update the app
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - 'mobile/**'
+      - 'packages/core/**'
+
+jobs:
+  fingerprint:
+    name: Check for native changes
+    type: fingerprint
+    environment: preview
+
+  get_build:
+    name: Find a compatible APK
+    needs: [fingerprint]
+    type: get-build
+    params:
+      platform: android
+      profile: preview
+      fingerprint_hash: ${{ needs.fingerprint.outputs.android_fingerprint_hash }}
+
+  publish_update:
+    name: Send update to phones
+    needs: [get_build]
+    if: ${{ needs.get_build.outputs.build_id }}
+    type: update
+    environment: preview
+    params:
+      channel: preview
+      platform: android
+
+  build_apk:
+    name: Build a new APK (native change)
+    needs: [get_build]
+    if: ${{ !needs.get_build.outputs.build_id }}
+    type: build
+    params:
+      platform: android
+      profile: preview

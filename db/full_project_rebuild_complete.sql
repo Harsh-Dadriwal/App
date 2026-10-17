@@ -3490,7 +3490,7 @@ BEGIN
     ) VALUES (
       item.tenant_id, partner.id, scheme.id, current_slab.id, item.site_order_id, item.id, 'commission',
       v_category_commission_type, v_business_amount, v_commission_percent, v_commission_amount, 0,
-      'Commission for supplied order item', v_idempotency_key
+      'Incentive for supplied order item', v_idempotency_key
     );
 
     UPDATE public.partner_business_summary
