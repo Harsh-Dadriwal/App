@@ -10,40 +10,40 @@ type Action = { label: string; hint: string; route: MobileScreen; icon: keyof ty
 
 const notes: Action = { label: "Project notes", hint: "Site conversations", route: "notes", icon: "message-square" };
 
+const quotations: Action = { label: "Quotations", hint: "Send your list, get prices", route: "quotations", icon: "file-text" };
+
 const roleActions: Record<AppRole, Action[]> = {
   customer: [
     { label: "Shop products", hint: "Live stock, easy ordering", route: "shop", icon: "shopping-bag" },
     { label: "My orders", hint: "Track your orders", route: "orders", icon: "package" },
+    quotations,
     { label: "Complaints & installation", hint: "Get an electrician", route: "service-requests", icon: "tool" },
-    { label: "Approvals", hint: "Items waiting for you", route: "approvals", icon: "check-square" },
-    { label: "Lighting visualizer", hint: "Plan your lights", route: "lighting", icon: "sun" },
     notes
   ],
   electrician: [
     { label: "Order materials", hint: "Live stock from the store", route: "shop", icon: "shopping-bag" },
     { label: "My orders", hint: "Track your orders", route: "orders", icon: "package" },
+    quotations,
     { label: "Service requests", hint: "Jobs near you", route: "service-requests", icon: "tool" },
-    { label: "Material tracker", hint: "What's supplied", route: "materials", icon: "layers" },
     { label: "Rewards", hint: "Partner incentives", route: "incentives", icon: "award" },
     notes
   ],
   architect: [
-    { label: "Lighting visualizer", hint: "Design scenes", route: "lighting", icon: "sun" },
-    { label: "Material reviews", hint: "Approve items", route: "materials", icon: "layers" },
     { label: "Shop products", hint: "Live stock from the store", route: "shop", icon: "shopping-bag" },
     { label: "My orders", hint: "Track your orders", route: "orders", icon: "package" },
+    quotations,
     { label: "Rewards", hint: "Partner incentives", route: "incentives", icon: "award" },
     notes
   ],
   admin: [
     { label: "Orders", hint: "Confirm & deliver", route: "orders", icon: "package" },
+    { label: "Quotations", hint: "Price requests", route: "quotations", icon: "file-text" },
     { label: "Price list", hint: "Tally prices & stock", route: "price-list", icon: "tag" },
     { label: "Service requests", hint: "Complaints & installs", route: "service-requests", icon: "tool" },
-    { label: "Lighting leads", hint: "Customer scenes", route: "lighting", icon: "sun" },
     { label: "Fintech", hint: "Wallets & savings", route: "fintech", icon: "credit-card" },
     notes
   ],
-  supplier: [{ label: "Lighting preview", hint: "Scene previews", route: "lighting", icon: "sun" }, notes],
+  supplier: [notes],
   pop_man: [notes],
   carpenter: [notes],
   painter: [notes],

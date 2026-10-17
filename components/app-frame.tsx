@@ -9,7 +9,6 @@ import { SkeletonWorkspace, TopProgressBar } from "@/components/skeleton";
 import { useTheme } from "@/components/theme-provider";
 import { getRoleNav, roleLabels } from "@/lib/navigation";
 import type { AppRole } from "@mahalaxmi/core/types/domain";
-import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
 import {
   listNotifications,
   markAllNotificationsRead,
@@ -68,52 +67,32 @@ export function AppFrame({
     [profile?.id, activeTenant?.id]
   );
   
-  const approvals = useRows(
-    async (client) => {
-      if (role !== "customer" || !profile?.id) {
-        return { data: [] as any[], error: null };
-      }
-      const { data, error } = await client
-        .from("vw_customer_items_on_approval")
-        .select("order_item_id")
-        .eq("customer_id", profile.id);
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
-    },
-    [role, profile?.id]
-  );
-  
-  const adminRequests = useRows(
-    async (client) => {
-      if (role !== "admin") {
-        return { data: [] as any[], error: null };
-      }
-      const { data, error } = await client
-        .from("product_requests")
-        .select("id, status")
-        .in("status", ["submitted", "reviewing", "matched"]);
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
-    },
-    [role]
-  );
-  
   const mutation = useMutationAction();
 
   const navBadges = useMemo(() => {
     const unreadNotes = notifications.data.filter((item: any) => item.data?.module === "site_notes" && !item.is_read).length;
-    const unreadRequests = notifications.data.filter((item: any) => item.data?.module === "product_requests" && !item.is_read).length;
+    const unread = (module: string) => notifications.data.filter((item: any) => item.data?.module === module && !item.is_read).length;
     const unreadServiceRequests = notifications.data.filter((item: any) => item.data?.module === "service_requests" && !item.is_read).length;
+    const unreadOrders = unread("order_requests");
+    const unreadQuotations = unread("quotations");
     return {
-      "/customer/approvals": approvals.data.length,
+      "/customer/orders": unreadOrders,
+      "/electrician/orders": unreadOrders,
+      "/architect/orders": unreadOrders,
+      "/admin/orders": unreadOrders,
+      "/customer/quotations": unreadQuotations,
+      "/electrician/quotations": unreadQuotations,
+      "/architect/quotations": unreadQuotations,
+      "/admin/quotations": unreadQuotations,
       "/customer/service-requests": unreadServiceRequests,
       "/electrician/service-requests": unreadServiceRequests,
       "/customer/notes": unreadNotes,
       "/electrician/notes": unreadNotes,
       "/architect/notes": unreadNotes,
-      "/architect/requests": unreadRequests,
       "/admin/notes": unreadNotes,
-      "/admin/requests": adminRequests.data.length || unreadRequests
+      "/admin/service-requests": unreadServiceRequests
     } as Record<string, number>;
-  }, [notifications.data, approvals.data.length, adminRequests.data.length]);
+  }, [notifications.data]);
 
   async function handleMarkNotificationRead(notificationId: string) {
     const ok = await mutation.run(
@@ -140,8 +119,6 @@ export function AppFrame({
     const ok = await switchTenant(tenantId);
     if (ok) {
       notifications.refetch?.();
-      approvals.refetch?.();
-      adminRequests.refetch?.();
       router.refresh();
       setIsSidebarOpen(false); // close sidebar on tenant switch
     }

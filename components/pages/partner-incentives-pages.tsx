@@ -21,7 +21,6 @@ import {
   deletePartnerIncentiveScheme,
   deletePartnerIncentiveSlab,
   duplicatePartnerIncentiveScheme,
-  listAdminRedemptions,
   resolveRedemption,
   savePartnerIncentiveScheme,
   savePartnerIncentiveSlab

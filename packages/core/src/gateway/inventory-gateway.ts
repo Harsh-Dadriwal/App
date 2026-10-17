@@ -10,6 +10,8 @@ type InventoryGatewayDependencies = {
 };
 
 export type PriceListItem = {
+  /** Stable id across syncs, used for orders and quotations. */
+  key?: string;
   category: string;
   group_name: string;
   item_name: string;

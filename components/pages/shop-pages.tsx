@@ -7,7 +7,7 @@ import { FormNotice, QueryState, useMutationAction, useRows } from "@/components
 import { SkeletonCards } from "@/components/skeleton";
 import { useAuth } from "@/components/providers/auth-provider";
 import { getServeUrl } from "@/lib/s3";
-import { createOrderRequest, getPriceCatalog, listOrderRequests, updateOrderRequestStatus } from "@/lib/backend/modules/shop-gateway";
+import { createOrderRequest, createQuotation, getPriceCatalog, listOrderRequests, updateOrderRequestStatus } from "@/lib/backend/modules/shop-gateway";
 import { formatPriceListAmount } from "@mahalaxmi/core/gateway/inventory-gateway";
 import { countBy } from "@mahalaxmi/core/gateway/price-list-taxonomy";
 import {
@@ -72,7 +72,7 @@ function QuantityStepper({ value, onChange, label }: { value: number; onChange: 
 }
 
 /** Order from the Tally price list: categories with pictures, availability, no prices. */
-export function ShopPage({ ordersHref }: { ordersHref: string }) {
+export function ShopPage({ ordersHref, quotationsHref }: { ordersHref: string; quotationsHref: string }) {
   const catalog = useCatalog(getPriceCatalog);
   const cart = useCart();
   const [query, setQuery] = useState("");
@@ -230,7 +230,7 @@ export function ShopPage({ ordersHref }: { ordersHref: string }) {
         </button>
       ) : null}
 
-      {cartOpen ? <CartSheet ordersHref={ordersHref} onClose={() => setCartOpen(false)} /> : null}
+      {cartOpen ? <CartSheet ordersHref={ordersHref} quotationsHref={quotationsHref} onClose={() => setCartOpen(false)} /> : null}
     </div>
   );
 }
@@ -270,7 +270,7 @@ function ShopItemCard({
   );
 }
 
-function CartSheet({ ordersHref, onClose }: { ordersHref: string; onClose: () => void }) {
+function CartSheet({ ordersHref, quotationsHref, onClose }: { ordersHref: string; quotationsHref: string; onClose: () => void }) {
   const { profile } = useAuth();
   const cart = useCart();
   const submit = useMutationAction();
@@ -279,7 +279,7 @@ function CartSheet({ ordersHref, onClose }: { ordersHref: string; onClose: () =>
     contact_phone: profile?.phone?.replace(/^\+91/, "") ?? "",
     note: ""
   }));
-  const [placed, setPlaced] = useState<string | null>(null);
+  const [placed, setPlaced] = useState<{ kind: "order" | "quotation"; number: string } | null>(null);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose();
@@ -307,7 +307,26 @@ function CartSheet({ ordersHref, onClose }: { ordersHref: string; onClose: () =>
     });
     if (ok) {
       cart.clear();
-      setPlaced(orderNumber);
+      setPlaced({ kind: "order", number: orderNumber });
+    }
+  }
+
+  // Same cart, but the shop sends prices first instead of taking the order straight away.
+  async function askForQuotation() {
+    let quotationNumber = "";
+    const ok = await submit.run(async () => {
+      const result = await createQuotation({
+        items: cart.lines.map((line) => ({ key: line.key, quantity: line.quantity })),
+        photo_keys: [],
+        note: form.note || undefined,
+        contact_phone: form.contact_phone || undefined
+      });
+      quotationNumber = result.data?.quotation_number ?? "";
+      return { error: result.error };
+    });
+    if (ok) {
+      cart.clear();
+      setPlaced({ kind: "quotation", number: quotationNumber });
     }
   }
 
@@ -315,19 +334,25 @@ function CartSheet({ ordersHref, onClose }: { ordersHref: string; onClose: () =>
     <div className="shop-sheet-backdrop" onClick={onClose}>
       <aside className="shop-sheet" role="dialog" aria-modal="true" aria-label="Your cart" onClick={(event) => event.stopPropagation()}>
         <div className="shop-sheet-head">
-          <h3>{placed !== null ? "Order sent" : "Your cart"}</h3>
+          <h3>{placed ? (placed.kind === "order" ? "Order sent" : "Quotation requested") : "Your cart"}</h3>
           <button type="button" className="pl-search-clear shop-sheet-close" onClick={onClose} aria-label="Close" autoFocus>
             ×
           </button>
         </div>
 
-        {placed !== null ? (
+        {placed ? (
           <div className="shop-placed">
             <span className="shop-placed-tick" aria-hidden="true">✓</span>
-            <strong>{placed ? `Order ${placed} received` : "Order received"}</strong>
-            <p>We will check stock and confirm your order shortly. You will get a notification at each step.</p>
-            <Link className="primary-button" href={ordersHref} onClick={onClose}>
-              Track my orders
+            <strong>
+              {placed.kind === "order" ? "Order" : "Quotation request"} {placed.number} received
+            </strong>
+            <p>
+              {placed.kind === "order"
+                ? "We will check stock and confirm your order shortly. You will get a notification at each step."
+                : "The shop will send you prices for these items. You will get a notification when your quotation is ready."}
+            </p>
+            <Link className="primary-button" href={placed.kind === "order" ? ordersHref : quotationsHref} onClick={onClose}>
+              {placed.kind === "order" ? "Track my orders" : "View my quotations"}
             </Link>
             <button type="button" className="secondary-button" onClick={onClose}>
               Continue shopping
@@ -382,6 +407,9 @@ function CartSheet({ ordersHref, onClose }: { ordersHref: string; onClose: () =>
             <FormNotice error={submit.error} success={null} />
             <button type="submit" className="primary-button shop-submit" disabled={submit.isSubmitting}>
               {submit.isSubmitting ? "Sending…" : `Send order (${cart.count} ${cart.count === 1 ? "item" : "items"})`}
+            </button>
+            <button type="button" className="secondary-button shop-submit" disabled={submit.isSubmitting} onClick={() => void askForQuotation()}>
+              Ask for a quotation instead
             </button>
           </form>
         )}
@@ -481,8 +509,8 @@ export function MyOrdersPage({ shopHref }: { shopHref: string }) {
 function OrderItems({ order, showPrices }: { order: OrderRequest; showPrices: boolean }) {
   return (
     <ul className="order-items">
-      {order.items.map((item) => (
-        <li key={item.key}>
+      {order.items.map((item, index) => (
+        <li key={`${item.key}-${index}`}>
           <span>
             {item.name}
             {item.brand ? <em> · {item.brand}</em> : null}

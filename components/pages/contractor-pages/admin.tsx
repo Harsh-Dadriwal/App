@@ -1,15 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type FormEvent } from "react";
-import { AdminWorkflowMonitor, OrderWorkflowTimeline } from "@/components/order-workflow";
+import { useMemo, useState } from "react";
+import { listOrderRequests, listQuotations } from "@/lib/backend/modules/shop-gateway";
+import { listServiceRequests } from "@/lib/backend/modules/service-requests-gateway";
 import {
   CardGrid,
   DataCard,
-  DataTable,
-  FormCard,
-  FormFieldHint,
-  FormGrid,
   FormNotice,
   ListSearchField,
   PageSection,
@@ -20,12 +17,7 @@ import {
 } from "@/components/data-view";
 import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
 import { roleLabels, type AppRole } from "@mahalaxmi/core/types/domain";
-import {
-  markOrderItemSupplied,
-  suggestSubstituteItem,
-  transitionSiteOrder,
-  verifyProfessionalUser
-} from "@/lib/backend/modules/workflow-gateway";
+import { verifyProfessionalUser } from "@/lib/backend/modules/workflow-gateway";
 import { ADMIN_MANAGED_USER_ROLES } from "./shared";
 export function AdminDashboardPage() {
   const users = useRows(
@@ -35,138 +27,66 @@ export function AdminDashboardPage() {
     },
     []
   );
-  const orders = useRows(
-    async (client) => {
-      const { data, error } = await client.from("site_orders").select("status");
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
-    },
-    []
-  );
-  const substitutions = useRows(
-    async (client) => {
-      const { data, error } = await client.from("substitute_suggestions").select("status");
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
-    },
-    []
-  );
-  const products = useRows(
-    async (client) => {
-      const { data, error } = await client.from("products").select("stock_status");
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
-    },
-    []
-  );
-  const assignments = useRows(
-    async (client) => {
-      const { data, error } = await client.from("site_assignments").select("status");
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
-    },
-    []
-  );
-  const requests = useRows(
-    async (client) => {
-      const { data, error } = await client.from("product_requests").select("status");
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
-    },
-    []
-  );
-  const notes = useRows(
-    async (client) => {
-      const { data, error } = await client.from("site_notes").select("id");
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
-    },
-    []
-  );
-  const pendingVerifications = users.data.filter(
-    (user: any) => user.verification_status === "pending"
-  ).length;
-  const ordersNeedingAttention = orders.data.filter((order: any) =>
-    ["draft", "awaiting_approval", "processing"].includes(order.status)
-  ).length;
-  const suggestedSubstitutions = substitutions.data.filter(
-    (item: any) => item.status === "suggested"
-  ).length;
-  const hasOperationalWork =
-    pendingVerifications > 0 || ordersNeedingAttention > 0 || suggestedSubstitutions > 0;
+  const orders = useRows(async () => {
+    const result = await listOrderRequests();
+    return { data: result.data?.orders ?? [], error: result.error };
+  }, []);
+  const quotations = useRows(async () => {
+    const result = await listQuotations();
+    return { data: result.data?.quotations ?? [], error: result.error };
+  }, []);
+  const serviceRequests = useRows(async () => {
+    const result = await listServiceRequests();
+    return { data: result.data?.requests ?? [], error: result.error };
+  }, []);
+
+  const pendingVerifications = users.data.filter((user: any) => user.verification_status === "pending").length;
+  const newOrders = orders.data.filter((order) => order.status === "submitted").length;
+  const activeOrders = orders.data.filter((order) => order.status === "confirmed" || order.status === "ready").length;
+  const newQuotations = quotations.data.filter((quotation) => quotation.status === "requested").length;
+  const openService = serviceRequests.data.filter((request) => request.status === "open").length;
+  const nextStep =
+    newOrders > 0
+      ? { href: "/admin/orders", label: `Confirm ${newOrders} new order${newOrders === 1 ? "" : "s"}` }
+      : newQuotations > 0
+        ? { href: "/admin/quotations", label: `Price ${newQuotations} quotation request${newQuotations === 1 ? "" : "s"}` }
+        : pendingVerifications > 0
+          ? { href: "/admin/users", label: `Review ${pendingVerifications} pending verification${pendingVerifications === 1 ? "" : "s"}` }
+          : null;
 
   return (
     <div className="page-stack">
       <StatsGrid
         items={[
+          { label: "New orders", value: newOrders },
+          { label: "Orders in progress", value: activeOrders },
+          { label: "Quotation requests", value: newQuotations },
+          { label: "Open service requests", value: openService },
           { label: "Users", value: users.data.length },
-          { label: "Orders", value: orders.data.length },
-          { label: "Substitutions", value: substitutions.data.length },
-          { label: "Products", value: products.data.length },
-          { label: "Assignments", value: assignments.data.length },
-          { label: "Product requests", value: requests.data.length },
-          { label: "Notes", value: notes.data.length }
+          { label: "Pending verifications", value: pendingVerifications }
         ]}
       />
       <PageSection
-        title={hasOperationalWork ? "Needs your attention" : "Start setting up your workspace"}
-        description={
-          hasOperationalWork
-            ? "Open the most important queue to keep people, orders, and supply decisions moving."
-            : "There is no pending work yet. Add products first so customers and professionals can begin planning and ordering."
-        }
+        title={nextStep ? "Needs your attention" : "All caught up"}
+        description={nextStep ? "Start with the most urgent queue." : "No new orders, quotation requests or verifications are waiting."}
       >
         <div className="inline-actions" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
-          {pendingVerifications > 0 ? (
-            <Link className="primary-button" href="/admin/users">
-              Review {pendingVerifications} pending verification{pendingVerifications === 1 ? "" : "s"}
+          {nextStep ? (
+            <Link className="primary-button" href={nextStep.href}>
+              {nextStep.label}
             </Link>
-          ) : ordersNeedingAttention > 0 ? (
-            <Link className="primary-button" href="/admin/site-orders">
-              Review {ordersNeedingAttention} order{ordersNeedingAttention === 1 ? "" : "s"}
-            </Link>
-          ) : suggestedSubstitutions > 0 ? (
-            <Link className="primary-button" href="/admin/substitutions">
-              Review {suggestedSubstitutions} substitution{suggestedSubstitutions === 1 ? "" : "s"}
-            </Link>
-          ) : (
-            <Link className="primary-button" href="/admin/orders">
-              Review orders
-            </Link>
-          )}
-          <Link className="secondary-button" href="/admin/users">
-            Review users
+          ) : null}
+          <Link className="secondary-button" href="/admin/orders">
+            Orders
+          </Link>
+          <Link className="secondary-button" href="/admin/quotations">
+            Quotations
+          </Link>
+          <Link className="secondary-button" href="/admin/price-list">
+            Price list & stock
           </Link>
         </div>
       </PageSection>
-      <PageSection
-        title="Admin operations overview"
-        description="A live summary of the people, orders, inventory, and requests you manage."
-      >
-        <CardGrid>
-          <DataCard
-            title="Verification pending"
-            meta="users"
-            subtitle="Professionals waiting to be approved"
-          >
-            <p>{pendingVerifications} awaiting review</p>
-          </DataCard>
-          <DataCard title="Orders awaiting work" meta="orders">
-            <p>{ordersNeedingAttention} awaiting action</p>
-          </DataCard>
-          <DataCard title="Substitute actions" meta="substitutions">
-            <p>{suggestedSubstitutions} pending decision{suggestedSubstitutions === 1 ? "" : "s"}</p>
-          </DataCard>
-          <DataCard title="Assignment coverage" meta="assignments">
-            <p>
-              {assignments.data.filter((item: any) => item.status === "active").length} active assignments
-            </p>
-          </DataCard>
-          <DataCard title="Custom product requests" meta="requests">
-            <p>
-              {requests.data.filter((item: any) => ["submitted", "reviewing", "matched"].includes(item.status)).length} open requests
-            </p>
-          </DataCard>
-          <DataCard title="Collaboration notes" meta="notes">
-            <p>{notes.data.length} notes logged across projects</p>
-          </DataCard>
-        </CardGrid>
-      </PageSection>
-      <AdminWorkflowMonitor />
     </div>
   );
 }
@@ -337,461 +257,5 @@ export function AdminUsersPage() {
         </QueryState>
       </QueryState>
     </PageSection>
-  );
-}
-
-export function AdminOrdersPage() {
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [selectedOrderItemId, setSelectedOrderItemId] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    site_id: "",
-    order_number: "",
-    customer_id: "",
-    electrician_id: "",
-    architect_id: "",
-    total_amount: ""
-  });
-  const mutation = useMutationAction();
-  const sites = useRows(async (client) => {
-    const { data, error } = await client.from("sites").select("id, site_name, customer_id");
-    return { data: (data ?? []) as any[], error: error?.message ?? null };
-  }, []);
-  const users = useRows(async (client) => {
-    const { data, error } = await client.from("users").select("id, full_name, role");
-    return { data: (data ?? []) as any[], error: error?.message ?? null };
-  }, []);
-  const orders = useRows(
-    async (client) => {
-      const { data, error } = await client
-        .from("site_orders")
-        .select("id, site_id, order_number, customer_id, electrician_id, architect_id, status, total_amount, confirmed_at, supplied_at")
-        .order("created_at", { ascending: false });
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
-    },
-    []
-  );
-  const orderItems = useRows(async (client) => {
-    const { data, error } = await client
-      .from("order_items")
-      .select("id, site_order_id, item_name_snapshot, quantity_required, quantity_supplied, status")
-      .order("created_at", { ascending: false });
-    return { data: (data ?? []) as any[], error: error?.message ?? null };
-  }, []);
-
-  async function saveOrder(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const client = await getSupabaseBrowserClient();
-    if (!client) return;
-    const payload = {
-      site_id: form.site_id,
-      order_number: form.order_number,
-      customer_id: form.customer_id,
-      electrician_id: form.electrician_id || null,
-      architect_id: form.architect_id || null,
-      subtotal_amount: Number(form.total_amount || 0),
-      total_amount: Number(form.total_amount || 0)
-    };
-    const ok = await mutation.run(async () => {
-      if (editingId) return client.from("site_orders").update(payload).eq("id", editingId);
-      return client.from("site_orders").insert({ ...payload, status: "draft" });
-    }, editingId ? "Order updated." : "Order created.");
-    if (ok) {
-      setEditingId(null);
-      setForm({ site_id: "", order_number: "", customer_id: "", electrician_id: "", architect_id: "", total_amount: "" });
-      orders.refetch?.();
-    }
-  }
-
-  async function markSupplied(orderItemId: string) {
-    const ok = await mutation.run(async () => markOrderItemSupplied({
-      target_order_item_id: orderItemId,
-      supplied_qty: 999999,
-      note_text: "Marked supplied from admin panel"
-    }), "Order item marked as supplied.");
-    if (ok) {
-      orders.refetch?.();
-      orderItems.refetch?.();
-      setSelectedOrderItemId(orderItemId);
-    }
-  }
-
-  async function transitionOrder(orderId: string, transitionKey: string, successMessage: string, noteText: string) {
-    const ok = await mutation.run(
-      async () => transitionSiteOrder({
-        target_site_order_id: orderId,
-        target_transition_key: transitionKey,
-        note_text: noteText,
-        event_payload: {},
-        target_source_module: "admin_orders"
-      }),
-      successMessage
-    );
-    if (ok) {
-      orders.refetch?.();
-      setSelectedOrderId(orderId);
-    }
-  }
-
-  return (
-    <div className="page-stack">
-    <FormCard title={editingId ? "Edit order" : "Create order"} description="Create or edit an order that material items are added to.">
-      <form onSubmit={saveOrder} className="auth-form">
-        <FormGrid>
-          <label>
-            Site
-            <select value={form.site_id} onChange={(e) => {
-              const site = sites.data.find((row: any) => row.id === e.target.value);
-              setForm((s) => ({ ...s, site_id: e.target.value, customer_id: site?.customer_id ?? s.customer_id }));
-            }} required>
-              <option value="">Select site</option>
-              {sites.data.map((site: any) => <option key={site.id} value={site.id}>{site.site_name}</option>)}
-            </select>
-          </label>
-          <label>
-            Order number
-            <input value={form.order_number} onChange={(e) => setForm((s) => ({ ...s, order_number: e.target.value }))} required />
-          </label>
-          <label>
-            Customer
-            <select value={form.customer_id} onChange={(e) => setForm((s) => ({ ...s, customer_id: e.target.value }))} required>
-              <option value="">Select customer</option>
-              {users.data.filter((u: any) => u.role === "customer").map((user: any) => <option key={user.id} value={user.id}>{user.full_name}</option>)}
-            </select>
-          </label>
-          <label>
-            Electrician
-            <select value={form.electrician_id} onChange={(e) => setForm((s) => ({ ...s, electrician_id: e.target.value }))}>
-              <option value="">Select electrician</option>
-              {users.data.filter((u: any) => u.role === "electrician").map((user: any) => <option key={user.id} value={user.id}>{user.full_name}</option>)}
-            </select>
-          </label>
-          <label>
-            Architect
-            <select value={form.architect_id} onChange={(e) => setForm((s) => ({ ...s, architect_id: e.target.value }))}>
-              <option value="">Select architect</option>
-              {users.data.filter((u: any) => u.role === "architect").map((user: any) => <option key={user.id} value={user.id}>{user.full_name}</option>)}
-            </select>
-          </label>
-          <label>
-            Total amount
-            <input type="number" value={form.total_amount} onChange={(e) => setForm((s) => ({ ...s, total_amount: e.target.value }))} />
-            <FormFieldHint>Order status now moves through workflow transitions, not direct form edits.</FormFieldHint>
-          </label>
-        </FormGrid>
-        <div className="form-actions">
-          <button className="primary-button" disabled={mutation.isSubmitting}>{mutation.isSubmitting ? "Saving..." : editingId ? "Update order" : "Create order"}</button>
-        </div>
-        <FormNotice error={mutation.error} success={mutation.success} />
-      </form>
-    </FormCard>
-    <PageSection title="Orders" description="Confirmed and in-progress orders.">
-      <QueryState
-        loading={orders.loading}
-        error={orders.error}
-        hasData={orders.data.length > 0}
-        empty={{ title: "No orders found", description: "Orders will appear here once they are placed." }}
-      >
-        <CardGrid>
-          {orders.data.map((order: any) => (
-            <DataCard key={order.id} title={order.order_number} subtitle={order.status} meta={`₹${Number(order.total_amount ?? 0).toLocaleString("en-IN")}`}>
-              <p>Confirmed: {order.confirmed_at ? new Date(order.confirmed_at).toLocaleDateString() : "-"}</p>
-              <p>Supplied: {order.supplied_at ? new Date(order.supplied_at).toLocaleDateString() : "-"}</p>
-              <div className="inline-actions">
-                <button type="button" className="secondary-button" onClick={() => {
-                  setEditingId(order.id);
-                  setForm({
-                    site_id: order.site_id ?? "",
-                    order_number: order.order_number ?? "",
-                    customer_id: order.customer_id ?? "",
-                    electrician_id: order.electrician_id ?? "",
-                    architect_id: order.architect_id ?? "",
-                    total_amount: String(order.total_amount ?? "")
-                  });
-                  mutation.reset();
-                }}>Edit</button>
-                <button type="button" className="secondary-button" onClick={() => setSelectedOrderId(order.id)}>
-                  Timeline
-                </button>
-                {order.status === "confirmed" ? (
-                  <button
-                    type="button"
-                    className="primary-button"
-                    disabled={mutation.isSubmitting}
-                    onClick={() => void transitionOrder(order.id, "admin_start_processing", "Order moved to processing.", "Moved into processing from admin orders.")}
-                  >
-                    Start processing
-                  </button>
-                ) : null}
-                {["confirmed", "processing", "partially_supplied"].includes(order.status) ? (
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    disabled={mutation.isSubmitting}
-                    onClick={() => void transitionOrder(order.id, "admin_mark_supplied", "Order marked supplied.", "Closed from admin orders panel.")}
-                  >
-                    Mark supplied
-                  </button>
-                ) : null}
-              </div>
-            </DataCard>
-          ))}
-        </CardGrid>
-      </QueryState>
-    </PageSection>
-    <PageSection title="Order item supply actions" description="Mark individual items as supplied.">
-      <QueryState
-        loading={orderItems.loading}
-        error={orderItems.error}
-        hasData={orderItems.data.length > 0}
-        empty={{ title: "No order items found", description: "Create material line items to manage supply actions here." }}
-      >
-        <CardGrid>
-          {orderItems.data.map((item: any) => (
-            <DataCard key={item.id} title={item.item_name_snapshot} subtitle={`Required ${item.quantity_required}`} meta={item.status}>
-              <p>Supplied: {item.quantity_supplied}</p>
-              {item.status !== "supplied" ? (
-                <div className="inline-actions">
-                  <button type="button" className="primary-button" disabled={mutation.isSubmitting} onClick={() => void markSupplied(item.id)}>
-                    Mark supplied
-                  </button>
-                  <button type="button" className="secondary-button" onClick={() => setSelectedOrderItemId(item.id)}>
-                    Timeline
-                  </button>
-                </div>
-              ) : (
-                <div className="inline-actions">
-                  <button type="button" className="secondary-button" onClick={() => setSelectedOrderItemId(item.id)}>
-                    Timeline
-                  </button>
-                </div>
-              )}
-            </DataCard>
-          ))}
-        </CardGrid>
-      </QueryState>
-    </PageSection>
-    <OrderWorkflowTimeline
-      entityType="site_order"
-      entityId={selectedOrderId}
-      title="Selected order timeline"
-      description="Header-level order transitions now flow through the same system event layer."
-    />
-    <OrderWorkflowTimeline
-      entityType="order_item"
-      entityId={selectedOrderItemId}
-      title="Selected line-item timeline"
-      description="Use this to inspect approvals, substitute actions, and supply updates for one material line."
-    />
-    </div>
-  );
-}
-
-export function AdminSubstitutionsPage() {
-  const mutation = useMutationAction();
-  const orderItems = useRows(async (client) => {
-    const { data, error } = await client.from("order_items").select("id, item_name_snapshot");
-    return { data: (data ?? []) as any[], error: error?.message ?? null };
-  }, []);
-  const products = useRows(async (client) => {
-    const { data, error } = await client.from("products").select("id, item_name");
-    return { data: (data ?? []) as any[], error: error?.message ?? null };
-  }, []);
-  const [form, setForm] = useState({ original_order_item_id: "", suggested_product_id: "", reason: "" });
-  const substitutions = useRows(
-    async (client) => {
-      const { data, error } = await client
-        .from("substitute_suggestions")
-        .select("id, original_order_item_id, status, reason, customer_response_at, created_at")
-        .order("created_at", { ascending: false });
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
-    },
-    []
-  );
-
-  async function saveSuggestion(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const ok = await mutation.run(async () => suggestSubstituteItem({
-      original_item_id: form.original_order_item_id,
-      suggested_product: form.suggested_product_id,
-      reason_text: form.reason || null
-    }), "Substitute suggested successfully.");
-    if (ok) {
-      setForm({ original_order_item_id: "", suggested_product_id: "", reason: "" });
-      substitutions.refetch?.();
-    }
-  }
-
-  return (
-    <div className="page-stack">
-      <FormCard title="Suggest substitute" description="Send a substitute suggestion for an order item.">
-        <form onSubmit={saveSuggestion} className="auth-form">
-          <FormGrid>
-            <label>
-              Original order item
-              <select value={form.original_order_item_id} onChange={(e) => setForm((s) => ({ ...s, original_order_item_id: e.target.value }))} required>
-                <option value="">Select item</option>
-                {orderItems.data.map((item: any) => <option key={item.id} value={item.id}>{item.item_name_snapshot}</option>)}
-              </select>
-            </label>
-            <label>
-              Suggested product
-              <select value={form.suggested_product_id} onChange={(e) => setForm((s) => ({ ...s, suggested_product_id: e.target.value }))} required>
-                <option value="">Select product</option>
-                {products.data.map((product: any) => <option key={product.id} value={product.id}>{product.item_name}</option>)}
-              </select>
-            </label>
-          </FormGrid>
-          <label>
-            Reason
-            <textarea value={form.reason} onChange={(e) => setForm((s) => ({ ...s, reason: e.target.value }))} />
-          </label>
-          <div className="form-actions">
-            <button className="primary-button" disabled={mutation.isSubmitting}>{mutation.isSubmitting ? "Saving..." : "Suggest substitute"}</button>
-          </div>
-          <FormNotice error={mutation.error} success={mutation.success} />
-        </form>
-      </FormCard>
-      <PageSection
-        title="Substitutions"
-        description="Admin substitution suggestions and customer responses are shown here."
-      >
-        <QueryState
-          loading={substitutions.loading}
-          error={substitutions.error}
-          hasData={substitutions.data.length > 0}
-          empty={{ title: "No substitutions yet", description: "Substitute suggestions will appear here once created." }}
-        >
-          <DataTable
-            columns={["Suggestion ID", "Original Item", "Status", "Reason", "Customer Response"]}
-            rows={substitutions.data.map((item: any) => [
-              item.id,
-              item.original_order_item_id,
-              item.status,
-              item.reason ?? "-",
-              item.customer_response_at ? new Date(item.customer_response_at).toLocaleDateString() : "-"
-            ])}
-          />
-        </QueryState>
-      </PageSection>
-    </div>
-  );
-}
-
-export function AdminContentPage() {
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ title: "", slug: "", category: "electrical_tips", summary: "", body: "", is_published: false });
-  const mutation = useMutationAction();
-  const posts = useRows(
-    async (client) => {
-      const { data, error } = await client
-        .from("content_posts")
-        .select("id, title, category, is_published, published_at, slug, summary, body")
-        .order("created_at", { ascending: false });
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
-    },
-    []
-  );
-
-  async function saveContent(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const client = await getSupabaseBrowserClient();
-    if (!client) return;
-    const payload = {
-      title: form.title,
-      slug: form.slug,
-      category: form.category,
-      summary: form.summary || null,
-      body: form.body,
-      is_published: form.is_published,
-      published_at: form.is_published ? new Date().toISOString() : null
-    };
-    const ok = await mutation.run(async () => {
-      if (editingId) return client.from("content_posts").update(payload).eq("id", editingId);
-      return client.from("content_posts").insert(payload);
-    }, editingId ? "Content updated." : "Content created.");
-    if (ok) {
-      setEditingId(null);
-      setForm({ title: "", slug: "", category: "electrical_tips", summary: "", body: "", is_published: false });
-      posts.refetch?.();
-    }
-  }
-
-  return (
-    <div className="page-stack">
-      <FormCard title={editingId ? "Edit content" : "Create content"} description="Create and edit tips and guides for customers.">
-        <form onSubmit={saveContent} className="auth-form">
-          <FormGrid>
-            <label>
-              Title
-              <input value={form.title} onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))} required />
-            </label>
-            <label>
-              Slug
-              <input value={form.slug} onChange={(e) => setForm((s) => ({ ...s, slug: e.target.value }))} required />
-            </label>
-            <label>
-              Category
-              <select value={form.category} onChange={(e) => setForm((s) => ({ ...s, category: e.target.value }))}>
-                <option value="electrical_tips">Electrical tips</option>
-                <option value="home_tips">Home tips</option>
-              </select>
-            </label>
-            <label>
-              Publish now
-              <select value={form.is_published ? "yes" : "no"} onChange={(e) => setForm((s) => ({ ...s, is_published: e.target.value === "yes" }))}>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
-            </label>
-          </FormGrid>
-          <label>
-            Summary
-            <textarea value={form.summary} onChange={(e) => setForm((s) => ({ ...s, summary: e.target.value }))} />
-          </label>
-          <label>
-            Body
-            <textarea value={form.body} onChange={(e) => setForm((s) => ({ ...s, body: e.target.value }))} required />
-          </label>
-          <div className="form-actions">
-            <button className="primary-button" disabled={mutation.isSubmitting}>{mutation.isSubmitting ? "Saving..." : editingId ? "Update content" : "Create content"}</button>
-          </div>
-          <FormNotice error={mutation.error} success={mutation.success} />
-        </form>
-      </FormCard>
-      <PageSection
-        title="Tips content"
-        description="All published and draft tips and guides."
-      >
-        <QueryState
-          loading={posts.loading}
-          error={posts.error}
-          hasData={posts.data.length > 0}
-          empty={{ title: "No content posts", description: "Create a tip to show it to customers." }}
-        >
-          <CardGrid>
-            {posts.data.map((post: any) => (
-              <DataCard key={post.slug} title={post.title} subtitle={post.category} meta={post.is_published ? "Published" : "Draft"}>
-                <p>Slug: {post.slug}</p>
-                <p>Published at: {post.published_at ? new Date(post.published_at).toLocaleDateString() : "-"}</p>
-                <div className="inline-actions">
-                  <button type="button" className="secondary-button" onClick={() => {
-                    setEditingId(post.id);
-                    setForm({
-                      title: post.title ?? "",
-                      slug: post.slug ?? "",
-                      category: post.category ?? "electrical_tips",
-                      summary: post.summary ?? "",
-                      body: post.body ?? "",
-                      is_published: Boolean(post.is_published)
-                    });
-                  }}>Edit</button>
-                </div>
-              </DataCard>
-            ))}
-          </CardGrid>
-        </QueryState>
-      </PageSection>
-    </div>
   );
 }

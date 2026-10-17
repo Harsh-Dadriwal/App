@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GetObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { getS3Client, getS3BucketName } from "@/lib/s3";
-import { createClient } from "@supabase/supabase-js";
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +15,6 @@ export async function GET(request: NextRequest) {
     const bucketName = getS3BucketName();
 
     let response;
-    let resolvedKey = key;
 
     try {
       const command = new GetObjectCommand({

@@ -227,6 +227,10 @@ export function AdminPriceListPage() {
               className={`pl-chip${category === name ? " is-active" : ""}`}
               onClick={() => chooseCategory(category === name ? null : name)}
             >
+              {categoryImages[name] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="pl-chip-img" src={getServeUrl(categoryImages[name])} alt="" loading="lazy" />
+              ) : null}
               {name} <span>{count.toLocaleString("en-IN")}</span>
             </button>
           ))}
@@ -319,7 +323,11 @@ export function AdminPriceListPage() {
               {visible.map((item, index) => {
                 const tone = stockTone(item);
                 return (
-                  <button key={`${item.item_name}|${index}`} type="button" className="pl-card" onClick={() => setSelectedIndex(index)}>
+                  <button key={`${item.item_name}|${index}`} type="button" className="pl-card pl-card--with-image" onClick={() => setSelectedIndex(index)}>
+                    {categoryImages[item.displayCategory] ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img className="pl-card-img" src={getServeUrl(categoryImages[item.displayCategory])} alt="" loading="lazy" />
+                    ) : null}
                     <span className="pl-card-meta">
                       {item.brand ? <span className="pl-card-brand">{item.brand}</span> : null}
                       <span>{item.displayCategory}</span>

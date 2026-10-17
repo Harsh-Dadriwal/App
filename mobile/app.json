@@ -32,6 +32,13 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Mahalaxmi Electricals to use your photos so you can send a picture of your requirement list.",
+          "cameraPermission": "Allow Mahalaxmi Electricals to use the camera so you can photograph your requirement list."
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "android": {

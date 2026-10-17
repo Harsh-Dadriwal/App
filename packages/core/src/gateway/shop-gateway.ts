@@ -84,6 +84,61 @@ export const ORDER_STATUS_ACTIONS: Record<OrderRequestStatus, string> = {
   cancelled: "Cancel order"
 };
 
+export type QuotationStatus = "requested" | "quoted" | "accepted" | "declined" | "cancelled";
+
+export type QuotationItem = {
+  key: string;
+  name: string;
+  category: string;
+  brand: string | null;
+  quantity: number;
+  /** Shown once the shop has priced the quotation (always to the shop). */
+  unit_price?: number;
+  mrp?: number;
+};
+
+export type Quotation = {
+  id: string;
+  quotation_number: string;
+  status: QuotationStatus;
+  expired: boolean;
+  note: string | null;
+  contact_phone: string | null;
+  /** Signed links to the requirement-list photos, valid for an hour. */
+  photo_urls: string[];
+  admin_note: string | null;
+  valid_until: string | null;
+  quoted_at: string | null;
+  order_request_id: string | null;
+  created_at: string;
+  subtotal?: number;
+  discount_amount?: number;
+  total?: number;
+  customer?: { id: string; full_name: string; phone: string | null; role: string | null };
+  items: QuotationItem[];
+};
+
+export type QuotationList = { canManage: boolean; quotations: Quotation[] };
+
+export type CreateQuotationInput = {
+  items: Array<{ key: string; quantity: number }>;
+  photo_keys: string[];
+  note?: string;
+  contact_phone?: string;
+};
+
+export type QuoteLineInput = { key?: string; name: string; category?: string; brand?: string | null; quantity: number; unit_price: number };
+
+export const QUOTATION_STATUS_LABELS: Record<QuotationStatus, string> = {
+  requested: "Waiting for prices",
+  quoted: "Quotation ready",
+  accepted: "Accepted — ordered",
+  declined: "Declined",
+  cancelled: "Cancelled"
+};
+
+export const MAX_QUOTATION_PHOTOS = 6;
+
 export type IndexedCatalogItem = CatalogItem & { searchText: string };
 
 export function indexCatalog(items: CatalogItem[]): IndexedCatalogItem[] {
@@ -148,5 +203,57 @@ export function createShopGateway({ backendRequest }: ShopGatewayDependencies) {
     });
   }
 
-  return { getPriceCatalog, listOrderRequests, createOrderRequest, updateOrderRequestStatus };
+  function listQuotations() {
+    return backendRequest<QuotationList>("/api/v1/quotations", { timeoutMs: 20_000 });
+  }
+
+  /** `form` carries one photo in the "file" field (a File on the web, { uri, name, type } on phones). */
+  function uploadQuotationPhoto(form: FormData) {
+    return backendRequest<{ key: string }>("/api/v1/quotations/photos", { method: "POST", body: form, timeoutMs: 60_000 });
+  }
+
+  function createQuotation(input: CreateQuotationInput) {
+    return backendRequest<{ id: string; quotation_number: string; status: QuotationStatus }>("/api/v1/quotations", {
+      method: "POST",
+      body: input,
+      timeoutMs: 20_000
+    });
+  }
+
+  function sendQuote(quotationId: string, input: { items: QuoteLineInput[]; discount_amount: number; admin_note?: string; valid_days: number }) {
+    return backendRequest<{ id: string; status: QuotationStatus; total: number; valid_until: string }>(`/api/v1/quotations/${quotationId}/quote`, {
+      method: "POST",
+      body: input,
+      timeoutMs: 20_000
+    });
+  }
+
+  function acceptQuotation(quotationId: string, input: { delivery_address: string; contact_phone?: string; note?: string }) {
+    return backendRequest<{ id: string; status: QuotationStatus; order_number: string }>(`/api/v1/quotations/${quotationId}/accept`, {
+      method: "POST",
+      body: input,
+      timeoutMs: 20_000
+    });
+  }
+
+  function closeQuotation(quotationId: string, adminNote?: string) {
+    return backendRequest<{ id: string; status: QuotationStatus }>(`/api/v1/quotations/${quotationId}/close`, {
+      method: "POST",
+      body: adminNote ? { admin_note: adminNote } : {},
+      timeoutMs: 15_000
+    });
+  }
+
+  return {
+    getPriceCatalog,
+    listOrderRequests,
+    createOrderRequest,
+    updateOrderRequestStatus,
+    listQuotations,
+    uploadQuotationPhoto,
+    createQuotation,
+    sendQuote,
+    acceptQuotation,
+    closeQuotation
+  };
 }

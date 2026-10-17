@@ -14,7 +14,6 @@ import { EventsModule } from "./common/events/events.module";
 import { TenancyModule } from "./common/tenancy/tenancy.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
 import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
-import { RequirementsModule } from "./modules/requirements/requirements.module";
 import { RiskModule } from "./modules/risk/risk.module";
 import { MonetizationModule } from "./modules/monetization/monetization.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
@@ -22,6 +21,7 @@ import { ProjectMediaModule } from "./modules/project-media/project-media.module
 import { PartnerIncentivesModule } from "./modules/partner-incentives/partner-incentives.module";
 import { ServiceRequestsModule } from "./modules/service-requests/service-requests.module";
 import { OrderRequestsModule } from "./modules/order-requests/order-requests.module";
+import { QuotationsModule } from "./modules/quotations/quotations.module";
 
 @Module({
   imports: [
@@ -42,14 +42,14 @@ import { OrderRequestsModule } from "./modules/order-requests/order-requests.mod
     InventoryModule,
     PaymentsModule,
     MaintenanceModule,
-    RequirementsModule,
     RiskModule,
     MonetizationModule,
     ProjectsModule,
     ProjectMediaModule,
     PartnerIncentivesModule,
     ServiceRequestsModule,
-    OrderRequestsModule
+    OrderRequestsModule,
+    QuotationsModule
   ],
   controllers: [HealthController]
 })

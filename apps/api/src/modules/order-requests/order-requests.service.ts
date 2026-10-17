@@ -108,7 +108,8 @@ export class OrderRequestsService {
     }
   }
 
-  private async listAdminIds(tenantId: string) {
+  /** Active admins of a workspace, who get notified about new orders and quotations. */
+  async listAdminIds(tenantId: string) {
     const memberships = await this.db.from("tenant_memberships").select("user_id, role").eq("tenant_id", tenantId).eq("is_active", true);
     if (memberships.error) throw new Error(memberships.error.message);
     const memberIds = (memberships.data ?? []).map((row) => row.user_id as string);
@@ -263,6 +264,49 @@ export class OrderRequestsService {
     );
 
     return { id: order.id, order_number: order.order_number, status: order.status, item_count: lines.length };
+  }
+
+  /**
+   * Turns an accepted quotation into an order at the quoted prices. Stock is not checked:
+   * the shop already agreed to supply these items when it sent the quotation.
+   */
+  async createFromQuotation(args: {
+    tenantId: string;
+    customerId: string;
+    quotationNumber: string;
+    deliveryAddress: string;
+    contactPhone: string | null;
+    note: string | null;
+    lines: Array<{ item_key: string; item_name: string; category: string; brand: string | null; quantity: number; unit_price: number; mrp: number }>;
+  }) {
+    const inserted = await this.db
+      .from("order_requests")
+      .insert({
+        tenant_id: args.tenantId,
+        customer_id: args.customerId,
+        delivery_address: args.deliveryAddress,
+        contact_phone: args.contactPhone,
+        note: [`From quotation ${args.quotationNumber}`, args.note].filter(Boolean).join(". ")
+      })
+      .select("id, order_number, status")
+      .single();
+    if (inserted.error) throw new Error(inserted.error.message);
+    const order = inserted.data as { id: string; order_number: string; status: OrderRequestStatus };
+
+    const itemInsert = await this.db.from("order_request_items").insert(args.lines.map((line) => ({ ...line, order_request_id: order.id })));
+    if (itemInsert.error) {
+      await this.db.from("order_requests").delete().eq("id", order.id);
+      throw new Error(itemInsert.error.message);
+    }
+
+    await this.notify(
+      args.tenantId,
+      (await this.listAdminIds(args.tenantId)).filter((id) => id !== args.customerId),
+      `New order ${order.order_number}`,
+      `Quotation ${args.quotationNumber} was accepted. Open Orders to confirm it.`,
+      { orderRequestId: order.id }
+    );
+    return order;
   }
 
   async updateStatus(actor: RequestActor, orderId: string, body: Record<string, unknown>) {

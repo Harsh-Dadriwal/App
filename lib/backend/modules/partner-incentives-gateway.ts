@@ -9,5 +9,4 @@ export const duplicatePartnerIncentiveScheme = gateway.duplicateScheme;
 export const deletePartnerIncentiveScheme = gateway.deleteScheme;
 export const savePartnerIncentiveSlab = gateway.saveSlab;
 export const deletePartnerIncentiveSlab = gateway.deleteSlab;
-export const listAdminRedemptions = gateway.listAdminRedemptions;
 export const resolveRedemption = gateway.resolveRedemption;

@@ -31,28 +31,29 @@ const tabConfig: Record<string, Array<{ key: MobileScreen; label: string; icon: 
     { key: "dashboard", label: "Home", icon: "home" },
     { key: "shop", label: "Shop", icon: "shopping-bag" },
     { key: "orders", label: "Orders", icon: "package" },
+    { key: "quotations", label: "Quotes", icon: "file-text" },
     { key: "service-requests", label: "Service", icon: "tool" }
   ],
   electrician: [
     { key: "dashboard", label: "Home", icon: "home" },
     { key: "shop", label: "Shop", icon: "shopping-bag" },
     { key: "orders", label: "Orders", icon: "package" },
-    { key: "service-requests", label: "Jobs", icon: "tool" },
-    { key: "incentives", label: "Rewards", icon: "award" }
+    { key: "quotations", label: "Quotes", icon: "file-text" },
+    { key: "service-requests", label: "Jobs", icon: "tool" }
   ],
   architect: [
     { key: "dashboard", label: "Home", icon: "home" },
     { key: "shop", label: "Shop", icon: "shopping-bag" },
     { key: "orders", label: "Orders", icon: "package" },
-    { key: "materials", label: "Tracker", icon: "layers" },
+    { key: "quotations", label: "Quotes", icon: "file-text" },
     { key: "incentives", label: "Rewards", icon: "award" }
   ],
   admin: [
     { key: "dashboard", label: "Home", icon: "home" },
     { key: "orders", label: "Orders", icon: "package" },
+    { key: "quotations", label: "Quotes", icon: "file-text" },
     { key: "price-list", label: "Prices", icon: "tag" },
-    { key: "service-requests", label: "Service", icon: "tool" },
-    { key: "fintech", label: "Fintech", icon: "credit-card" }
+    { key: "service-requests", label: "Service", icon: "tool" }
   ]
 };
 

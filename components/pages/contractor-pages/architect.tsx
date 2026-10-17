@@ -1,21 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { OrderWorkflowTimeline } from "@/components/order-workflow";
 import {
   CardGrid,
   DataCard,
   DataTable,
-  FormNotice,
-  ListSearchField,
   PageSection,
   QueryState,
   StatsGrid,
-  useMutationAction,
   useRows
 } from "@/components/data-view";
-import { reviewOrderItemByArchitect } from "@/lib/backend/modules/workflow-gateway";
 export function ArchitectDashboardPage() {
   const { profile } = useAuth();
   const architectId = profile?.id ?? "";
@@ -142,116 +136,5 @@ export function ArchitectProjectsPage({ mode }: { mode: "new" | "ongoing" }) {
         />
       </QueryState>
     </PageSection>
-  );
-}
-
-export function ArchitectMaterialsPage() {
-  const { profile } = useAuth();
-  const architectId = profile?.id ?? "";
-  const [archMaterialSearch, setArchMaterialSearch] = useState("");
-  const [selectedWorkflowItemId, setSelectedWorkflowItemId] = useState<string | null>(null);
-  const materials = useRows(
-    async (client) => {
-      const { data, error } = await client
-        .from("vw_architect_material_tracker")
-        .select("*")
-        .eq("architect_id", architectId);
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
-    },
-    [architectId],
-    { enabled: Boolean(architectId) }
-  );
-
-  const mutation = useMutationAction();
-
-  async function reviewItem(orderItemId: string, approve: boolean) {
-    const ok = await mutation.run(async () => reviewOrderItemByArchitect({
-      target_order_item_id: orderItemId,
-      approve,
-      note_text: approve ? "Approved by architect" : "Rejected by architect"
-    }), approve ? "Item approved by architect." : "Item rejected by architect.");
-    if (ok) materials.refetch?.();
-  }
-
-  const visibleArchMaterials = useMemo(() => {
-    const q = archMaterialSearch.trim().toLowerCase();
-    if (!q) return materials.data;
-    return materials.data.filter((item: any) =>
-      [item.item_name_snapshot, item.site_name, item.status].some((value) => String(value ?? "").toLowerCase().includes(q))
-    );
-  }, [materials.data, archMaterialSearch]);
-
-  useEffect(() => {
-    if (!selectedWorkflowItemId && visibleArchMaterials[0]?.order_item_id) {
-      setSelectedWorkflowItemId(visibleArchMaterials[0].order_item_id);
-    }
-  }, [visibleArchMaterials, selectedWorkflowItemId]);
-
-  return (
-    <div className="page-stack">
-      <PageSection
-        title="Architect material tracker"
-        description="Search items, then approve or reject those waiting for your review."
-      >
-        <QueryState
-          loading={materials.loading}
-          error={materials.error}
-          hasData={materials.data.length > 0}
-          empty={{
-            title: "No materials to track yet",
-            description: "Materials for your assigned sites will appear here."
-          }}
-        >
-          <FormNotice error={mutation.error} success={mutation.success} />
-          <ListSearchField
-            value={archMaterialSearch}
-            onChange={setArchMaterialSearch}
-            placeholder="Search by item, site, or status"
-            ariaLabel="Search architect materials"
-          />
-          <QueryState
-            loading={false}
-            error={null}
-            hasData={visibleArchMaterials.length > 0}
-            empty={{ title: "No matching lines", description: "Try another search or clear the filter." }}
-          >
-            <CardGrid>
-              {visibleArchMaterials.map((item: any) => (
-                <DataCard key={item.order_item_id} title={item.item_name_snapshot} subtitle={item.site_name} meta={item.status}>
-                  <p>Required: {item.quantity_required}</p>
-                  <p>Approved: {item.quantity_approved ?? "-"}</p>
-                  <p>Supplied: {item.quantity_supplied}</p>
-                  {item.status === "pending_architect_approval" ? (
-                    <div className="inline-actions">
-                      <button type="button" className="primary-button" disabled={mutation.isSubmitting} onClick={() => void reviewItem(item.order_item_id, true)}>
-                        Approve
-                      </button>
-                      <button type="button" className="secondary-button" disabled={mutation.isSubmitting} onClick={() => void reviewItem(item.order_item_id, false)}>
-                        Reject
-                      </button>
-                      <button type="button" className="secondary-button" onClick={() => setSelectedWorkflowItemId(item.order_item_id)}>
-                        Timeline
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="inline-actions">
-                      <button type="button" className="secondary-button" onClick={() => setSelectedWorkflowItemId(item.order_item_id)}>
-                        Timeline
-                      </button>
-                    </div>
-                  )}
-                </DataCard>
-              ))}
-            </CardGrid>
-          </QueryState>
-        </QueryState>
-      </PageSection>
-      <OrderWorkflowTimeline
-        entityType="order_item"
-        entityId={selectedWorkflowItemId}
-        title="Architect workflow timeline"
-        description="Track approvals, substitute detours, and supply updates for the currently selected material line."
-      />
-    </div>
   );
 }

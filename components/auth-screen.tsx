@@ -17,13 +17,12 @@ type EmailMode = "login" | "signup";
 /** What a customer gets from the app (every new account is a customer). */
 const PERKS: Array<{ icon: string; title: string; text: string }> = [
   { icon: "🛠️", title: "Book repairs and installations", text: "Raise a complaint or installation request and choose who does the job." },
-  { icon: "🛒", title: "Order electrical materials", text: "Order for your home or site straight from the shop." },
-  { icon: "✅", title: "Approve before it is supplied", text: "Check every item on your site's list and approve it first." },
-  { icon: "💡", title: "Plan your lighting", text: "See how lights will look in your rooms before you buy." },
+  { icon: "🛒", title: "Order with live stock", text: "See what is in stock and order for your home or site from the shop." },
+  { icon: "🧾", title: "Free quotations", text: "Send your list or a photo of it and get a priced quotation from the shop." },
   { icon: "💰", title: "Save every month", text: "Join a savings plan and get bonus points at maturity." },
   { icon: "🎁", title: "Wallet and referral rewards", text: "Earn rewards when friends you invite join." },
   { icon: "📊", title: "Track your budget", text: "Keep your project spending in one place." },
-  { icon: "📘", title: "Home and electrical tips", text: "Practical guides for a safer, smarter home." }
+  { icon: "👷", title: "Verified electricians & architects", text: "Find trusted professionals for your project." }
 ];
 
 function normalizeUsername(value: string) {

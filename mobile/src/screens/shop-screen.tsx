@@ -7,7 +7,7 @@ import { useMutationAction, useRows } from "@/components/app-state";
 import { palette, radii, shadow } from "@/lib/theme";
 import { useAuth } from "@/providers/auth-provider";
 import { useMobileNavigation } from "@/providers/navigation-provider";
-import { createOrderRequest, getPriceCatalog, listOrderRequests, updateOrderRequestStatus } from "@/lib/backend/shop-gateway";
+import { createOrderRequest, createQuotation, getPriceCatalog, listOrderRequests, updateOrderRequestStatus } from "@/lib/backend/shop-gateway";
 import { formatPriceListAmount } from "@mahalaxmi/core/gateway/inventory-gateway";
 import { countBy } from "@mahalaxmi/core/gateway/price-list-taxonomy";
 import {
@@ -202,9 +202,9 @@ export function ShopScreen() {
       <CartSheet
         visible={cartOpen}
         onClose={() => setCartOpen(false)}
-        onPlaced={() => {
+        onPlaced={(kind) => {
           setCartOpen(false);
-          navigate("orders");
+          navigate(kind === "order" ? "orders" : "quotations");
         }}
       />
     </ScreenShell>
@@ -247,7 +247,7 @@ function ShopItemRow({
   );
 }
 
-function CartSheet({ visible, onClose, onPlaced }: { visible: boolean; onClose: () => void; onPlaced: () => void }) {
+function CartSheet({ visible, onClose, onPlaced }: { visible: boolean; onClose: () => void; onPlaced: (kind: "order" | "quotation") => void }) {
   const { profile } = useAuth();
   const cart = useCart();
   const submit = useMutationAction();
@@ -271,7 +271,28 @@ function CartSheet({ visible, onClose, onPlaced }: { visible: boolean; onClose: 
       cart.clear();
       setNote("");
       Alert.alert("Order sent", `${orderNumber ? `Order ${orderNumber} received. ` : ""}We will confirm it shortly and notify you at each step.`);
-      onPlaced();
+      onPlaced("order");
+    }
+  }
+
+  // Same cart, but the shop sends prices first instead of taking the order straight away.
+  async function askForQuotation() {
+    let quotationNumber = "";
+    const ok = await submit.run(async () => {
+      const result = await createQuotation({
+        items: cart.lines.map((line) => ({ key: line.key, quantity: line.quantity })),
+        photo_keys: [],
+        note: note || undefined,
+        contact_phone: phone || undefined
+      });
+      quotationNumber = result.data?.quotation_number ?? "";
+      return { error: result.error };
+    });
+    if (ok) {
+      cart.clear();
+      setNote("");
+      Alert.alert("Quotation requested", `${quotationNumber ? `${quotationNumber} received. ` : ""}The shop will send you prices for these items.`);
+      onPlaced("quotation");
     }
   }
 
@@ -309,6 +330,7 @@ function CartSheet({ visible, onClose, onPlaced }: { visible: boolean; onClose: 
                 disabled={address.trim().length < 5}
                 onPress={() => void send()}
               />
+              <AppButton label="Ask for a quotation instead" icon="file-text" kind="secondary" disabled={submit.loading} onPress={() => void askForQuotation()} />
             </>
           ) : null}
         </ScrollView>
@@ -374,8 +396,8 @@ function OrderCard({ order, canManage, onDone }: { order: OrderRequest; canManag
           {order.note ? <Text style={styles.muted}>Note: {order.note}</Text> : null}
         </View>
       ) : null}
-      {order.items.map((item) => (
-        <View key={item.key} style={styles.orderItem}>
+      {order.items.map((item, index) => (
+        <View key={`${item.key}-${index}`} style={styles.orderItem}>
           <Text style={styles.orderItemName}>{item.name}</Text>
           <Text style={styles.orderQty}>
             × {item.quantity.toLocaleString("en-IN")}

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { OrderWorkflowTimeline } from "@/components/order-workflow";
 import {
   CardGrid,
   DataCard,
@@ -22,10 +21,6 @@ import {
 } from "@/components/data-view";
 import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
 import { roleLabels, type AppRole } from "@mahalaxmi/core/types/domain";
-import {
-  approveOrderItemByCustomer,
-  respondToSubstitute
-} from "@/lib/backend/modules/workflow-gateway";
 
 const CUSTOMER_SITE_STEPS = [
   { label: "Basics", description: "Code, name, budget" },
@@ -53,6 +48,10 @@ function formatDirectoryTitle(roles: AppRole[]) {
 
   if (roles.every((role) => CUSTOMER_DIRECTORY_TRADE_ROLES.includes(role))) {
     return "Verified handymen and trade partners";
+  }
+
+  if (roles.length === 2 && roles.includes("electrician") && roles.includes("architect")) {
+    return "Verified electricians & architects";
   }
 
   return "Verified professionals";
@@ -162,6 +161,7 @@ export function DirectoryPage({
   roles: AppRole[];
 }) {
   const [dirSearch, setDirSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<AppRole | null>(null);
   const title = useMemo(() => formatDirectoryTitle(roles), [roles]);
   const placeholder = useMemo(() => formatDirectoryPlaceholder(roles), [roles]);
   const directory = useRows(
@@ -180,8 +180,9 @@ export function DirectoryPage({
 
   const visibleDirectory = useMemo(() => {
     const q = dirSearch.trim().toLowerCase();
-    if (!q) return directory.data;
-    return directory.data.filter((person: any) =>
+    const byRole = roleFilter ? directory.data.filter((person: any) => person.role === roleFilter) : directory.data;
+    if (!q) return byRole;
+    return byRole.filter((person: any) =>
       [
         person.full_name,
         person.username,
@@ -194,7 +195,7 @@ export function DirectoryPage({
       ]
         .some((value) => String(value ?? "").toLowerCase().includes(q))
     );
-  }, [directory.data, dirSearch]);
+  }, [directory.data, dirSearch, roleFilter]);
 
   return (
     <div className="page-stack">
@@ -211,6 +212,23 @@ export function DirectoryPage({
             description: "There are currently no verified professionals in this directory. When admin verifies them, they will appear here automatically."
           }}
         >
+          {roles.length > 1 ? (
+            <div className="pl-chips" role="tablist" aria-label="Show">
+              {[null, ...roles].map((role) => (
+                <button
+                  key={role ?? "all"}
+                  type="button"
+                  role="tab"
+                  aria-selected={roleFilter === role}
+                  className={`pl-chip${roleFilter === role ? " is-active" : ""}`}
+                  onClick={() => setRoleFilter(role)}
+                >
+                  {role ? `${roleLabels[role]}s` : "All"}{" "}
+                  <span>{(role ? directory.data.filter((person: any) => person.role === role) : directory.data).length}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
           <ListSearchField
             value={dirSearch}
             onChange={setDirSearch}
@@ -558,68 +576,6 @@ export function CustomerSitesPage() {
   );
 }
 
-export function TipsPage({ category }: { category: "electrical_tips" | "home_tips" }) {
-  const [tipSearch, setTipSearch] = useState("");
-  const posts = useRows(
-    async (client) => {
-      const { data, error } = await client
-        .from("content_posts")
-        .select("id, title, summary, published_at, category")
-        .eq("category", category)
-        .eq("is_published", true)
-        .order("published_at", { ascending: false });
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
-    },
-    [category]
-  );
-
-  const visibleTips = useMemo(() => {
-    const q = tipSearch.trim().toLowerCase();
-    if (!q) return posts.data;
-    return posts.data.filter((post: any) =>
-      [post.title, post.summary].some((value) => String(value ?? "").toLowerCase().includes(q))
-    );
-  }, [posts.data, tipSearch]);
-
-  return (
-    <div className="page-stack">
-      <PageSection
-        title={category === "electrical_tips" ? "Electrical tips & tricks" : "Home tips & tricks"}
-        description="Helpful tips and guides for your project."
-      >
-        <QueryState
-          loading={posts.loading}
-          error={posts.error}
-          hasData={posts.data.length > 0}
-          empty={{
-            title: "No tips published yet",
-            description: `There are no tips in the "${category}" category yet.`
-          }}
-        >
-          <ListSearchField value={tipSearch} onChange={setTipSearch} placeholder="Search tips by title or summary" ariaLabel="Search tips" />
-          <QueryState
-            loading={false}
-            error={null}
-            hasData={visibleTips.length > 0}
-            empty={{ title: "No matching tips", description: "Try different words or clear the search." }}
-          >
-            <CardGrid>
-              {visibleTips.map((post: any) => (
-                <DataCard
-                  key={post.id}
-                  title={post.title}
-                  subtitle={post.summary}
-                  meta={post.published_at ? new Date(post.published_at).toLocaleDateString() : "Draft"}
-                />
-              ))}
-            </CardGrid>
-          </QueryState>
-        </QueryState>
-      </PageSection>
-    </div>
-  );
-}
-
 export function CustomerBudgetPage() {
   const { profile } = useAuth();
   const customerId = profile?.id ?? "";
@@ -661,118 +617,6 @@ export function CustomerBudgetPage() {
           ])}
         />
       </QueryState>
-    </PageSection>
-  );
-}
-
-export function CustomerApprovalsPage() {
-  const { profile } = useAuth();
-  const customerId = profile?.id ?? "";
-  const [selectedWorkflowItemId, setSelectedWorkflowItemId] = useState<string | null>(null);
-  const approvals = useRows(
-    async (client) => {
-      const { data, error } = await client
-        .from("vw_customer_items_on_approval")
-        .select("*")
-        .eq("customer_id", customerId);
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
-    },
-    [customerId],
-    { enabled: Boolean(customerId) }
-  );
-
-  const mutation = useMutationAction();
-  const suggestions = useRows(
-    async (client) => {
-      const { data, error } = await client
-        .from("substitute_suggestions")
-        .select("id, original_order_item_id, suggested_product_id, status")
-        .eq("customer_id", customerId)
-        .eq("status", "suggested");
-      return { data: (data ?? []) as any[], error: error?.message ?? null };
-    },
-    [customerId],
-    { enabled: Boolean(customerId) }
-  );
-
-  async function respond(orderItemId: string, approve: boolean) {
-    const suggestion = suggestions.data.find((item: any) => item.original_order_item_id === orderItemId);
-    const ok = await mutation.run(
-      async () => {
-        if (suggestion) {
-          return respondToSubstitute({
-            suggestion_id: suggestion.id,
-            accept_choice: approve
-          });
-        }
-        return approveOrderItemByCustomer({
-          target_order_item_id: orderItemId,
-          approve,
-          note_text: approve ? "Approved from customer app" : "Rejected from customer app"
-        });
-      },
-      suggestion
-        ? approve
-          ? "Substitute accepted."
-          : "Substitute rejected."
-        : approve
-          ? "Item approved."
-          : "Item rejected."
-    );
-    if (ok) {
-      approvals.refetch?.();
-      suggestions.refetch?.();
-      setSelectedWorkflowItemId(orderItemId);
-    }
-  }
-
-  useEffect(() => {
-    if (!selectedWorkflowItemId && approvals.data[0]?.order_item_id) {
-      setSelectedWorkflowItemId(approvals.data[0].order_item_id);
-    }
-  }, [approvals.data, selectedWorkflowItemId]);
-
-  return (
-    <PageSection
-      title="Items on approval"
-      description="Customer approval queue for material items and substitution decisions."
-    >
-      <QueryState
-        loading={approvals.loading}
-        error={approvals.error}
-        hasData={approvals.data.length > 0}
-        empty={{
-          title: "No approval items waiting",
-          description: "Items awaiting your approval will appear here."
-        }}
-      >
-        <FormNotice error={mutation.error} success={mutation.success} />
-        <CardGrid>
-          {approvals.data.map((item: any) => (
-            <DataCard
-              key={item.order_item_id}
-              title={item.item_name_snapshot}
-              subtitle={item.site_name}
-              meta={item.status}
-            >
-              <p>Brand: {item.brand_name_snapshot ?? "-"}</p>
-              <p>Quantity: {item.quantity_required ?? "-"}</p>
-              <p>Line total: ₹{Number(item.line_total ?? 0).toLocaleString("en-IN")}</p>
-              <div className="inline-actions">
-                <button type="button" className="primary-button" disabled={mutation.isSubmitting} onClick={() => void respond(item.order_item_id, true)}>Approve</button>
-                <button type="button" className="secondary-button" disabled={mutation.isSubmitting} onClick={() => void respond(item.order_item_id, false)}>Reject</button>
-                <button type="button" className="secondary-button" onClick={() => setSelectedWorkflowItemId(item.order_item_id)}>Timeline</button>
-              </div>
-            </DataCard>
-          ))}
-        </CardGrid>
-      </QueryState>
-      <OrderWorkflowTimeline
-        entityType="order_item"
-        entityId={selectedWorkflowItemId}
-        title="Customer approval timeline"
-        description="See how this line moved through architect review, substitute steps, and final customer action."
-      />
     </PageSection>
   );
 }

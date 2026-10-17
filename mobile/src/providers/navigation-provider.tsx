@@ -3,11 +3,9 @@ import { BackHandler } from "react-native";
 
 export type MobileScreen =
   | "dashboard"
-  | "lighting"
   | "shop"
   | "orders"
-  | "approvals"
-  | "materials"
+  | "quotations"
   | "incentives"
   | "notes"
   | "price-list"

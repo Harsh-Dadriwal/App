@@ -9,14 +9,12 @@ import { AuthProvider, useAuth } from "@/providers/auth-provider";
 import { NavigationProvider, useMobileNavigation } from "@/providers/navigation-provider";
 import { AuthScreen } from "@/screens/auth-screen";
 import { DashboardScreen } from "@/screens/dashboard-screen";
-import { ApprovalsScreen } from "@/screens/approvals-screen";
-import { MaterialsScreen } from "@/screens/materials-screen";
 import { NotesScreen } from "@/screens/notes-screen";
 import { PriceListScreen } from "@/screens/price-list-screen";
 import { OrdersScreen, ShopScreen } from "@/screens/shop-screen";
+import { QuotationsScreen } from "@/screens/quotations-screen";
 import { ServiceRequestsScreen } from "@/screens/service-requests-screen";
 import { FintechScreen } from "@/screens/fintech-screen";
-import { LightingScreen } from "@/screens/lighting-screen";
 import { IncentivesScreen } from "@/screens/incentives-screen";
 
 function Splash({ title, message, busy }: { title?: string; message: string; busy?: boolean }) {
@@ -76,9 +74,7 @@ function AppBody() {
 
   if (screen === "shop") return <ShopScreen />;
   if (screen === "orders") return <OrdersScreen />;
-  if (screen === "lighting") return <LightingScreen />;
-  if (screen === "approvals") return <ApprovalsScreen />;
-  if (screen === "materials") return <MaterialsScreen />;
+  if (screen === "quotations") return <QuotationsScreen />;
   if (screen === "incentives") return <IncentivesScreen />;
   if (screen === "notes") return <NotesScreen />;
   if (screen === "price-list") return <PriceListScreen />;
