@@ -7,3 +7,8 @@ dist/
 
 expo-env.d.ts
 # @end expo-cli
+
+# Native folders are generated during each build (continuous native generation),
+# so they never belong in git and must not count toward the update fingerprint.
+/android
+/ios

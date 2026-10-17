@@ -2,6 +2,10 @@
   "expo": {
     "name": "Mahalaxmi Electricals",
     "slug": "mahalaxmi-electricals-mobile",
+    "platforms": [
+      "android",
+      "ios"
+    ],
     "scheme": "mahalaxmimobile",
     "version": "1.0.0",
     "orientation": "portrait",
