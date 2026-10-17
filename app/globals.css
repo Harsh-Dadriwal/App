@@ -2765,3 +2765,41 @@ input.quote-rate:not([type]) { width: 6.5rem; padding: 0.45rem 0.5rem; text-alig
 }
 .incentive-scheme-block { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1.25rem; }
 .incentive-scheme-block h4 { margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+
+/* Partner incentives: one panel per audience */
+.incentive-audience-tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.75rem; }
+.incentive-audience {
+  display: flex; align-items: center; gap: 0.75rem; padding: 0.9rem 1rem;
+  font: inherit; text-align: left; color: var(--text-main); background: var(--surface);
+  border: 2px solid var(--border-color); border-radius: var(--radius-xl); cursor: pointer;
+}
+.incentive-audience strong { display: block; font-size: 1.05rem; }
+.incentive-audience small { color: var(--text-muted); }
+.incentive-audience-icon { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 12px; font-size: 1.3rem; background: var(--surface-hover); }
+.incentive-audience--electrician.is-active { border-color: #d97706; background: #fff7e6; }
+.incentive-audience--electrician .incentive-audience-icon { background: #fde68a; }
+.incentive-audience--architect.is-active { border-color: #0f766e; background: #ecfdf8; }
+.incentive-audience--architect .incentive-audience-icon { background: #99f6e4; }
+.incentive-audience--all.is-active { border-color: #475569; background: #f1f5f9; }
+.incentive-panel {
+  display: flex; flex-direction: column; gap: 1rem; padding: 1.25rem;
+  border-radius: var(--radius-xl); border: 1px solid var(--border-color); border-top: 6px solid #475569; background: var(--card-bg);
+}
+.incentive-panel--electrician { border-top-color: #d97706; }
+.incentive-panel--architect { border-top-color: #0f766e; }
+.incentive-panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+.incentive-panel-head h3 { margin: 0.15rem 0 0.35rem; font-size: 1.35rem; }
+.incentive-panel-head p { margin: 0; max-width: 60ch; color: var(--text-main); font-size: 1rem; }
+.incentive-kicker { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.incentive-tiers { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; }
+.incentive-tier { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.9rem 1rem; background: var(--surface); border: 1px solid var(--border-color); border-radius: var(--radius-lg); }
+.incentive-tier-name { font-size: 1.15rem; font-weight: 800; }
+.incentive-tier-range { font-weight: 600; font-size: 0.92rem; }
+.incentive-tier-range small { display: block; font-weight: 400; color: var(--text-muted); }
+.incentive-tier dl { margin: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.incentive-tier dl div { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.9rem; }
+.incentive-tier dt { color: var(--text-muted); }
+.incentive-tier dd { margin: 0; font-weight: 800; }
+.incentive-form { padding: 1rem; border: 1px dashed var(--border-color); border-radius: var(--radius-lg); background: var(--surface); }
+.incentive-form h4 { margin: 0; }
+.incentive-other-schemes summary { cursor: pointer; color: var(--text-muted); font-weight: 600; }
