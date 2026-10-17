@@ -39,6 +39,13 @@
         }
       ],
       [
+        "expo-notifications",
+        {
+          "color": "#c2570c",
+          "defaultChannel": "default"
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "android": {

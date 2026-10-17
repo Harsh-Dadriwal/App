@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { SupabaseAdminService } from "../../common/supabase/supabase-admin.service";
 import { QUEUE_NAMES } from "../../common/queue/queue.constants";
 import { QueueService } from "../../common/queue/queue.service";
@@ -109,6 +109,28 @@ export class NotificationsService {
     });
 
     return notificationIds;
+  }
+
+  /** Remembers this phone's Expo push token so new notifications also reach it. */
+  async registerPushToken(actor: RequestActor, token: unknown, platform: unknown) {
+    if (!actor.appUserId) throw new UnauthorizedException("Your profile could not be found. Please sign in again.");
+    const value = typeof token === "string" ? token.trim() : "";
+    if (!/^(ExponentPushToken|ExpoPushToken)\[[^\]]{10,200}\]$/.test(value)) throw new BadRequestException("This device could not be registered for notifications.");
+    const result = await this.supabaseAdmin
+      .getClient()
+      .from("push_tokens")
+      // A phone that changes hands moves to its new owner.
+      .upsert({ token: value, user_id: actor.appUserId, platform: platform === "ios" ? "ios" : "android", updated_at: new Date().toISOString() }, { onConflict: "token" });
+    if (result.error) throw new Error(result.error.message);
+    return { registered: true };
+  }
+
+  /** Stops pushes to this phone, e.g. on sign-out. */
+  async removePushToken(actor: RequestActor, token: unknown) {
+    if (!actor.appUserId || typeof token !== "string") return { removed: false };
+    const result = await this.supabaseAdmin.getClient().from("push_tokens").delete().eq("token", token.trim()).eq("user_id", actor.appUserId);
+    if (result.error) throw new Error(result.error.message);
+    return { removed: true };
   }
 
   async createBulkNotifications(args: {

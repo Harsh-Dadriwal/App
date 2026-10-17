@@ -140,12 +140,48 @@ export class OrderRequestsService {
     return (users.data ?? []).filter((user) => user.role === "admin" || adminMemberships.has(user.id)).map((user) => user.id as string);
   }
 
+  /** Customers whose sites this electrician/architect is currently assigned to. */
+  private async assignedCustomerIds(tenantId: string, professionalId: string) {
+    const assignments = await this.db.from("site_assignments").select("site_id").eq("tenant_id", tenantId).eq("user_id", professionalId).eq("status", "active");
+    if (assignments.error) throw new Error(assignments.error.message);
+    const siteIds = (assignments.data ?? []).map((row: any) => row.site_id as string);
+    if (!siteIds.length) return [] as string[];
+    const sites = await this.db.from("sites").select("customer_id").in("id", siteIds);
+    if (sites.error) throw new Error(sites.error.message);
+    return [...new Set((sites.data ?? []).map((row: any) => row.customer_id as string).filter(Boolean))];
+  }
+
+  /**
+   * The electricians and architects who should hear about a customer's order: the one who
+   * brought it (partner) and those assigned to the customer's sites.
+   */
+  async linkedProfessionalIds(tenantId: string, customerId: string, partnerId: string | null) {
+    const ids = new Set<string>(partnerId ? [partnerId] : []);
+    const sites = await this.db.from("sites").select("id").eq("tenant_id", tenantId).eq("customer_id", customerId);
+    if (!sites.error && sites.data?.length) {
+      const assignments = await this.db
+        .from("site_assignments")
+        .select("user_id")
+        .eq("status", "active")
+        .in("site_id", sites.data.map((row: any) => row.id));
+      for (const row of assignments.data ?? []) ids.add(row.user_id as string);
+    }
+    ids.delete(customerId);
+    return [...ids];
+  }
+
   async list(actor: RequestActor) {
     const { userId, tenantId, role } = await this.requireContext(actor);
     const isAdmin = isAdminRole(role);
 
     let query = this.db.from("order_requests").select(ORDER_COLUMNS).eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(200);
-    if (!isAdmin) query = query.eq("customer_id", userId);
+    if (isPartnerRole(role)) {
+      // Their own orders, plus orders from customers they brought in or work for.
+      const customers = await this.assignedCustomerIds(tenantId, userId);
+      query = query.or([`customer_id.eq.${userId}`, `partner_id.eq.${userId}`, ...(customers.length ? [`customer_id.in.(${customers.join(",")})`] : [])].join(","));
+    } else if (!isAdmin) {
+      query = query.eq("customer_id", userId);
+    }
     const orders = await query;
     if (orders.error) throw new Error(orders.error.message);
     const rows = (orders.data ?? []) as OrderRow[];
@@ -155,7 +191,7 @@ export class OrderRequestsService {
     if (rows.length) {
       const [itemResult, userResult] = await Promise.all([
         this.db.from("order_request_items").select(ITEM_COLUMNS).in("order_request_id", rows.map((row) => row.id)),
-        isAdmin
+        isAdmin || isPartnerRole(role)
           ? this.db
               .from("users")
               .select("id, full_name, phone, role")
@@ -193,6 +229,9 @@ export class OrderRequestsService {
           updated_at: row.updated_at,
           item_count: lines.length,
           total_quantity: lines.reduce((sum, line) => sum + Number(line.quantity), 0),
+          // For electricians/architects: was this their own order, or one of their customers'?
+          relation: row.customer_id === userId ? ("mine" as const) : ("customer" as const),
+          ...(!isAdmin && row.customer_id !== userId && customer ? { customer_name: customer.full_name } : {}),
           // Prices are settled at billing; only the shop sees the price list estimate.
           ...(isAdmin
             ? {
@@ -309,6 +348,15 @@ export class OrderRequestsService {
       { orderRequestId: order.id }
     );
 
+    const professionals = await this.linkedProfessionalIds(tenantId, customerId, args.partnerId);
+    await this.notify(
+      tenantId,
+      professionals,
+      `${who} placed order ${order.order_number}`,
+      `${lines.length} item${lines.length === 1 ? "" : "s"}${args.partnerId && professionals.includes(args.partnerId) ? " — you earn incentives when it is delivered" : ""}. Open Orders to see it.`,
+      { orderRequestId: order.id }
+    );
+
     return { id: order.id, order_number: order.order_number, status: order.status, item_count: lines.length };
   }
 
@@ -411,6 +459,18 @@ export class OrderRequestsService {
     } else {
       const admins = await this.listAdminIds(tenantId);
       await this.notify(tenantId, admins, `Order ${order.order_number} cancelled`, "The customer cancelled this order.", { orderRequestId: order.id, status });
+    }
+
+    const professionals = (await this.linkedProfessionalIds(tenantId, order.customer_id, order.partner_id)).filter((id) => id !== userId);
+    if (professionals.length) {
+      const customer = await this.db.from("users").select("full_name").eq("id", order.customer_id).maybeSingle();
+      await this.notify(
+        tenantId,
+        professionals,
+        `${customer.data?.full_name ?? "Customer"}'s order ${order.order_number} ${STATUS_MESSAGES[status]}`,
+        status === "delivered" && order.partner_id && professionals.includes(order.partner_id) ? "Your incentive for it has been added." : "Open Orders for the details.",
+        { orderRequestId: order.id, status }
+      );
     }
 
     return { id: order.id, status };

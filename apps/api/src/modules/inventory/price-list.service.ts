@@ -1,7 +1,8 @@
-import { BadGatewayException, BadRequestException, Injectable, Logger, ServiceUnavailableException } from "@nestjs/common";
+import { BadGatewayException, BadRequestException, Injectable, Logger, Optional, ServiceUnavailableException } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import { sign } from "jsonwebtoken";
 import { SupabaseAdminService } from "../../common/supabase/supabase-admin.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { DEFAULT_CATEGORY_IMAGE_FILES, indexPriceList, type IndexedPriceListItem } from "../../core/gateway/price-list-taxonomy";
 import { parsePriceListDocument } from "./price-list.parser";
 
@@ -22,7 +23,7 @@ export type PriceListView = "full" | "prices" | "catalog";
 
 type RawRow = { category: string; group_name: string; item_name: string; final_price: number; mrp: number; cost_price: number; stock_label: string };
 export type SnapshotItem = IndexedPriceListItem<RawRow> & { key: string };
-type SyncState = { content_hash: string; item_count: number; synced_at: string; checked_at: string };
+type SyncState = { content_hash: string; item_count: number; synced_at: string; checked_at: string; last_error?: string | null };
 type Snapshot = {
   version: string;
   syncedAt: string | null;
@@ -58,7 +59,10 @@ export class PriceListService {
   private driveToken: { value: string; expiresAt: number } | null = null;
   private readonly cache = new Map<string, Snapshot>();
 
-  constructor(private readonly supabaseAdmin: SupabaseAdminService) {}
+  constructor(
+    private readonly supabaseAdmin: SupabaseAdminService,
+    @Optional() private readonly notifications?: NotificationsService
+  ) {}
 
   private get db() {
     return this.supabaseAdmin.getClient();
@@ -151,11 +155,29 @@ export class PriceListService {
   private async getSyncState(tenantId: string) {
     const result = await this.db
       .from("price_list_sync_state")
-      .select("content_hash, item_count, synced_at, checked_at")
+      .select("content_hash, item_count, synced_at, checked_at, last_error")
       .eq("tenant_id", tenantId)
       .maybeSingle();
     if (result.error) throw new Error(result.error.message);
     return (result.data as SyncState | null) ?? null;
+  }
+
+  /** Tells the admins once when syncing starts failing (not on every 15-minute retry). */
+  private async reportSyncProblem(tenantId: string, message: string) {
+    try {
+      const previous = await this.getSyncState(tenantId);
+      if (previous?.last_error || !this.notifications) return;
+      const admins = await this.db.from("users").select("id").eq("role", "admin").eq("status", "active");
+      await this.notifications.createBulkNotifications({
+        tenantId,
+        userIds: (admins.data ?? []).map((row: any) => row.id as string),
+        title: "Price list could not update from Tally",
+        body: `${message} Stock in the app stays as it was until this is fixed.`,
+        data: { module: "price_list" }
+      });
+    } catch (error) {
+      this.logger.warn(`Sync problem notification failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   private async saveSyncState(tenantId: string, state: Partial<SyncState> & { last_error?: string | null }) {
@@ -178,6 +200,7 @@ export class PriceListService {
     } catch (error) {
       this.logger.error(error instanceof Error ? error.message : String(error));
       const message = error instanceof PriceListSourceError ? error.message : DOWNLOAD_FAILED;
+      await this.reportSyncProblem(tenantId, message);
       await this.saveSyncState(tenantId, { checked_at: new Date().toISOString(), last_error: message });
       throw new BadGatewayException(message);
     }
@@ -187,6 +210,7 @@ export class PriceListService {
     // keep the last good snapshot instead of wiping it.
     if (!items.length) {
       const message = "No items were found in the latest price list file, so the current list was kept.";
+      await this.reportSyncProblem(tenantId, message);
       await this.saveSyncState(tenantId, { checked_at: new Date().toISOString(), last_error: message });
       throw new BadGatewayException(message);
     }

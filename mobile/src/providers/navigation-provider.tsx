@@ -7,6 +7,7 @@ export type MobileScreen =
   | "orders"
   | "quotations"
   | "selections"
+  | "notifications"
   | "incentives"
   | "notes"
   | "price-list"

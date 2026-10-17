@@ -14,6 +14,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { clearQueryCache, setQueryCacheScope } from "@mahalaxmi/core/hooks/query-cache";
 import { configureShopStorage } from "@mahalaxmi/core/hooks/shop-store";
+import { unregisterPushNotifications } from "@/lib/notifications";
 
 // The catalogue and cart are kept on the phone so the shop opens instantly.
 configureShopStorage(AsyncStorage);
@@ -221,6 +222,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function signOut() {
+    // Stop pushes to this phone while the session can still prove who it is.
+    await unregisterPushNotifications();
     if (!supabase) return;
     try {
       await supabase.auth.signOut();

@@ -100,9 +100,20 @@ export function createNotificationsGateway({
     return { data: result.data ?? null, error: result.error?.message ?? null };
   }
 
+  /** Lets the server push new notifications to this phone (Expo push token). */
+  function registerPushToken(token: string, platform: "android" | "ios") {
+    return backendRequest<{ registered: boolean }>("/api/v1/notifications/push-token", { method: "POST", body: { token, platform }, timeoutMs: 15_000 });
+  }
+
+  function removePushToken(token: string) {
+    return backendRequest<{ removed: boolean }>("/api/v1/notifications/push-token/remove", { method: "POST", body: { token }, timeoutMs: 8_000 });
+  }
+
   return {
     listNotifications,
     markNotificationRead,
-    markAllNotificationsRead
+    markAllNotificationsRead,
+    registerPushToken,
+    removePushToken
   };
 }

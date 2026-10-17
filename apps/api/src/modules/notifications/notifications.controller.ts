@@ -28,6 +28,16 @@ export class NotificationsController {
     };
   }
 
+  @Post("/push-token")
+  async registerPushToken(@Req() request: AuthenticatedRequest, @Body() body: { token?: string; platform?: string }) {
+    return { data: await this.notificationsService.registerPushToken(request.actor!, body?.token, body?.platform) };
+  }
+
+  @Post("/push-token/remove")
+  async removePushToken(@Req() request: AuthenticatedRequest, @Body() body: { token?: string }) {
+    return { data: await this.notificationsService.removePushToken(request.actor!, body?.token) };
+  }
+
   @Post("/mark-read")
   async markRead(@Req() request: AuthenticatedRequest, @Body() body: { notificationId: string }) {
     return {

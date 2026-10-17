@@ -377,6 +377,7 @@ function OrderCard({ order, canManage, onDone }: { order: OrderRequest; canManag
       <View style={styles.orderHead}>
         <View style={{ flex: 1 }}>
           <Text style={styles.orderNumber}>{order.order_number}</Text>
+          {order.relation === "customer" ? <Text style={styles.customerTag}>Customer: {order.customer_name ?? "—"}</Text> : null}
           <Text style={styles.muted}>{new Date(order.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</Text>
         </View>
         <Text style={[styles.stockPill, statusColors(order.status)]}>{ORDER_STATUS_LABELS[order.status]}</Text>
@@ -426,7 +427,7 @@ function OrderCard({ order, canManage, onDone }: { order: OrderRequest; canManag
           </View>
         </>
       ) : null}
-      {!canManage && order.status === "submitted" ? (
+      {!canManage && order.relation !== "customer" && order.status === "submitted" ? (
         <Pressable onPress={() => void change("cancelled")} hitSlop={8} accessibilityRole="button">
           <Text style={[styles.link, { color: palette.danger }]}>Cancel order</Text>
         </Pressable>
@@ -456,7 +457,7 @@ export function OrdersScreen() {
   const list = canManage ? all.filter((order) => statuses.includes(order.status)) : all;
 
   return (
-    <ScreenShell title={canManage ? "Orders" : "My orders"} subtitle={canManage ? "Orders sent from the price list" : "Track what you ordered"} currentScreen="orders">
+    <ScreenShell title={canManage ? "Orders" : "My orders"} subtitle={canManage ? "Orders sent from the price list" : all.some((order) => order.relation === "customer") ? "Your orders and your customers' orders" : "Track what you ordered"} currentScreen="orders">
       {canManage ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
           {ADMIN_FILTERS.map((option) => {
@@ -560,6 +561,7 @@ const styles = StyleSheet.create({
   },
   orderHead: { flexDirection: "row", alignItems: "center", gap: 10 },
   orderNumber: { fontSize: 16, fontWeight: "900", color: palette.ink },
+  customerTag: { alignSelf: "flex-start", marginTop: 2, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, overflow: "hidden", fontSize: 12, fontWeight: "800", color: palette.teal, backgroundColor: palette.tealSoft },
   steps: { flexDirection: "row", gap: 4 },
   step: { flex: 1, height: 4, borderRadius: 4, backgroundColor: palette.line },
   stepDone: { backgroundColor: palette.teal },

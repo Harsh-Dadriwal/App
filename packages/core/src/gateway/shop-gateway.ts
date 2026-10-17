@@ -44,6 +44,9 @@ export type OrderRequest = {
   updated_at: string;
   item_count: number;
   total_quantity: number;
+  /** For electricians/architects: their own order, or one of their customers' orders. */
+  relation?: "mine" | "customer";
+  customer_name?: string;
   /** Only sent to the shop's admins. */
   customer?: { id: string; full_name: string; phone: string | null; role: string | null } | null;
   /** Only for the shop: the electrician/architect who earns incentives on this order. */

@@ -452,6 +452,8 @@ export function MyOrdersPage({ shopHref }: { shopHref: string }) {
   const orders = useOrders();
   const cancel = useMutationAction();
   const list = orders.data[0]?.orders ?? [];
+  const mine = list.filter((order) => order.relation !== "customer");
+  const customers = list.filter((order) => order.relation === "customer");
 
   return (
     <div className="page-stack">
@@ -471,38 +473,48 @@ export function MyOrdersPage({ shopHref }: { shopHref: string }) {
         hasData={list.length > 0}
         empty={{ title: "No orders yet", description: "Browse the catalogue, add items to your cart and send your order." }}
       >
-        <div className="order-list">
-          {list.map((order) => (
-            <article key={order.id} className="order-card">
-              <header>
-                <div>
-                  <strong>{order.order_number}</strong>
-                  <span className="shop-muted"> · {formatWhen(order.created_at)}</span>
-                </div>
-                <span className={`order-status order-status--${order.status}`}>{ORDER_STATUS_LABELS[order.status]}</span>
-              </header>
-              <OrderProgress status={order.status} />
-              <OrderItems order={order} showPrices={false} />
-              {order.admin_note ? <p className="order-note">Shop: {order.admin_note}</p> : null}
-              {order.status === "submitted" ? (
-                <button
-                  type="button"
-                  className="text-link-button"
-                  disabled={cancel.isSubmitting}
-                  onClick={() => {
-                    if (window.confirm(`Cancel order ${order.order_number}?`)) {
-                      void cancel.run(() => updateOrderRequestStatus(order.id, "cancelled"), `Order ${order.order_number} cancelled.`);
-                    }
-                  }}
-                >
-                  Cancel order
-                </button>
-              ) : null}
-            </article>
-          ))}
-        </div>
+        {mine.length ? (
+          <div className="order-list">
+            {mine.map((order) => (
+              <MyOrderCard key={order.id} order={order} onCancel={() => window.confirm(`Cancel order ${order.order_number}?`) && void cancel.run(() => updateOrderRequestStatus(order.id, "cancelled"), `Order ${order.order_number} cancelled.`)} busy={cancel.isSubmitting} />
+            ))}
+          </div>
+        ) : null}
+        {customers.length ? (
+          <>
+            <h3 className="shop-title" style={{ fontSize: "1.2rem", marginTop: "0.5rem" }}>Your customers&apos; orders</h3>
+            <p className="shop-muted">Orders from customers you brought in or whose site you work on. You get a notification at every step.</p>
+            <div className="order-list">
+              {customers.map((order) => (
+                <MyOrderCard key={order.id} order={order} />
+              ))}
+            </div>
+          </>
+        ) : null}
       </QueryState>
     </div>
+  );
+}
+
+function MyOrderCard({ order, onCancel, busy }: { order: OrderRequest; onCancel?: () => void; busy?: boolean }) {
+  return (
+    <article className="order-card">
+      <header>
+        <div>
+          <strong>{order.relation === "customer" ? `${order.customer_name ?? "Customer"} · ${order.order_number}` : order.order_number}</strong>
+          <span className="shop-muted"> · {formatWhen(order.created_at)}</span>
+        </div>
+        <span className={`order-status order-status--${order.status}`}>{ORDER_STATUS_LABELS[order.status]}</span>
+      </header>
+      <OrderProgress status={order.status} />
+      <OrderItems order={order} showPrices={false} />
+      {order.admin_note ? <p className="order-note">Shop: {order.admin_note}</p> : null}
+      {onCancel && order.status === "submitted" ? (
+        <button type="button" className="text-link-button" disabled={busy} onClick={onCancel}>
+          Cancel order
+        </button>
+      ) : null}
+    </article>
   );
 }
 

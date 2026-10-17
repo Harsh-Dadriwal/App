@@ -9,6 +9,8 @@ function setup() {
   const tables: Record<string, Row[]> = {
     order_requests: [],
     order_request_items: [],
+    sites: [{ id: "site-1", tenant_id: "t1", customer_id: "cust-1" }],
+    site_assignments: [{ site_id: "site-1", tenant_id: "t1", user_id: "arch-1", status: "active" }],
     tenant_memberships: [
       { tenant_id: "t1", user_id: "admin-1", role: "admin", is_active: true },
       { tenant_id: "t1", user_id: "cust-1", role: "customer", is_active: true }
@@ -17,7 +19,8 @@ function setup() {
       { id: "admin-1", role: "admin", status: "active", full_name: "Shop Admin", phone: null },
       { id: "cust-1", role: "customer", status: "active", full_name: "Ravi Kumar", phone: "+919000000001" },
       { id: "cust-2", role: "customer", status: "active", full_name: "Asha", phone: null },
-      { id: "elec-1", role: "electrician", status: "active", full_name: "Mohan Electric", phone: null }
+      { id: "elec-1", role: "electrician", status: "active", full_name: "Mohan Electric", phone: null },
+      { id: "arch-1", role: "architect", status: "active", full_name: "Neha Designs", phone: null }
     ]
   };
   let nextId = 1;
@@ -51,6 +54,17 @@ function setup() {
       delete: () => ((action = "delete"), builder),
       eq: (column: string, value: unknown) => (filters.push((row) => row[column] === value), builder),
       in: (column: string, values: unknown[]) => (filters.push((row) => values.includes(row[column])), builder),
+      // Supports the "a.eq.x,b.in.(y,z)" form the service uses.
+      or: (expression: string) => {
+        const parts = expression.match(/[a-z_]+\.(eq\.[^,]+|in\.\([^)]*\))/g) ?? [];
+        const tests = parts.map((part) => {
+          const [column, op, ...rest] = part.split(".");
+          const value = rest.join(".");
+          return op === "eq" ? (row: Row) => row[column] === value : (row: Row) => value.slice(1, -1).split(",").includes(row[column]);
+        });
+        filters.push((row) => tests.some((test) => test(row)));
+        return builder;
+      },
       order: () => builder,
       limit: () => builder,
       single: async () => ({ data: run()[0] ?? null, error: null }),
@@ -133,8 +147,9 @@ describe("Order requests from the price list", () => {
 
     await assert.rejects(service.updateStatus(actor("cust-2", "customer"), id, { status: "cancelled" }), NotFoundException);
     await service.updateStatus(actor("admin-1", "admin"), id, { status: "confirmed", admin_note: "Delivery tomorrow" });
-    assert.deepEqual(notifications.at(-1)!.userIds, ["cust-1"]);
-    assert.match(notifications.at(-1)!.body, /Delivery tomorrow/);
+    const toCustomer = notifications.filter((note) => note.userIds.includes("cust-1")).at(-1)!;
+    assert.deepEqual(toCustomer.userIds, ["cust-1"]);
+    assert.match(toCustomer.body, /Delivery tomorrow/);
 
     await assert.rejects(service.updateStatus(actor("cust-1", "customer"), id, { status: "cancelled" }), ConflictException);
   });
@@ -151,5 +166,23 @@ describe("Order requests from the price list", () => {
     assert.equal(rpcCalls.length, 0);
     await service.updateStatus(admin, mine.id, { status: "delivered" });
     assert.deepEqual(rpcCalls, [{ name: "credit_partner_incentives_for_order_request", target_order_id: mine.id }]);
+  });
+
+  it("tells the customer's site architect about their orders and lets them see it, without prices", async () => {
+    const { service, notifications, actor } = setup();
+    const { id } = await service.create(actor("cust-1", "customer"), { items: [{ key: "k-panel", quantity: 2 }], delivery_address: "12 MG Road, Jaipur" });
+    const placed = notifications.find((note) => note.userIds.includes("arch-1"));
+    assert.ok(placed, "the assigned architect is notified");
+    assert.match(placed!.title, /Ravi Kumar placed order/);
+
+    const view = await service.list(actor("arch-1", "architect"));
+    assert.equal(view.orders.length, 1);
+    assert.equal((view.orders[0] as any).relation, "customer");
+    assert.equal((view.orders[0] as any).customer_name, "Ravi Kumar");
+    assert.ok(!JSON.stringify(view).includes("450"), "no prices for professionals");
+
+    await service.updateStatus(actor("admin-1", "admin"), id, { status: "confirmed" });
+    assert.ok(notifications.at(-1)!.userIds.includes("arch-1"));
+    assert.equal((await service.list(actor("elec-1", "electrician"))).orders.length, 0);
   });
 });

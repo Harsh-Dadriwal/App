@@ -19,6 +19,7 @@ import { palette, radii, shadow } from "@/lib/theme";
 import { subscribeQueryActivity } from "@mahalaxmi/core/hooks/query-cache";
 import { roleLabels } from "@mahalaxmi/core/types/domain";
 import { useAuth } from "@/providers/auth-provider";
+import { useNotifications } from "@/lib/notifications";
 import {
   useMobileNavigation,
   type MobileScreen
@@ -77,7 +78,8 @@ export function ScreenShell({
 }) {
   const { width } = useWindowDimensions();
   const { profile, session, tenantMemberships, activeTenant, switchTenant } = useAuth();
-  const { screen, replace, goBack, canGoBack } = useMobileNavigation();
+  const { screen, replace, goBack, canGoBack, navigate } = useMobileNavigation();
+  const { unread } = useNotifications(session ? profile?.id : null, activeTenant?.id);
   const activeScreen = currentScreen ?? screen;
   const tabs = profile ? tabConfig[profile.role] ?? [] : [];
   const showTabs = Boolean(profile && session && tabs.length);
@@ -106,6 +108,22 @@ export function ScreenShell({
               {profile ? `${roleLabels[profile.role]}${activeTenant?.display_name ? ` · ${activeTenant.display_name}` : ""}` : "Electrical supplies & services"}
             </Text>
           </View>
+          {profile && session ? (
+            <Pressable
+              style={styles.bell}
+              onPress={() => (activeScreen === "notifications" ? undefined : navigate("notifications"))}
+              accessibilityRole="button"
+              accessibilityLabel={unread ? `Notifications, ${unread} unread` : "Notifications"}
+              hitSlop={6}
+            >
+              <Feather name="bell" size={19} color={palette.nightText} />
+              {unread ? (
+                <View style={styles.bellBadge}>
+                  <Text style={styles.bellBadgeText}>{unread > 9 ? "9+" : unread}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+          ) : null}
           {profile ? (
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
@@ -885,6 +903,28 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   footer: { position: "absolute", left: 14, right: 14, bottom: 16 },
+  bell: {
+    width: 38,
+    height: 38,
+    marginRight: 8,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.12)"
+  },
+  bellBadge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: palette.danger
+  },
+  bellBadgeText: { color: "#fff", fontSize: 10.5, fontWeight: "900" },
   footerWithTabs: { bottom: 96 },
   tabBarWrap: {
     position: "absolute",

@@ -14,6 +14,9 @@ import { PriceListScreen } from "@/screens/price-list-screen";
 import { OrdersScreen, ShopScreen } from "@/screens/shop-screen";
 import { QuotationsScreen } from "@/screens/quotations-screen";
 import { SelectionsScreen } from "@/screens/selections-screen";
+import { NotificationsScreen } from "@/screens/notifications-screen";
+import { registerForPushNotifications, useNotificationRouting } from "@/lib/notifications";
+import { useEffect } from "react";
 import { ServiceRequestsScreen } from "@/screens/service-requests-screen";
 import { FintechScreen } from "@/screens/fintech-screen";
 import { IncentivesScreen } from "@/screens/incentives-screen";
@@ -32,7 +35,15 @@ function Splash({ title, message, busy }: { title?: string; message: string; bus
 
 function AppBody() {
   const { configured, loading, session, profile, signOut } = useAuth();
-  const { screen } = useMobileNavigation();
+  const { screen, navigate } = useMobileNavigation();
+  const signedIn = Boolean(session && profile);
+
+  // Once signed in: let the server push notifications to this phone, and open the right
+  // screen when one is tapped.
+  useEffect(() => {
+    if (signedIn) void registerForPushNotifications();
+  }, [signedIn, profile?.id]);
+  useNotificationRouting(navigate, signedIn);
 
   if (!configured) {
     return (
@@ -77,6 +88,7 @@ function AppBody() {
   if (screen === "orders") return <OrdersScreen />;
   if (screen === "quotations") return <QuotationsScreen />;
   if (screen === "selections") return <SelectionsScreen />;
+  if (screen === "notifications") return <NotificationsScreen />;
   if (screen === "incentives") return <IncentivesScreen />;
   if (screen === "notes") return <NotesScreen />;
   if (screen === "price-list") return <PriceListScreen />;
