@@ -1,6 +1,6 @@
 import type { BackendRequestOptions } from "./http";
 import type { BackendResult } from "../types/contracts";
-import type { ActiveTenant, TenantMembership, UserProfile } from "../types/domain";
+import { resolveActiveTenant, type TenantMembership, type UserProfile } from "../types/domain";
 
 type AuthGatewayDependencies = {
   isBackendApiConfigured: () => boolean;
@@ -13,39 +13,6 @@ type AuthGatewayDependencies = {
 
 const profileSelect =
   "id, auth_user_id, default_tenant_id, username, full_name, email, phone, role, city, state, company_name, verification_status, is_admin_verified";
-
-export function resolveActiveTenant(
-  profile: UserProfile | null,
-  memberships: TenantMembership[]
-): ActiveTenant | null {
-  const preferredTenantId =
-    profile?.default_tenant_id ||
-    memberships.find((membership) => membership.is_default)?.tenant_id ||
-    memberships[0]?.tenant_id ||
-    null;
-
-  const activeMembership =
-    memberships.find((membership) => membership.tenant_id === preferredTenantId) ??
-    memberships[0] ??
-    null;
-
-  if (!activeMembership?.tenant) {
-    return null;
-  }
-
-  return {
-    id: activeMembership.tenant.id,
-    slug: activeMembership.tenant.slug,
-    display_name: activeMembership.tenant.display_name,
-    status: activeMembership.tenant.status,
-    membership_role: activeMembership.role,
-    app_name: activeMembership.branding?.app_name ?? activeMembership.tenant.display_name,
-    logo_url: activeMembership.branding?.logo_url ?? null,
-    primary_color: activeMembership.branding?.primary_color ?? null,
-    secondary_color: activeMembership.branding?.secondary_color ?? null,
-    accent_color: activeMembership.branding?.accent_color ?? null
-  };
-}
 
 export type PhoneSignupProfile = { full_name: string; username: string; email?: string; role?: string };
 type PhoneSession = { access_token: string; refresh_token: string };

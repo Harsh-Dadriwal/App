@@ -5,10 +5,11 @@
   "scripts": {
     "prebuild": "node scripts/sync-core.js",
     "build": "nest build",
+    "pretest": "node scripts/sync-core.js",
+    "test": "node --test -r ts-node/register -r tsconfig-paths/register \"src/**/*.test.ts\"",
     "start": "node dist/apps/api/src/main.js",
     "start:prod": "node dist/apps/api/src/main.js",
-    "start:dev": "node --watch --watch-path=src --watch-path=../../packages/core/src -r ts-node/register -r tsconfig-paths/register src/main.ts",
-    "test": "node --test -r ts-node/register -r tsconfig-paths/register \"src/**/*.test.ts\""
+    "start:dev": "node scripts/sync-core.js && node --watch --watch-path=src --watch-path=../../packages/core/src -r ts-node/register -r tsconfig-paths/register src/main.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1024.0",
@@ -21,14 +22,12 @@
     "bullmq": "^5.12.12",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
-    "ioredis": "^5.4.1",
     "jsonwebtoken": "^9.0.3",
     "pdf-parse": "^2.4.5",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "sharp": "^0.34.3",
     "tesseract.js": "^6.0.1",
-    "typeorm": "^0.3.29",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

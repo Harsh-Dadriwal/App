@@ -1,5 +1,5 @@
 // Draws the default shop category pictures (original flat illustrations) and saves them
-// as PNGs in public/categories, which the web app serves. Run: node scripts/generate-category-images.mjs
+// as WebP images in public/categories, which the web app serves. Run: node scripts/generate-category-images.mjs
 // Admins can replace any of them from Price List & Stock -> Category pictures.
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -204,6 +204,6 @@ export const CATEGORY_IMAGES = {
 
 mkdirSync(OUT, { recursive: true });
 for (const [name, svg] of Object.entries(CATEGORIES)) {
-  await sharp(Buffer.from(svg)).png({ compressionLevel: 9, palette: true, quality: 90 }).toFile(join(OUT, `${name}.png`));
-  console.log(`public/categories/${name}.png`);
+  await sharp(Buffer.from(svg)).webp({ quality: 82 }).toFile(join(OUT, `${name}.webp`));
+  console.log(`public/categories/${name}.webp`);
 }

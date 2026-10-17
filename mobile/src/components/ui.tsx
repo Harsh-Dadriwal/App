@@ -929,7 +929,6 @@ const styles = StyleSheet.create({
   }
 });
 
-export const uiStyles = styles;
 
 export function BottomActionSheet({
   visible,

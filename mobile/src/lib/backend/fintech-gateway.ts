@@ -25,4 +25,3 @@ const fintechGateway = createFintechGateway({
 });
 
 export const paySavingsInstallment = fintechGateway.paySavingsInstallment;
-export const postWalletEntry = fintechGateway.postWalletEntry;

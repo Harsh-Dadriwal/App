@@ -21,50 +21,6 @@ export const ADMIN_ASSIGN_STEPS = [
   { label: "Status", description: "Save assignment" }
 ] as const;
 
-export function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 120);
-}
-
-export function ModalShell({
-  title,
-  description,
-  onClose,
-  children
-}: {
-  title: string;
-  description?: string;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="modal-backdrop" role="presentation" onClick={onClose}>
-      <section
-        className="modal-card"
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="modal-head">
-          <div className="section-title">
-            <h2>{title}</h2>
-            {description ? <p>{description}</p> : null}
-          </div>
-          <button type="button" className="secondary-button" onClick={onClose}>
-            Close
-          </button>
-        </div>
-        {children}
-      </section>
-    </div>
-  );
-}
-
 export function useAccessibleSites(role: AppRole, profileId: string) {
   return useRows(
     async (client) => {

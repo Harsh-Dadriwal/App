@@ -321,4 +321,3 @@ export function useAuth() {
 }
 
 export { AuthProvider };
-export default AuthProvider;

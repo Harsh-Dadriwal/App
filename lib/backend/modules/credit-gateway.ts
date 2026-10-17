@@ -18,16 +18,6 @@ export async function getCreditHistory(contractorId: string): Promise<BackendRes
   });
 }
 
-export async function approveOrder(dto: {
-  contractorId: string;
-  orderAmount: number;
-}): Promise<BackendResult<any>> {
-  return backendRequest("/api/v1/credit/approve-order", {
-    method: "POST",
-    body: dto
-  });
-}
-
 export async function manualCreditReview(dto: {
   contractorId: string;
   action: "increase_limit" | "decrease_limit" | "freeze_credit" | "unfreeze_credit";

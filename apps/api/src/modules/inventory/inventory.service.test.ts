@@ -27,35 +27,35 @@ const warehouseActor: RequestActor = {
 
 describe("Inventory Permissions Enforcement", () => {
   it("allows viewing products for all users in tenant", () => {
-    const service = new InventoryService({} as any, {} as any, {} as any);
+    const service = new InventoryService({} as any);
     assert.doesNotThrow(() => {
       service.assertInventoryPermission(customerActor, "view_products");
     });
   });
 
   it("denies product creation for regular customer", () => {
-    const service = new InventoryService({} as any, {} as any, {} as any);
+    const service = new InventoryService({} as any);
     assert.throws(() => {
       service.assertInventoryPermission(customerActor, "create_product");
     }, ForbiddenException);
   });
 
   it("denies product deletion for warehouse manager", () => {
-    const service = new InventoryService({} as any, {} as any, {} as any);
+    const service = new InventoryService({} as any);
     assert.throws(() => {
       service.assertInventoryPermission(warehouseActor, "delete_product");
     }, ForbiddenException);
   });
 
   it("allows stock changes for warehouse manager", () => {
-    const service = new InventoryService({} as any, {} as any, {} as any);
+    const service = new InventoryService({} as any);
     assert.doesNotThrow(() => {
       service.assertInventoryPermission(warehouseActor, "change_stock");
     });
   });
 
   it("allows all inventory actions for platform/tenant admin", () => {
-    const service = new InventoryService({} as any, {} as any, {} as any);
+    const service = new InventoryService({} as any);
     const actions = [
       "view_products",
       "create_product",
@@ -75,7 +75,7 @@ describe("Inventory Permissions Enforcement", () => {
   });
 
   it("keeps the price list and its cost prices away from customers", () => {
-    const service = new InventoryService({} as any, {} as any, {} as any);
+    const service = new InventoryService({} as any);
     assert.throws(() => {
       service.assertInventoryPermission(customerActor, "view_price_list");
     }, ForbiddenException);
