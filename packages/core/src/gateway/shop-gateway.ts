@@ -46,6 +46,9 @@ export type OrderRequest = {
   total_quantity: number;
   /** Only sent to the shop's admins. */
   customer?: { id: string; full_name: string; phone: string | null; role: string | null } | null;
+  /** Only for the shop: the electrician/architect who earns incentives on this order. */
+  partner?: { id: string; full_name: string; role: string | null } | null;
+  from_selection?: boolean;
   estimated_total?: number;
   items: OrderRequestItem[];
 };
@@ -138,6 +141,58 @@ export const QUOTATION_STATUS_LABELS: Record<QuotationStatus, string> = {
 };
 
 export const MAX_QUOTATION_PHOTOS = 6;
+
+export type SelectionStatus = "active" | "ordered" | "closed";
+
+export type ProductSelection = {
+  id: string;
+  selection_number: string;
+  title: string;
+  status: SelectionStatus;
+  site_note: string | null;
+  customer_name: string | null;
+  /** Shown to the professional who made it and to the shop. */
+  customer_phone: string | null;
+  customer_linked: boolean;
+  created_by: { id: string; full_name: string; role: string; phone: string | null } | null;
+  created_at: string;
+  updated_at: string;
+  orders: Array<{ number: string; status: OrderRequestStatus }>;
+  quotations: Array<{ number: string; status: QuotationStatus }>;
+  /** Only for the shop: what the selection is worth at today's prices. */
+  estimated_total?: number;
+  items: Array<{ key: string; name: string; category: string; brand: string | null; quantity: number; note: string | null; unit_price?: number | null; in_stock?: boolean }>;
+};
+
+export type SelectionList = { role: "admin" | "partner" | "customer"; selections: ProductSelection[] };
+
+export type SaveSelectionInput = {
+  title: string;
+  customer_name?: string;
+  customer_phone?: string;
+  site_note?: string;
+  items: Array<{ key: string; quantity: number; note?: string }>;
+};
+
+export const SELECTION_STATUS_LABELS: Record<SelectionStatus, string> = {
+  active: "Shared",
+  ordered: "Ordered",
+  closed: "Closed"
+};
+
+/** Plain-text list for sharing a selection on WhatsApp (never includes prices). */
+export function selectionShareText(selection: Pick<ProductSelection, "title" | "selection_number" | "items" | "site_note">, from: string) {
+  const lines = selection.items.map((item, index) => `${index + 1}. ${item.name} × ${item.quantity}${item.note ? ` (${item.note})` : ""}`);
+  return [
+    `*${selection.title}* (${selection.selection_number})`,
+    `Products selected by ${from}:`,
+    ...lines,
+    selection.site_note ? `Note: ${selection.site_note}` : "",
+    "Order these in the Mahalaxmi Electricals app → Selections."
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
 
 export type IndexedCatalogItem = CatalogItem & { searchText: string };
 
@@ -244,7 +299,35 @@ export function createShopGateway({ backendRequest }: ShopGatewayDependencies) {
     });
   }
 
+  function listSelections() {
+    return backendRequest<SelectionList>("/api/v1/selections", { timeoutMs: 20_000 });
+  }
+
+  function saveSelection(input: SaveSelectionInput, selectionId?: string) {
+    return backendRequest<{ id: string; selection_number?: string; linked_customer: boolean }>(
+      selectionId ? `/api/v1/selections/${selectionId}` : "/api/v1/selections",
+      { method: selectionId ? "PUT" : "POST", body: input, timeoutMs: 20_000 }
+    );
+  }
+
+  function orderSelection(selectionId: string, input: { delivery_address: string; contact_phone?: string; note?: string }) {
+    return backendRequest<{ id: string; order_number: string }>(`/api/v1/selections/${selectionId}/order`, { method: "POST", body: input, timeoutMs: 20_000 });
+  }
+
+  function quoteSelection(selectionId: string, input: { note?: string; contact_phone?: string } = {}) {
+    return backendRequest<{ id: string; quotation_number: string }>(`/api/v1/selections/${selectionId}/quotation`, { method: "POST", body: input, timeoutMs: 20_000 });
+  }
+
+  function closeSelection(selectionId: string) {
+    return backendRequest<{ id: string; status: SelectionStatus }>(`/api/v1/selections/${selectionId}/close`, { method: "POST", body: {}, timeoutMs: 15_000 });
+  }
+
   return {
+    listSelections,
+    saveSelection,
+    orderSelection,
+    quoteSelection,
+    closeSelection,
     getPriceCatalog,
     listOrderRequests,
     createOrderRequest,

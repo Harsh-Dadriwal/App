@@ -28,7 +28,7 @@ import {
 } from "@mahalaxmi/core/gateway/shop-gateway";
 import { useCart, useCatalog } from "@mahalaxmi/core/hooks/shop-store";
 
-type PickedItem = { key: string; name: string; category: string; brand: string | null; quantity: number };
+export type PickedItem = { key: string; name: string; category: string; brand: string | null; quantity: number };
 
 function formatWhen(value: string) {
   return new Date(value).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
@@ -130,7 +130,7 @@ function QuotationLines({ quotation }: { quotation: Quotation }) {
 }
 
 /** Catalogue search (no prices) to add items to a quotation request. */
-function ItemPicker({ picked, onChange }: { picked: PickedItem[]; onChange: (next: PickedItem[]) => void }) {
+export function ItemPicker({ picked, onChange }: { picked: PickedItem[]; onChange: (next: PickedItem[]) => void }) {
   const catalog = useCatalog(getPriceCatalog);
   const [query, setQuery] = useState("");
   const deferred = useDeferredValue(query);

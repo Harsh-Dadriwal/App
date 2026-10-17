@@ -22,6 +22,7 @@ import { PartnerIncentivesModule } from "./modules/partner-incentives/partner-in
 import { ServiceRequestsModule } from "./modules/service-requests/service-requests.module";
 import { OrderRequestsModule } from "./modules/order-requests/order-requests.module";
 import { QuotationsModule } from "./modules/quotations/quotations.module";
+import { SelectionsModule } from "./modules/selections/selections.module";
 
 @Module({
   imports: [
@@ -49,7 +50,8 @@ import { QuotationsModule } from "./modules/quotations/quotations.module";
     PartnerIncentivesModule,
     ServiceRequestsModule,
     OrderRequestsModule,
-    QuotationsModule
+    QuotationsModule,
+    SelectionsModule
   ],
   controllers: [HealthController]
 })

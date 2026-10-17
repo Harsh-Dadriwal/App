@@ -13,6 +13,7 @@ import { NotesScreen } from "@/screens/notes-screen";
 import { PriceListScreen } from "@/screens/price-list-screen";
 import { OrdersScreen, ShopScreen } from "@/screens/shop-screen";
 import { QuotationsScreen } from "@/screens/quotations-screen";
+import { SelectionsScreen } from "@/screens/selections-screen";
 import { ServiceRequestsScreen } from "@/screens/service-requests-screen";
 import { FintechScreen } from "@/screens/fintech-screen";
 import { IncentivesScreen } from "@/screens/incentives-screen";
@@ -75,6 +76,7 @@ function AppBody() {
   if (screen === "shop") return <ShopScreen />;
   if (screen === "orders") return <OrdersScreen />;
   if (screen === "quotations") return <QuotationsScreen />;
+  if (screen === "selections") return <SelectionsScreen />;
   if (screen === "incentives") return <IncentivesScreen />;
   if (screen === "notes") return <NotesScreen />;
   if (screen === "price-list") return <PriceListScreen />;

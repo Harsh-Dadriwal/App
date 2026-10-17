@@ -16,7 +16,8 @@ function setup() {
     users: [
       { id: "admin-1", role: "admin", status: "active", full_name: "Shop Admin", phone: null },
       { id: "cust-1", role: "customer", status: "active", full_name: "Ravi Kumar", phone: "+919000000001" },
-      { id: "cust-2", role: "customer", status: "active", full_name: "Asha", phone: null }
+      { id: "cust-2", role: "customer", status: "active", full_name: "Asha", phone: null },
+      { id: "elec-1", role: "electrician", status: "active", full_name: "Mohan Electric", phone: null }
     ]
   };
   let nextId = 1;
@@ -58,6 +59,7 @@ function setup() {
     };
     return builder;
   };
+  const rpcCalls: Row[] = [];
 
   const catalog = new Map<string, Row>([
     ["k-panel", { displayName: "12w Panel Havells", displayCategory: "Lighting", brand: "Havells", final_price: 450, mrp: 1590, stock_label: "12 pcs", outOfStock: false }],
@@ -66,13 +68,13 @@ function setup() {
   const priceList = { findItems: async (_tenant: string, keys: string[]) => new Map(keys.map((key) => [key, catalog.get(key)])) };
   const notificationsService = { createBulkNotifications: async (args: Row) => notifications.push(args) };
   const service = new OrderRequestsService(
-    { getClient: () => ({ from: table }) } as any,
+    { getClient: () => ({ from: table, rpc: async (name: string, args: Row) => (rpcCalls.push({ name, ...args }), { data: null, error: null }) }) } as any,
     { assertTenantAccess: async () => undefined } as any,
     notificationsService as any,
     priceList as any
   );
   const actor = (id: string, role: string) => ({ authUserId: `auth-${id}`, appUserId: id, role, defaultTenantId: "t1" });
-  return { service, tables, notifications, actor };
+  return { service, tables, notifications, actor, rpcCalls };
 }
 
 describe("Order requests from the price list", () => {
@@ -135,5 +137,19 @@ describe("Order requests from the price list", () => {
     assert.match(notifications.at(-1)!.body, /Delivery tomorrow/);
 
     await assert.rejects(service.updateStatus(actor("cust-1", "customer"), id, { status: "cancelled" }), ConflictException);
+  });
+
+  it("credits the electrician who ordered once the order is delivered, not before", async () => {
+    const { service, tables, rpcCalls, actor } = setup();
+    const admin = actor("admin-1", "admin");
+    const mine = await service.create(actor("elec-1", "electrician"), { items: [{ key: "k-panel", quantity: 4 }], delivery_address: "Site 7, Jaipur" });
+    const theirs = await service.create(actor("cust-1", "customer"), { items: [{ key: "k-panel", quantity: 1 }], delivery_address: "12 MG Road, Jaipur" });
+    assert.equal(tables.order_requests.find((row) => row.id === mine.id)!.partner_id, "elec-1");
+    assert.equal(tables.order_requests.find((row) => row.id === theirs.id)!.partner_id, null);
+
+    await service.updateStatus(admin, mine.id, { status: "confirmed" });
+    assert.equal(rpcCalls.length, 0);
+    await service.updateStatus(admin, mine.id, { status: "delivered" });
+    assert.deepEqual(rpcCalls, [{ name: "credit_partner_incentives_for_order_request", target_order_id: mine.id }]);
   });
 });

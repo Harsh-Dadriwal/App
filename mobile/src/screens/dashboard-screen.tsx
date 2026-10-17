@@ -10,6 +10,8 @@ type Action = { label: string; hint: string; route: MobileScreen; icon: keyof ty
 
 const notes: Action = { label: "Project notes", hint: "Site conversations", route: "notes", icon: "message-square" };
 
+const selections: Action = { label: "Product selections", hint: "Pick products for a customer", route: "selections", icon: "list" };
+
 const quotations: Action = { label: "Quotations", hint: "Send your list, get prices", route: "quotations", icon: "file-text" };
 
 const roleActions: Record<AppRole, Action[]> = {
@@ -17,10 +19,12 @@ const roleActions: Record<AppRole, Action[]> = {
     { label: "Shop products", hint: "Live stock, easy ordering", route: "shop", icon: "shopping-bag" },
     { label: "My orders", hint: "Track your orders", route: "orders", icon: "package" },
     quotations,
+    { label: "Selections", hint: "Picked by your electrician", route: "selections", icon: "list" },
     { label: "Complaints & installation", hint: "Get an electrician", route: "service-requests", icon: "tool" },
     notes
   ],
   electrician: [
+    selections,
     { label: "Order materials", hint: "Live stock from the store", route: "shop", icon: "shopping-bag" },
     { label: "My orders", hint: "Track your orders", route: "orders", icon: "package" },
     quotations,
@@ -29,6 +33,7 @@ const roleActions: Record<AppRole, Action[]> = {
     notes
   ],
   architect: [
+    selections,
     { label: "Shop products", hint: "Live stock from the store", route: "shop", icon: "shopping-bag" },
     { label: "My orders", hint: "Track your orders", route: "orders", icon: "package" },
     quotations,
@@ -38,6 +43,7 @@ const roleActions: Record<AppRole, Action[]> = {
   admin: [
     { label: "Orders", hint: "Confirm & deliver", route: "orders", icon: "package" },
     { label: "Quotations", hint: "Price requests", route: "quotations", icon: "file-text" },
+    { label: "Selections", hint: "Picked by professionals", route: "selections", icon: "list" },
     { label: "Price list", hint: "Tally prices & stock", route: "price-list", icon: "tag" },
     { label: "Service requests", hint: "Complaints & installs", route: "service-requests", icon: "tool" },
     { label: "Fintech", hint: "Wallets & savings", route: "fintech", icon: "credit-card" },

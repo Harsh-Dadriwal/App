@@ -75,6 +75,7 @@ export function AppFrame({
     const unreadServiceRequests = notifications.data.filter((item: any) => item.data?.module === "service_requests" && !item.is_read).length;
     const unreadOrders = unread("order_requests");
     const unreadQuotations = unread("quotations");
+    const unreadSelections = unread("selections");
     return {
       "/customer/orders": unreadOrders,
       "/electrician/orders": unreadOrders,
@@ -84,6 +85,9 @@ export function AppFrame({
       "/electrician/quotations": unreadQuotations,
       "/architect/quotations": unreadQuotations,
       "/admin/quotations": unreadQuotations,
+      "/customer/selections": unreadSelections,
+      "/electrician/selections": unreadSelections,
+      "/architect/selections": unreadSelections,
       "/customer/service-requests": unreadServiceRequests,
       "/electrician/service-requests": unreadServiceRequests,
       "/customer/notes": unreadNotes,

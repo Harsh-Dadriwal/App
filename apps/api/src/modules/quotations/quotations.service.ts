@@ -12,7 +12,7 @@ import { SupabaseAdminService } from "../../common/supabase/supabase-admin.servi
 import { TenantAccessService } from "../../common/tenancy/tenant-access.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PriceListService } from "../inventory/price-list.service";
-import { OrderRequestsService } from "../order-requests/order-requests.service";
+import { OrderRequestsService, isPartnerRole } from "../order-requests/order-requests.service";
 import { QuotationPhotosService, type UploadedPhoto } from "./quotation-photos.service";
 
 export const QUOTATION_STATUSES = ["requested", "quoted", "accepted", "declined", "cancelled"] as const;
@@ -23,13 +23,15 @@ const MAX_PHOTOS = 6;
 const MAX_QUANTITY = 100_000;
 const DEFAULT_VALID_DAYS = 7;
 const QUOTATION_COLUMNS =
-  "id, quotation_number, customer_id, status, note, contact_phone, photo_keys, discount_amount, admin_note, valid_until, quoted_at, order_request_id, created_at, updated_at";
+  "id, quotation_number, customer_id, partner_id, selection_id, status, note, contact_phone, photo_keys, discount_amount, admin_note, valid_until, quoted_at, order_request_id, created_at, updated_at";
 const ITEM_COLUMNS = "quotation_id, position, item_key, item_name, category, brand, quantity, unit_price, mrp";
 
 type QuotationRow = {
   id: string;
   quotation_number: string;
   customer_id: string;
+  partner_id: string | null;
+  selection_id: string | null;
   status: QuotationStatus;
   note: string | null;
   contact_phone: string | null;
@@ -92,7 +94,8 @@ export class QuotationsService {
     const tenantId = actor.defaultTenantId;
     if (!tenantId) throw new BadRequestException("Please select a workspace.");
     await this.tenantAccess.assertTenantAccess(actor, tenantId);
-    return { userId: actor.appUserId, tenantId, isAdmin: isAdminRole((actor.role ?? "").toLowerCase()) };
+    const role = (actor.role ?? "").toLowerCase();
+    return { userId: actor.appUserId, tenantId, isAdmin: isAdminRole(role), isPartner: isPartnerRole(role) };
   }
 
   private async notify(tenantId: string, userIds: string[], title: string, body: string, data: Record<string, unknown>) {
@@ -192,7 +195,7 @@ export class QuotationsService {
   }
 
   async create(actor: RequestActor, body: Record<string, unknown>) {
-    const { userId, tenantId } = await this.requireContext(actor);
+    const { userId, tenantId, isPartner } = await this.requireContext(actor);
 
     const quantities = new Map<string, number>();
     for (const raw of Array.isArray(body.items) ? body.items : []) {
@@ -204,15 +207,37 @@ export class QuotationsService {
       }
       quantities.set(key, (quantities.get(key) ?? 0) + quantity);
     }
-    if (quantities.size > MAX_LINES) throw new BadRequestException(`A quotation can have up to ${MAX_LINES} different items.`);
 
     const prefix = this.photos.ownerPrefix(tenantId, userId);
     const photoKeys = [...new Set((Array.isArray(body.photo_keys) ? body.photo_keys : []).map((key) => cleanText(key, 300)).filter(Boolean))];
     if (photoKeys.length > MAX_PHOTOS) throw new BadRequestException(`Add up to ${MAX_PHOTOS} photos.`);
     if (photoKeys.some((key) => !key.startsWith(prefix))) throw new ForbiddenException("One of the photos could not be used. Please upload it again.");
 
-    const note = cleanText(body.note, 2000) || null;
-    const contactPhone = cleanText(body.contact_phone, 20) || null;
+    return this.requestQuotation({
+      tenantId,
+      customerId: userId,
+      partnerId: isPartner ? userId : null,
+      selectionId: null,
+      quantities,
+      photoKeys,
+      note: cleanText(body.note, 2000) || null,
+      contactPhone: cleanText(body.contact_phone, 20) || null
+    });
+  }
+
+  /** Records a quotation request and tells the shop. Lines are prefilled with today's prices. */
+  async requestQuotation(args: {
+    tenantId: string;
+    customerId: string;
+    partnerId: string | null;
+    selectionId: string | null;
+    quantities: Map<string, number>;
+    photoKeys: string[];
+    note: string | null;
+    contactPhone: string | null;
+  }) {
+    const { tenantId, customerId: userId, quantities, photoKeys, note, contactPhone } = args;
+    if (quantities.size > MAX_LINES) throw new BadRequestException(`A quotation can have up to ${MAX_LINES} different items.`);
     if (!quantities.size && !photoKeys.length && !note) {
       throw new BadRequestException("Add items, a photo of your list, or a note describing what you need.");
     }
@@ -225,7 +250,15 @@ export class QuotationsService {
 
     const inserted = await this.db
       .from("quotations")
-      .insert({ tenant_id: tenantId, customer_id: userId, note, contact_phone: contactPhone, photo_keys: photoKeys })
+      .insert({
+        tenant_id: tenantId,
+        customer_id: userId,
+        partner_id: args.partnerId,
+        selection_id: args.selectionId,
+        note,
+        contact_phone: contactPhone,
+        photo_keys: photoKeys
+      })
       .select("id, quotation_number, status")
       .single();
     if (inserted.error) throw new Error(inserted.error.message);
@@ -349,6 +382,8 @@ export class QuotationsService {
       order = await this.orderRequests.createFromQuotation({
         tenantId,
         customerId: userId,
+        partnerId: row.partner_id,
+        selectionId: row.selection_id,
         quotationNumber: row.quotation_number,
         deliveryAddress,
         contactPhone: cleanText(body.contact_phone, 20) || row.contact_phone,

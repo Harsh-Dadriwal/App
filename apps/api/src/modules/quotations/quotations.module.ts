@@ -10,6 +10,7 @@ import { QuotationsService } from "./quotations.service";
 @Module({
   imports: [TenancyModule, NotificationsModule, InventoryModule, OrderRequestsModule],
   controllers: [QuotationsController],
-  providers: [QuotationsService, QuotationPhotosService]
+  providers: [QuotationsService, QuotationPhotosService],
+  exports: [QuotationsService]
 })
 export class QuotationsModule {}

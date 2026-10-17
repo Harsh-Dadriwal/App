@@ -33,6 +33,7 @@ import {
 } from "@/components/pages/service-requests-pages";
 import { AdminOrderRequestsPage, MyOrdersPage, ShopPage } from "@/components/pages/shop-pages";
 import { AdminQuotationsPage, QuotationsPage } from "@/components/pages/quotation-pages";
+import { AdminSelectionsPage, SelectionsPage } from "@/components/pages/selection-pages";
 import {
   AdminPartnerIncentivesPage,
   PartnerIncentivesPage
@@ -55,6 +56,7 @@ export const rolePageRegistry: RolePageRegistry = {
     shop: { title: "Shop Products", component: <ShopPage ordersHref="/customer/orders" quotationsHref="/customer/quotations" /> },
     orders: { title: "My Orders", component: <MyOrdersPage shopHref="/customer/shop" /> },
     quotations: { title: "Quotations", component: <QuotationsPage shopHref="/customer/shop" ordersHref="/customer/orders" /> },
+    selections: { title: "Selections", component: <SelectionsPage ordersHref="/customer/orders" quotationsHref="/customer/quotations" /> },
     "service-requests": { title: "Complaints & Installation", component: <CustomerServiceRequestsPage /> },
     professionals: {
       title: "Electricians & Architects",
@@ -93,6 +95,7 @@ export const rolePageRegistry: RolePageRegistry = {
     shop: { title: "Order Materials", component: <ShopPage ordersHref="/electrician/orders" quotationsHref="/electrician/quotations" /> },
     orders: { title: "My Orders", component: <MyOrdersPage shopHref="/electrician/shop" /> },
     quotations: { title: "Quotations", component: <QuotationsPage shopHref="/electrician/shop" ordersHref="/electrician/orders" /> },
+    selections: { title: "Product Selections", component: <SelectionsPage ordersHref="/electrician/orders" quotationsHref="/electrician/quotations" incentivesHref="/electrician/incentives" /> },
     "service-requests": { title: "Service Requests", component: <ElectricianServiceRequestsPage /> },
     "projects/new": { title: "New Projects", component: <ElectricianProjectsPage mode="new" /> },
     "projects/market": {
@@ -111,6 +114,7 @@ export const rolePageRegistry: RolePageRegistry = {
     shop: { title: "Shop Products", component: <ShopPage ordersHref="/architect/orders" quotationsHref="/architect/quotations" /> },
     orders: { title: "My Orders", component: <MyOrdersPage shopHref="/architect/shop" /> },
     quotations: { title: "Quotations", component: <QuotationsPage shopHref="/architect/shop" ordersHref="/architect/orders" /> },
+    selections: { title: "Product Selections", component: <SelectionsPage ordersHref="/architect/orders" quotationsHref="/architect/quotations" incentivesHref="/architect/incentives" /> },
     "projects/new": { title: "New Projects", component: <ArchitectProjectsPage mode="new" /> },
     "projects/ongoing": {
       title: "Ongoing Projects",
@@ -123,6 +127,7 @@ export const rolePageRegistry: RolePageRegistry = {
     "": { title: "Dashboard", component: <AdminDashboardPage /> },
     orders: { title: "Orders", component: <AdminOrderRequestsPage /> },
     quotations: { title: "Quotations", component: <AdminQuotationsPage /> },
+    selections: { title: "Product Selections", component: <AdminSelectionsPage /> },
     "service-requests": { title: "Service Requests", component: <AdminServiceRequestsPage /> },
     users: { title: "Users & Verification", component: <AdminUsersPage /> },
     "price-list": { title: "Price List & Stock", component: <AdminPriceListPage /> },

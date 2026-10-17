@@ -584,6 +584,11 @@ export function AdminOrderRequestsPage() {
                 ) : null}
                 <span>{order.delivery_address}</span>
                 {order.note ? <span className="order-note">Note: {order.note}</span> : null}
+                {order.partner ? (
+                  <span className="order-note">
+                    Brought by {order.partner.full_name} ({order.partner.role}) — earns incentives when delivered
+                  </span>
+                ) : null}
               </div>
               <OrderItems order={order} showPrices />
               <p className="order-total">

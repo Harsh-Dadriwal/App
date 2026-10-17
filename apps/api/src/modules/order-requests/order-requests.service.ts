@@ -18,7 +18,7 @@ export type OrderRequestStatus = (typeof ORDER_REQUEST_STATUSES)[number];
 
 const MAX_LINES = 100;
 const MAX_QUANTITY = 10_000;
-const ORDER_COLUMNS = "id, order_number, customer_id, status, delivery_address, contact_phone, note, admin_note, created_at, updated_at";
+const ORDER_COLUMNS = "id, order_number, customer_id, partner_id, selection_id, status, delivery_address, contact_phone, note, admin_note, created_at, updated_at";
 const ITEM_COLUMNS = "order_request_id, item_key, item_name, category, brand, quantity, unit_price, mrp";
 const STATUS_MESSAGES: Record<OrderRequestStatus, string> = {
   submitted: "has been received",
@@ -32,6 +32,8 @@ type OrderRow = {
   id: string;
   order_number: string;
   customer_id: string;
+  partner_id: string | null;
+  selection_id: string | null;
   status: OrderRequestStatus;
   delivery_address: string;
   contact_phone: string | null;
@@ -57,6 +59,24 @@ function cleanText(value: unknown, maxLength: number) {
 }
 
 const isAdminRole = (role: string) => role === "admin" || role === "tenant_admin";
+
+/** Electricians and architects earn incentives on the business they bring in. */
+export const isPartnerRole = (role: string | null | undefined) => role === "electrician" || role === "architect";
+
+/** Reads [{ key, quantity }] lines, merging repeats; throws a friendly error on bad quantities. */
+export function parseItemQuantities(rawItems: unknown, maxQuantity = MAX_QUANTITY) {
+  const quantities = new Map<string, number>();
+  for (const raw of Array.isArray(rawItems) ? rawItems : []) {
+    const key = cleanText((raw as Record<string, unknown>)?.key, 40);
+    const quantity = Math.floor(Number((raw as Record<string, unknown>)?.quantity));
+    if (!key) continue;
+    if (!Number.isFinite(quantity) || quantity < 1 || quantity > maxQuantity) {
+      throw new BadRequestException(`Quantities must be between 1 and ${maxQuantity.toLocaleString("en-IN")}.`);
+    }
+    quantities.set(key, (quantities.get(key) ?? 0) + quantity);
+  }
+  return quantities;
+}
 
 /** Which status changes the shop and the person who ordered may make, and from which statuses. */
 export function allowedOrderStatusChange(party: "customer" | "admin", from: OrderRequestStatus, to: OrderRequestStatus) {
@@ -136,7 +156,10 @@ export class OrderRequestsService {
       const [itemResult, userResult] = await Promise.all([
         this.db.from("order_request_items").select(ITEM_COLUMNS).in("order_request_id", rows.map((row) => row.id)),
         isAdmin
-          ? this.db.from("users").select("id, full_name, phone, role").in("id", [...new Set(rows.map((row) => row.customer_id))])
+          ? this.db
+              .from("users")
+              .select("id, full_name, phone, role")
+              .in("id", [...new Set(rows.flatMap((row) => [row.customer_id, row.partner_id]).filter((id): id is string => Boolean(id)))])
           : Promise.resolve({ data: [], error: null })
       ]);
       if (itemResult.error) throw new Error(itemResult.error.message);
@@ -157,6 +180,7 @@ export class OrderRequestsService {
       orders: rows.map((row) => {
         const lines = (itemsByOrder.get(row.id) ?? []).sort((a, b) => a.item_name.localeCompare(b.item_name));
         const customer = customers.get(row.customer_id);
+        const partner = row.partner_id ? customers.get(row.partner_id) : undefined;
         return {
           id: row.id,
           order_number: row.order_number,
@@ -173,6 +197,9 @@ export class OrderRequestsService {
           ...(isAdmin
             ? {
                 customer: customer ? { id: row.customer_id, full_name: customer.full_name, phone: customer.phone, role: customer.role } : null,
+                // The electrician/architect who earns incentives on this order, if any.
+                partner: partner && row.partner_id !== row.customer_id ? { id: row.partner_id, full_name: partner.full_name, role: partner.role } : null,
+                from_selection: Boolean(row.selection_id),
                 estimated_total: lines.reduce((sum, line) => sum + Number(line.quantity) * Number(line.unit_price), 0)
               }
             : {}),
@@ -190,25 +217,36 @@ export class OrderRequestsService {
   }
 
   async create(actor: RequestActor, body: Record<string, unknown>) {
-    const { userId, tenantId } = await this.requireContext(actor);
-
-    const rawLines = Array.isArray(body.items) ? body.items : [];
-    const quantities = new Map<string, number>();
-    for (const raw of rawLines) {
-      const key = cleanText((raw as Record<string, unknown>)?.key, 40);
-      const quantity = Math.floor(Number((raw as Record<string, unknown>)?.quantity));
-      if (!key) continue;
-      if (!Number.isFinite(quantity) || quantity < 1 || quantity > MAX_QUANTITY) {
-        throw new BadRequestException(`Quantities must be between 1 and ${MAX_QUANTITY.toLocaleString("en-IN")}.`);
-      }
-      quantities.set(key, (quantities.get(key) ?? 0) + quantity);
-    }
+    const { userId, tenantId, role } = await this.requireContext(actor);
+    const quantities = parseItemQuantities(body.items);
     if (!quantities.size) throw new BadRequestException("Add at least one item to your cart.");
-    if (quantities.size > MAX_LINES) throw new BadRequestException(`An order can have up to ${MAX_LINES} different items.`);
+    return this.placeOrder({
+      tenantId,
+      customerId: userId,
+      // A professional ordering for a site brings that business in themselves.
+      partnerId: isPartnerRole(role) ? userId : null,
+      selectionId: null,
+      quantities,
+      deliveryAddress: cleanText(body.delivery_address, 500),
+      contactPhone: cleanText(body.contact_phone, 20) || null,
+      note: cleanText(body.note, 1000) || null
+    });
+  }
 
-    const deliveryAddress = cleanText(body.delivery_address, 500);
-    const contactPhone = cleanText(body.contact_phone, 20) || null;
-    const note = cleanText(body.note, 1000) || null;
+  /** Places an order from price list items at today's prices, refusing anything out of stock. */
+  async placeOrder(args: {
+    tenantId: string;
+    customerId: string;
+    partnerId: string | null;
+    selectionId: string | null;
+    quantities: Map<string, number>;
+    deliveryAddress: string;
+    contactPhone: string | null;
+    note: string | null;
+  }) {
+    const { tenantId, customerId, quantities, deliveryAddress, contactPhone, note } = args;
+    if (!quantities.size) throw new BadRequestException("Add at least one item.");
+    if (quantities.size > MAX_LINES) throw new BadRequestException(`An order can have up to ${MAX_LINES} different items.`);
     if (deliveryAddress.length < 5) throw new BadRequestException("Add the delivery address.");
     if (contactPhone && !/^\+?[0-9 -]{7,20}$/.test(contactPhone)) throw new BadRequestException("Enter a valid contact number.");
 
@@ -216,7 +254,7 @@ export class OrderRequestsService {
     const missing = [...found].filter(([, item]) => !item).length;
     if (missing) {
       throw new ConflictException(
-        `${missing === 1 ? "One item in your cart is" : `${missing} items in your cart are`} no longer in the price list. Remove ${missing === 1 ? "it" : "them"} and try again.`
+        `${missing === 1 ? "One item is" : `${missing} items are`} no longer in the price list. Remove ${missing === 1 ? "it" : "them"} and try again.`
       );
     }
     const unavailable = [...found.values()].filter((item) => item!.outOfStock).map((item) => item!.displayName);
@@ -226,7 +264,15 @@ export class OrderRequestsService {
 
     const inserted = await this.db
       .from("order_requests")
-      .insert({ tenant_id: tenantId, customer_id: userId, delivery_address: deliveryAddress, contact_phone: contactPhone, note })
+      .insert({
+        tenant_id: tenantId,
+        customer_id: customerId,
+        partner_id: args.partnerId,
+        selection_id: args.selectionId,
+        delivery_address: deliveryAddress,
+        contact_phone: contactPhone,
+        note
+      })
       .select("id, order_number, status")
       .single();
     if (inserted.error) throw new Error(inserted.error.message);
@@ -252,14 +298,14 @@ export class OrderRequestsService {
 
     const [admins, profile] = await Promise.all([
       this.listAdminIds(tenantId),
-      this.db.from("users").select("full_name").eq("id", userId).maybeSingle()
+      this.db.from("users").select("full_name").eq("id", customerId).maybeSingle()
     ]);
     const who = (profile.data?.full_name as string | undefined) || "A customer";
     await this.notify(
       tenantId,
-      admins.filter((id) => id !== userId),
+      admins.filter((id) => id !== customerId),
       `New order ${order.order_number}`,
-      `${who} ordered ${lines.length} item${lines.length === 1 ? "" : "s"}. Open Orders to confirm it.`,
+      `${who} ordered ${lines.length} item${lines.length === 1 ? "" : "s"}${args.selectionId ? " from a product selection" : ""}. Open Orders to confirm it.`,
       { orderRequestId: order.id }
     );
 
@@ -273,6 +319,8 @@ export class OrderRequestsService {
   async createFromQuotation(args: {
     tenantId: string;
     customerId: string;
+    partnerId: string | null;
+    selectionId: string | null;
     quotationNumber: string;
     deliveryAddress: string;
     contactPhone: string | null;
@@ -284,6 +332,8 @@ export class OrderRequestsService {
       .insert({
         tenant_id: args.tenantId,
         customer_id: args.customerId,
+        partner_id: args.partnerId,
+        selection_id: args.selectionId,
         delivery_address: args.deliveryAddress,
         contact_phone: args.contactPhone,
         note: [`From quotation ${args.quotationNumber}`, args.note].filter(Boolean).join(". ")
@@ -341,6 +391,12 @@ export class OrderRequestsService {
       .maybeSingle();
     if (updated.error) throw new Error(updated.error.message);
     if (!updated.data) throw new ConflictException("This order was just updated by someone else. Refresh to see the latest.");
+
+    if (status === "delivered") {
+      // Never let incentive bookkeeping undo the delivery itself.
+      const credit = await this.db.rpc("credit_partner_incentives_for_order_request", { target_order_id: order.id });
+      if (credit.error) this.logger.error(`Incentive credit failed for ${order.order_number}: ${credit.error.message}`);
+    }
 
     if (isAdmin) {
       if (order.customer_id !== userId) {
