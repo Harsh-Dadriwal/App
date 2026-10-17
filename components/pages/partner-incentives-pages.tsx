@@ -26,6 +26,14 @@ import {
   savePartnerIncentiveSlab
 } from "@/lib/backend/modules/partner-incentives-gateway";
 
+function partnerTypeLabel(type: string | null | undefined) {
+  const value = (type ?? "").toLowerCase();
+  if (value === "electrician") return "Electricians";
+  if (value === "architect") return "Architects";
+  if (value === "all") return "Everyone";
+  return type || "-";
+}
+
 const money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
 
 function formatMoney(value: unknown) {
@@ -243,7 +251,7 @@ export function AdminPartnerIncentivesPage() {
         <form onSubmit={saveScheme} className="form-stack">
           <FormGrid>
             <label>Scheme name<input required value={schemeForm.name} onChange={(e) => setSchemeForm((f) => ({ ...f, name: e.target.value }))} /></label>
-            <label>Partner type<input value={schemeForm.partner_type} onChange={(e) => setSchemeForm((f) => ({ ...f, partner_type: e.target.value }))} placeholder="all, architect, electrician..." /></label>
+            <label>For<select value={schemeForm.partner_type} onChange={(e) => setSchemeForm((f) => ({ ...f, partner_type: e.target.value }))}><option value="electrician">Electricians</option><option value="architect">Architects</option><option value="all">Everyone (when no scheme of their own)</option></select></label>
             <label>Status<select value={schemeForm.status} onChange={(e) => setSchemeForm((f) => ({ ...f, status: e.target.value }))}><option value="draft">Draft</option><option value="active">Active</option><option value="archived">Archived</option></select></label>
             <label>Effective from<input type="date" value={schemeForm.effective_from} onChange={(e) => setSchemeForm((f) => ({ ...f, effective_from: e.target.value }))} /></label>
           </FormGrid>
@@ -252,10 +260,10 @@ export function AdminPartnerIncentivesPage() {
         </form>
         <QueryState loading={schemes.loading} error={schemes.error} hasData={schemes.data.length > 0} empty={{ title: "No schemes", description: "Create the first incentive scheme for this tenant." }}>
           <DataTable
-            columns={["Name", "Partner type", "Status", "Effective", "Actions"]}
+            columns={["Name", "For", "Status", "Effective", "Actions"]}
             rows={schemes.data.map((scheme: any) => [
               scheme.name,
-              scheme.partner_type,
+              partnerTypeLabel(scheme.partner_type),
               scheme.status,
               scheme.effective_from,
               <span key={scheme.id} className="table-action-row"><button type="button" onClick={() => setSchemeForm({ id: scheme.id, name: scheme.name, partner_type: scheme.partner_type, status: scheme.status, effective_from: scheme.effective_from, description: scheme.description ?? "" })}>Edit</button><button type="button" onClick={() => void mutation.run(async () => duplicatePartnerIncentiveScheme(scheme.id), "Scheme duplicated.").then(() => schemes.refetch?.())}>Duplicate</button><button type="button" onClick={() => void mutation.run(async () => deletePartnerIncentiveScheme(scheme.id), "Scheme deleted.").then(() => schemes.refetch?.())}>Delete</button></span>
@@ -266,7 +274,7 @@ export function AdminPartnerIncentivesPage() {
       <FormCard title="Slabs" description="Set business ranges, wire and other incentive %, bonus points, colours and order.">
         <form onSubmit={saveSlab} className="form-stack">
           <FormGrid>
-            <label>Scheme<select value={slabForm.scheme_id || activeSchemeId} onChange={(e) => setSlabForm((f) => ({ ...f, scheme_id: e.target.value }))}>{schemes.data.map((scheme: any) => <option key={scheme.id} value={scheme.id}>{scheme.name}</option>)}</select></label>
+            <label>Scheme<select value={slabForm.scheme_id || activeSchemeId} onChange={(e) => setSlabForm((f) => ({ ...f, scheme_id: e.target.value }))}>{schemes.data.map((scheme: any) => <option key={scheme.id} value={scheme.id}>{scheme.name} — {partnerTypeLabel(scheme.partner_type)}</option>)}</select></label>
             <label>Tier name<input required value={slabForm.tier_name} onChange={(e) => setSlabForm((f) => ({ ...f, tier_name: e.target.value }))} /></label>
             <label>Min business<input type="number" value={slabForm.min_business} onChange={(e) => setSlabForm((f) => ({ ...f, min_business: e.target.value }))} /></label>
             <label>Max business<input type="number" value={slabForm.max_business} onChange={(e) => setSlabForm((f) => ({ ...f, max_business: e.target.value }))} placeholder="Blank for no cap" /></label>
@@ -283,18 +291,34 @@ export function AdminPartnerIncentivesPage() {
           <button className="primary-button" type="submit" disabled={mutation.isSubmitting}>{slabForm.id ? "Update slab" : "Create slab"}</button>
         </form>
         <QueryState loading={slabs.loading} error={slabs.error} hasData={slabs.data.length > 0} empty={{ title: "No slabs", description: "Add Bronze, Silver, Gold, Platinum, Diamond, or custom tiers." }}>
-          <DataTable
-            columns={["Tier", "Range", "Wire incentive %", "Other incentive %", "Bonus points", "Order", "Actions"]}
-            rows={slabs.data.map((slab: any) => [
-              slab.tier_name,
-              `${formatMoney(slab.min_business)} – ${slab.max_business ? formatMoney(slab.max_business) : "∞"}`,
-              slab.wire_commission_percent,
-              slab.other_commission_percent,
-              formatPoints(slab.bonus_points),
-              slab.sort_order,
-              <span key={slab.id} className="table-action-row"><button type="button" onClick={() => setSlabForm({ id: slab.id, scheme_id: slab.scheme_id, tier_name: slab.tier_name, min_business: String(slab.min_business), max_business: slab.max_business ? String(slab.max_business) : "", wire_commission_percent: String(slab.wire_commission_percent), other_commission_percent: String(slab.other_commission_percent), bonus_points: String(slab.bonus_points), color: slab.color ?? "", icon: slab.icon ?? "", description: slab.description ?? "", sort_order: String(slab.sort_order ?? 0) })}>Edit</button><button type="button" onClick={() => void mutation.run(async () => deletePartnerIncentiveSlab(slab.id), "Slab deleted.").then(() => slabs.refetch?.())}>Delete</button></span>
-            ])}
-          />
+          {/* One table per scheme, so it is clear whose tiers are whose. */}
+          {schemes.data.map((scheme: any) => {
+            const schemeSlabs = slabs.data.filter((slab: any) => slab.scheme_id === scheme.id);
+            return (
+              <div key={scheme.id} className="incentive-scheme-block">
+                <h4>
+                  {scheme.name} <span className="order-role">For {partnerTypeLabel(scheme.partner_type).toLowerCase()}</span>{" "}
+                  <span className="shop-muted">· {scheme.status}</span>
+                </h4>
+                {schemeSlabs.length ? (
+                  <DataTable
+                    columns={["Tier", "Business range (per year)", "Wire incentive %", "Other incentive %", "Bonus points", "Order", "Actions"]}
+                    rows={schemeSlabs.map((slab: any) => [
+                      slab.tier_name,
+                      `${formatMoney(slab.min_business)} – ${slab.max_business ? formatMoney(slab.max_business) : "∞"}`,
+                      slab.wire_commission_percent,
+                      slab.other_commission_percent,
+                      formatPoints(slab.bonus_points),
+                      slab.sort_order,
+                      <span key={slab.id} className="table-action-row"><button type="button" onClick={() => setSlabForm({ id: slab.id, scheme_id: slab.scheme_id, tier_name: slab.tier_name, min_business: String(slab.min_business), max_business: slab.max_business ? String(slab.max_business) : "", wire_commission_percent: String(slab.wire_commission_percent), other_commission_percent: String(slab.other_commission_percent), bonus_points: String(slab.bonus_points), color: slab.color ?? "", icon: slab.icon ?? "", description: slab.description ?? "", sort_order: String(slab.sort_order ?? 0) })}>Edit</button><button type="button" onClick={() => void mutation.run(async () => deletePartnerIncentiveSlab(slab.id), "Slab deleted.").then(() => slabs.refetch?.())}>Delete</button></span>
+                    ])}
+                  />
+                ) : (
+                  <p className="shop-muted">No tiers yet — add one above with this scheme selected.</p>
+                )}
+              </div>
+            );
+          })}
         </QueryState>
       </FormCard>
       <PageSection title="Product category incentive types" description="Classify categories as WIRE or OTHER. Products get the incentive type of their category.">

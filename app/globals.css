@@ -2763,3 +2763,5 @@ input.quote-rate:not([type]) { width: 6.5rem; padding: 0.45rem 0.5rem; text-alig
   .quote-table th:nth-child(4), .quote-table td:nth-child(4) { display: none; }
   .quote-totals { min-width: 0; width: 100%; }
 }
+.incentive-scheme-block { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1.25rem; }
+.incentive-scheme-block h4 { margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
