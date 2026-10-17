@@ -26,6 +26,8 @@ jobs:
       platform: android
       profile: preview
       fingerprint_hash: ${{ needs.fingerprint.outputs.android_fingerprint_hash }}
+      # A matching build that is still running counts too, so pushes never start a duplicate.
+      wait_for_in_progress: true
 
   publish_update:
     name: Send update to phones
