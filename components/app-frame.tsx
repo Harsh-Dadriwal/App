@@ -225,6 +225,9 @@ export function AppFrame({
           <button type="button" className="secondary-button" onClick={() => void signOut()}>
             Log out
           </button>
+          <Link className="sidebar-link-muted" href={`/${role}/account`}>
+            Account & privacy
+          </Link>
         </div>
       </aside>
 

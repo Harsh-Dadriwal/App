@@ -11,6 +11,6 @@ import { QuotationsService } from "./quotations.service";
   imports: [TenancyModule, NotificationsModule, InventoryModule, OrderRequestsModule],
   controllers: [QuotationsController],
   providers: [QuotationsService, QuotationPhotosService],
-  exports: [QuotationsService]
+  exports: [QuotationsService, QuotationPhotosService]
 })
 export class QuotationsModule {}

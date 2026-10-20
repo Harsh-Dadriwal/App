@@ -19,7 +19,16 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1f1712"
-      }
+      },
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
     },
     "plugins": [
       [
@@ -35,7 +44,8 @@
         "expo-image-picker",
         {
           "photosPermission": "Allow Mahalaxmi Electricals to use your photos so you can send a picture of your requirement list.",
-          "cameraPermission": "Allow Mahalaxmi Electricals to use the camera so you can photograph your requirement list."
+          "cameraPermission": "Allow Mahalaxmi Electricals to use the camera so you can photograph your requirement list.",
+          "microphonePermission": false
         }
       ],
       [

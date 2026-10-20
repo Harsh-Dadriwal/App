@@ -5,10 +5,12 @@ import { PhoneAuthController } from "./phone-auth.controller";
 import { PhoneAuthService } from "./phone-auth.service";
 import { TextBeeSmsService } from "./textbee-sms.service";
 import { TenantsModule } from "../tenants/tenants.module";
+import { QuotationsModule } from "../quotations/quotations.module";
+import { AccountDeletionService } from "./account-deletion.service";
 
 @Module({
-  imports: [TenantsModule],
+  imports: [TenantsModule, QuotationsModule],
   controllers: [IdentityController, PhoneAuthController],
-  providers: [IdentityService, PhoneAuthService, TextBeeSmsService]
+  providers: [IdentityService, PhoneAuthService, TextBeeSmsService, AccountDeletionService]
 })
 export class IdentityModule {}

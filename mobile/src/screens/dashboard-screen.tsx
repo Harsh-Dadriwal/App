@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { deleteMyAccount } from "@/lib/backend/auth-gateway";
 import { useAuth } from "@/providers/auth-provider";
 import { AppButton, Card, ScreenShell, SectionTitle } from "@/components/ui";
 import { palette, radii, shadow } from "@/lib/theme";
@@ -7,6 +8,8 @@ import { roleLabels, type AppRole } from "@mahalaxmi/core/types/domain";
 import { useMobileNavigation, type MobileScreen } from "@/providers/navigation-provider";
 
 type Action = { label: string; hint: string; route: MobileScreen; icon: keyof typeof Feather.glyphMap };
+
+const WEB_APP_URL = (process.env.EXPO_PUBLIC_WEB_APP_URL || "https://app-rho-one-49.vercel.app").replace(/\/$/, "");
 
 const notes: Action = { label: "Project notes", hint: "Site conversations", route: "notes", icon: "message-square" };
 
@@ -64,6 +67,32 @@ function greeting() {
 
 export function DashboardScreen() {
   const { profile, signOut } = useAuth();
+
+  // Google Play requires people to be able to delete their account from inside the app.
+  function confirmDelete() {
+    Alert.alert(
+      "Delete your account?",
+      "This permanently deletes your sign-in, name, contact details, address and uploaded photos. Order and payment records are kept without your personal details, as tax law requires. This cannot be undone.",
+      [
+        { text: "Keep my account", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              const result = await deleteMyAccount();
+              if (result.error) {
+                Alert.alert("Could not delete your account", result.error);
+                return;
+              }
+              Alert.alert("Account deleted", "Your account has been deleted.");
+              await signOut();
+            })();
+          }
+        }
+      ]
+    );
+  }
   const { navigate } = useMobileNavigation();
 
   if (!profile) {
@@ -125,12 +154,24 @@ export function DashboardScreen() {
           </View>
         </View>
         <AppButton label="Log out" icon="log-out" kind="secondary" onPress={() => void signOut()} />
+        <View style={styles.accountLinks}>
+          <Pressable onPress={() => void Linking.openURL(`${WEB_APP_URL}/privacy`)} hitSlop={8} accessibilityRole="link">
+            <Text style={styles.accountLink}>Privacy policy</Text>
+          </Pressable>
+          {profile?.role !== "admin" ? (
+            <Pressable onPress={confirmDelete} hitSlop={8} accessibilityRole="button">
+              <Text style={[styles.accountLink, { color: palette.danger }]}>Delete my account</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </Card>
     </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
+  accountLinks: { flexDirection: "row", justifyContent: "space-between", marginTop: 14, paddingHorizontal: 4 },
+  accountLink: { color: palette.muted, fontWeight: "700", fontSize: 13.5 },
   flex: { flex: 1 },
   row: { flexDirection: "row", alignItems: "center", gap: 12 },
   pendingText: { flex: 1, color: palette.brandDeep, fontWeight: "600", lineHeight: 20 },

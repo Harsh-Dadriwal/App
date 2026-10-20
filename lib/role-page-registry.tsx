@@ -34,6 +34,7 @@ import {
 import { AdminOrderRequestsPage, MyOrdersPage, ShopPage } from "@/components/pages/shop-pages";
 import { AdminQuotationsPage, QuotationsPage } from "@/components/pages/quotation-pages";
 import { AdminSelectionsPage, SelectionsPage } from "@/components/pages/selection-pages";
+import { AccountPage } from "@/components/pages/account-page";
 import {
   AdminPartnerIncentivesPage,
   PartnerIncentivesPage
@@ -52,6 +53,7 @@ type RolePageRegistry = Partial<Record<AppRole, Record<string, RolePageEntry>>>;
 
 export const rolePageRegistry: RolePageRegistry = {
   customer: {
+    account: { title: "Account & privacy", component: <AccountPage /> },
     "": { title: "Dashboard", component: <CustomerDashboardPage /> },
     shop: { title: "Shop Products", component: <ShopPage ordersHref="/customer/orders" quotationsHref="/customer/quotations" /> },
     orders: { title: "My Orders", component: <MyOrdersPage shopHref="/customer/shop" /> },
@@ -91,6 +93,7 @@ export const rolePageRegistry: RolePageRegistry = {
     notes: { title: "Project Notes", component: <ProjectNotesPage role="customer" /> }
   },
   electrician: {
+    account: { title: "Account & privacy", component: <AccountPage /> },
     "": { title: "Dashboard", component: <ElectricianDashboardPage /> },
     shop: { title: "Order Materials", component: <ShopPage ordersHref="/electrician/orders" quotationsHref="/electrician/quotations" /> },
     orders: { title: "My Orders", component: <MyOrdersPage shopHref="/electrician/shop" /> },
@@ -110,6 +113,7 @@ export const rolePageRegistry: RolePageRegistry = {
     notes: { title: "Project Notes", component: <ProjectNotesPage role="electrician" /> }
   },
   architect: {
+    account: { title: "Account & privacy", component: <AccountPage /> },
     "": { title: "Dashboard", component: <ArchitectDashboardPage /> },
     shop: { title: "Shop Products", component: <ShopPage ordersHref="/architect/orders" quotationsHref="/architect/quotations" /> },
     orders: { title: "My Orders", component: <MyOrdersPage shopHref="/architect/shop" /> },
@@ -124,6 +128,7 @@ export const rolePageRegistry: RolePageRegistry = {
     notes: { title: "Project Notes", component: <ProjectNotesPage role="architect" /> }
   },
   admin: {
+    account: { title: "Account & privacy", component: <AccountPage /> },
     "": { title: "Dashboard", component: <AdminDashboardPage /> },
     orders: { title: "Orders", component: <AdminOrderRequestsPage /> },
     quotations: { title: "Quotations", component: <AdminQuotationsPage /> },
@@ -137,6 +142,7 @@ export const rolePageRegistry: RolePageRegistry = {
     notes: { title: "Project Notes", component: <ProjectNotesPage role="admin" /> }
   },
   supplier: {
+    account: { title: "Account & privacy", component: <AccountPage /> },
     "": { title: "Dashboard", component: <SupplierDashboardPage /> }
   }
 };

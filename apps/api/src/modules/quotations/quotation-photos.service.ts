@@ -1,4 +1,4 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectsCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { BadRequestException, Injectable, ServiceUnavailableException } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
@@ -54,6 +54,23 @@ export class QuotationPhotosService {
     const key = `${this.ownerPrefix(tenantId, userId)}${randomUUID()}.${extension}`;
     await this.storage().send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: file.buffer, ContentType: file.mimetype }));
     return { key };
+  }
+
+  /** Deletes every photo a person uploaded in a workspace (used when they delete their account). */
+  async deleteOwnerPhotos(tenantId: string, userId: string) {
+    const prefix = this.ownerPrefix(tenantId, userId);
+    let deleted = 0;
+    let token: string | undefined;
+    do {
+      const page = await this.storage().send(new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix, ContinuationToken: token }));
+      const keys = (page.Contents ?? []).map((object) => ({ Key: object.Key! }));
+      if (keys.length) {
+        await this.storage().send(new DeleteObjectsCommand({ Bucket: this.bucket, Delete: { Objects: keys, Quiet: true } }));
+        deleted += keys.length;
+      }
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (token);
+    return deleted;
   }
 
   /** Signed links valid for an hour; empty when storage is not set up, so lists still load. */

@@ -241,7 +241,13 @@ export function createAuthGateway({
     });
   }
 
+  /** Permanently deletes the signed-in person's account (Google Play requires this in the app). */
+  function deleteMyAccount() {
+    return backendRequest<{ deleted: boolean }>("/api/v1/me/delete-account", { method: "POST", body: {}, timeoutMs: 30_000 });
+  }
+
   return {
+    deleteMyAccount,
     fetchAppProfile,
     fetchTenantMemberships,
     resolveActiveTenant,
