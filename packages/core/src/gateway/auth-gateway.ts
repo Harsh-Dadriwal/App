@@ -289,12 +289,39 @@ export function createAuthGateway({
     });
   }
 
+  /** Saves changes to the signed-in person's own details (name, username, city, state, company). */
+  async function updateMyProfile(changes: Partial<Record<"full_name" | "username" | "company_name" | "city" | "state", string | null>>) {
+    prefetchedMemberships.clear();
+    return backendRequest<UserProfile>("/api/v1/me/profile", { method: "PATCH", body: changes, timeoutMs: 20_000 });
+  }
+
+  /** Texts a code to a mobile number the signed-in person wants to add or switch to. */
+  function sendMyPhoneCode(phone: string) {
+    return backendRequest<{ phone: string; expiresInSeconds: number; resendInSeconds: number }>("/api/v1/me/phone/send-code", {
+      method: "POST",
+      body: { phone },
+      timeoutMs: 20_000
+    });
+  }
+
+  /** Saves that number on the account once the texted code is right. */
+  function verifyMyPhone(phone: string, code: string) {
+    return backendRequest<{ phone: string }>("/api/v1/me/phone/verify", {
+      method: "POST",
+      body: { phone, code },
+      timeoutMs: 20_000
+    });
+  }
+
   /** Permanently deletes the signed-in person's account (Google Play requires this in the app). */
   function deleteMyAccount() {
     return backendRequest<{ deleted: boolean }>("/api/v1/me/delete-account", { method: "POST", body: {}, timeoutMs: 30_000 });
   }
 
   return {
+    updateMyProfile,
+    sendMyPhoneCode,
+    verifyMyPhone,
     deleteMyAccount,
     fetchAppProfile,
     fetchTenantMemberships,

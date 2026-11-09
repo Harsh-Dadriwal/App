@@ -20,6 +20,7 @@ import { useEffect } from "react";
 import { ServiceRequestsScreen } from "@/screens/service-requests-screen";
 import { FintechScreen } from "@/screens/fintech-screen";
 import { IncentivesScreen } from "@/screens/incentives-screen";
+import { AccountScreen } from "@/screens/account-screen";
 
 function Splash({ title, message, busy }: { title?: string; message: string; busy?: boolean }) {
   return (
@@ -94,6 +95,7 @@ function AppBody() {
   if (screen === "price-list") return <PriceListScreen />;
   if (screen === "service-requests") return <ServiceRequestsScreen />;
   if (screen === "fintech") return <FintechScreen />;
+  if (screen === "account") return <AccountScreen />;
   return <DashboardScreen />;
 }
 

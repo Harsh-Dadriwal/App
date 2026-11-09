@@ -7,10 +7,11 @@ import { TextBeeSmsService } from "./textbee-sms.service";
 import { TenantsModule } from "../tenants/tenants.module";
 import { QuotationsModule } from "../quotations/quotations.module";
 import { AccountDeletionService } from "./account-deletion.service";
+import { AccountProfileService } from "./account-profile.service";
 
 @Module({
   imports: [TenantsModule, QuotationsModule],
   controllers: [IdentityController, PhoneAuthController],
-  providers: [IdentityService, PhoneAuthService, TextBeeSmsService, AccountDeletionService]
+  providers: [IdentityService, PhoneAuthService, TextBeeSmsService, AccountDeletionService, AccountProfileService]
 })
 export class IdentityModule {}

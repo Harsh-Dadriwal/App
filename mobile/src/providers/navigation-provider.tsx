@@ -12,7 +12,8 @@ export type MobileScreen =
   | "notes"
   | "price-list"
   | "service-requests"
-  | "fintech";
+  | "fintech"
+  | "account";
 
 type NavigationContextValue = {
   screen: MobileScreen;

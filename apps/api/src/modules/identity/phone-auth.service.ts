@@ -102,12 +102,12 @@ export class PhoneAuthService {
     return { phone, expiresInSeconds: CODE_TTL_MS / 1000, resendInSeconds: RESEND_COOLDOWN_MS / 1000 };
   }
 
-  /** Checks the code and signs the user in, creating the account (with signup details) if new. */
-  async verifyCode(rawPhone: unknown, rawCode: unknown, signup?: SignupProfile) {
-    const phone = toE164(rawPhone);
-    const code = typeof rawCode === "string" ? rawCode.replace(/\D/g, "") : "";
-    if (!phone || code.length !== 6) throw new BadRequestException("Enter the 6-digit code from the SMS.");
-
+  /**
+   * Checks the 6-digit code texted to a number and uses it up (one use only). Throws a
+   * user-facing error when it is wrong, expired or has been tried too often. Shared by
+   * sign-in and by adding a number to an existing account.
+   */
+  async consumeCode(phone: string, code: string) {
     const db = this.supabaseAdmin.getClient();
     const row = await db.from("phone_otp_codes").select("code_hash, expires_at, attempts").eq("phone", phone).maybeSingle();
     if (row.error) throw new Error(row.error.message);
@@ -131,6 +131,15 @@ export class PhoneAuthService {
 
     // One use only.
     await db.from("phone_otp_codes").delete().eq("phone", phone);
+  }
+
+  /** Checks the code and signs the user in, creating the account (with signup details) if new. */
+  async verifyCode(rawPhone: unknown, rawCode: unknown, signup?: SignupProfile) {
+    const phone = toE164(rawPhone);
+    const code = typeof rawCode === "string" ? rawCode.replace(/\D/g, "") : "";
+    if (!phone || code.length !== 6) throw new BadRequestException("Enter the 6-digit code from the SMS.");
+
+    await this.consumeCode(phone, code);
 
     const digits = phone.replace(/[^0-9]/g, "");
     const existing = await this.findAccount(digits);

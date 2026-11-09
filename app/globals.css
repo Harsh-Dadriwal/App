@@ -2990,3 +2990,16 @@ img { max-width: 100%; height: auto; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
+
+
+/* ---------- Account details (edit profile, add/change number and email) ---------- */
+.account-form { display: grid; gap: 1rem; }
+.account-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1rem; }
+.account-form .primary-button { justify-self: start; }
+.contact-list { display: grid; gap: 0.75rem; }
+.contact-row { padding: 1rem 1.1rem; background: var(--surface); border: 1px solid var(--border-color); border-radius: var(--radius-lg); display: grid; gap: 0.85rem; }
+.contact-row-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.contact-row-head strong { display: block; font-size: 0.82rem; color: var(--text-muted); font-weight: 700; }
+.contact-row-head p { margin: 0.15rem 0 0; font-weight: 700; overflow-wrap: anywhere; }
+.contact-editor { display: grid; gap: 0.85rem; max-width: 420px; }
+.contact-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }

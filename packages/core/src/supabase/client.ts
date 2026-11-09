@@ -34,7 +34,7 @@ type BrowserSupabaseClient = {
     signInWithOtp: (params: unknown) => Promise<any>;
     verifyOtp: (params: unknown) => Promise<any>;
     resetPasswordForEmail: (email: string, options?: any) => Promise<any>;
-    updateUser: (attributes: any) => Promise<any>;
+    updateUser: (attributes: any, options?: any) => Promise<any>;
     setSession: (params: { access_token: string; refresh_token: string }) => Promise<{ error: any }>;
   };
   from: (table: string) => any;

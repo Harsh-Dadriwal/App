@@ -18,3 +18,6 @@ export const verifyPhoneOtp = authGateway.verifyPhoneOtp;
 export const completePhoneSignup = authGateway.completePhoneSignup;
 export const checkSignupAvailability = authGateway.checkSignupAvailability;
 export const deleteMyAccount = authGateway.deleteMyAccount;
+export const updateMyProfile = authGateway.updateMyProfile;
+export const sendMyPhoneCode = authGateway.sendMyPhoneCode;
+export const verifyMyPhone = authGateway.verifyMyPhone;

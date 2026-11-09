@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { FormNotice, PageSection } from "@/components/data-view";
 import { useAuth } from "@/components/providers/auth-provider";
+import { AccountDetails } from "@/components/pages/account-details";
 import { deleteMyAccount } from "@/lib/backend/modules/auth-gateway";
 import { roleLabels } from "@mahalaxmi/core/types/domain";
 
@@ -30,18 +31,16 @@ export function AccountPage() {
 
   return (
     <div className="page-stack">
-      <PageSection title="Your account" description="The details we hold for you.">
+      <PageSection title="Your account" description="Your account type and how we use your information.">
         <dl className="account-details">
-          <div><dt>Name</dt><dd>{profile?.full_name ?? "-"}</dd></div>
-          <div><dt>Username</dt><dd>{profile?.username ?? "-"}</dd></div>
-          <div><dt>Mobile</dt><dd>{profile?.phone ?? "-"}</dd></div>
-          <div><dt>Email</dt><dd>{profile?.email ?? "-"}</dd></div>
           <div><dt>Account type</dt><dd>{profile?.role ? roleLabels[profile.role] : "-"}</dd></div>
         </dl>
         <p className="shop-muted">
           Read our <Link href="/privacy">privacy policy</Link> to see how your information is used.
         </p>
       </PageSection>
+
+      <AccountDetails />
 
       <section className="danger-zone">
         <h3>Delete my account</h3>

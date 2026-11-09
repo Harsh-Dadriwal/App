@@ -169,6 +169,7 @@ export function DashboardScreen() {
             </Text>
           </View>
         </View>
+        <AppButton label="Edit my details" icon="edit-3" kind="secondary" onPress={() => navigate("account")} />
         <AppButton
           label={loggingOut ? "Logging out…" : "Log out"}
           icon="log-out"
