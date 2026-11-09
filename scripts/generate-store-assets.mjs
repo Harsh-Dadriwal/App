@@ -35,9 +35,9 @@ async function categoryImage(name, size) {
   return `data:image/png;base64,${png.toString("base64")}`;
 }
 
-const bolt = (cx, cy, r) => `
-  <circle cx="${cx}" cy="${cy}" r="${r}" fill="${C.gold}"/>
-  <path transform="translate(${cx - r * 0.42} ${cy - r * 0.62}) scale(${r / 50})" d="M24 0 L4 36 L20 36 L12 62 L40 22 L24 22 L32 0 Z" fill="${C.night}"/>`;
+// The app icon (rounded), drawn centred at (cx, cy) with radius r.
+const ICON = `data:image/png;base64,${readFileSync(join(ROOT, "mobile", "assets", "splash-icon.png")).toString("base64")}`;
+const logo = (cx, cy, r) => `<image href="${ICON}" x="${cx - r}" y="${cy - r}" width="${r * 2}" height="${r * 2}"/>`;
 
 const text = (x, y, value, size, { weight = 700, fill = C.ink, anchor = "start", opacity = 1 } = {}) =>
   `<text x="${x}" y="${y}" font-family="${FONT}" font-size="${size}" font-weight="${weight}" fill="${fill}" text-anchor="${anchor}" opacity="${opacity}">${esc(value)}</text>`;
@@ -62,7 +62,7 @@ function screenshot(headline, subline, appTitle, appSubtitle, body) {
   <g filter="url(#sh)"><rect x="90" y="380" width="900" height="1640" rx="64" fill="${C.bg}"/></g>
   <g clip-path="url(#screen)">
     <rect x="90" y="380" width="900" height="270" fill="${C.night}"/>
-    ${bolt(160, 455, 30)}
+    ${logo(160, 455, 32)}
     ${text(210, 448, "Mahalaxmi Electricals", 30, { weight: 800, fill: "#f6ede2" })}
     ${text(210, 486, "Electrical supplies & services", 24, { weight: 500, fill: "#c9b8a6" })}
     ${text(130, 580, appTitle, 56, { weight: 900, fill: "#fff" })}
@@ -85,7 +85,7 @@ async function main() {
     <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${C.night}"/><stop offset="1" stop-color="#5a3214"/></linearGradient></defs>
     <rect width="1024" height="500" fill="url(#g)"/>
     <circle cx="900" cy="60" r="200" fill="${C.gold}" opacity="0.08"/>
-    ${bolt(110, 150, 52)}
+    ${logo(112, 150, 58)}
     ${text(60, 270, "Mahalaxmi", 64, { weight: 900, fill: "#fff" })}
     ${text(60, 336, "Electricals", 64, { weight: 900, fill: C.gold })}
     ${text(60, 392, "Live stock · Quick quotations", 28, { weight: 600, fill: "#f6ede2" })}

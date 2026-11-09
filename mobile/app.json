@@ -18,7 +18,8 @@
       "package": "com.mahalaxmi.electricals",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1f1712"
+        "backgroundColor": "#d9590b",
+        "backgroundImage": "./assets/adaptive-icon-background.png"
       },
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
