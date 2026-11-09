@@ -170,7 +170,7 @@ function PhoneInput({ value, onChange, label }: { value: string; onChange: (valu
           textContentType="telephoneNumber"
           autoComplete="tel"
           placeholder="98765 43210"
-          placeholderTextColor="#a89c8d"
+          placeholderTextColor="#8591a6"
           maxLength={16}
           style={styles.phoneInput}
           accessibilityLabel={label}
@@ -546,7 +546,7 @@ const styles = StyleSheet.create({
     width: 260,
     height: 260,
     borderRadius: 130,
-    backgroundColor: "rgba(194, 87, 12, 0.35)"
+    backgroundColor: "rgba(79, 110, 255, 0.4)"
   },
   logo: { width: 76, height: 76, marginBottom: 10 },
   brandName: { color: "#ffffff", fontSize: 22, fontWeight: "900", letterSpacing: -0.3 },
@@ -612,7 +612,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.successSoft
   },
   verifiedText: { color: palette.success, fontWeight: "800", fontSize: 12.5 },
-  segment: { flexDirection: "row", padding: 4, borderRadius: radii.md, backgroundColor: "#efe6da" },
+  segment: { flexDirection: "row", padding: 4, borderRadius: radii.md, backgroundColor: "#e8edf7" },
   segmentButton: { flex: 1, minHeight: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   segmentButtonActive: { backgroundColor: palette.surface, ...shadow },
   segmentText: { fontWeight: "700", color: palette.muted, fontSize: 15 },

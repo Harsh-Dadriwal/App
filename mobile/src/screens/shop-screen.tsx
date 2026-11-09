@@ -24,7 +24,7 @@ import {
 import { useCart, useCatalog } from "@mahalaxmi/core/hooks/shop-store";
 
 const PAGE_SIZE = 30;
-const TILE_TONES = ["#7c2d12", "#0f766e", "#1e3a8a", "#6d28d9", "#9a3412", "#065f46", "#334155", "#a16207"];
+const TILE_TONES = ["#1e3a8a", "#0f766e", "#4338ca", "#6d28d9", "#1d4ed8", "#065f46", "#334155", "#b45309"];
 // Category pictures are served through the web app (the storage bucket is private).
 const WEB_APP_URL = (process.env.EXPO_PUBLIC_WEB_APP_URL || "https://app-rho-one-49.vercel.app").replace(/\/$/, "");
 

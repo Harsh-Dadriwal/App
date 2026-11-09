@@ -26,9 +26,9 @@ const STOCK_FILTERS: Array<{ id: PriceListStockFilter; label: string }> = [
   { id: "out", label: "Out of stock" }
 ];
 const CUSTOMER_VIEW_SWATCHES = [
-  { background: "#7c2d12", color: "#fff7ed" },
+  { background: "#1e3a8a", color: "#eaf0ff" },
   { background: "#0f766e", color: "#f0fdfa" },
-  { background: "#1f1712", color: "#f6ede2" },
+  { background: "#0b1230", color: "#eaf0ff" },
   { background: "#134e4a", color: "#ecfdf5" }
 ];
 

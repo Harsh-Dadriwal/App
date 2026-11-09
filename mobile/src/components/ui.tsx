@@ -324,7 +324,7 @@ export function Field({
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor="#a89c8d"
+          placeholderTextColor="#8591a6"
           style={[styles.input, multiline && styles.textarea]}
           secureTextEntry={secureTextEntry && !revealed}
           multiline={multiline}
@@ -556,7 +556,7 @@ const styles = StyleSheet.create({
     width: 200,
     height: 200,
     borderRadius: 100,
-    backgroundColor: "rgba(194, 87, 12, 0.35)"
+    backgroundColor: "rgba(79, 110, 255, 0.4)"
   },
   heroGlowSmall: {
     position: "absolute",
@@ -565,7 +565,7 @@ const styles = StyleSheet.create({
     width: 110,
     height: 110,
     borderRadius: 55,
-    backgroundColor: "rgba(224, 163, 58, 0.16)"
+    backgroundColor: "rgba(255, 255, 255, 0.10)"
   },
   heroTopRow: {
     flexDirection: "row",
@@ -677,7 +677,7 @@ const styles = StyleSheet.create({
   },
   cardBrand: {
     backgroundColor: palette.brandSoft,
-    borderColor: "rgba(194, 87, 12, 0.18)",
+    borderColor: "rgba(37, 99, 235, 0.18)",
     borderWidth: 1
   },
   cardDanger: {

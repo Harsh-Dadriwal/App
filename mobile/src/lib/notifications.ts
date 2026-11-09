@@ -68,7 +68,7 @@ export async function registerForPushNotifications() {
         importance: Notifications.AndroidImportance.HIGH,
         sound: "default",
         vibrationPattern: [0, 250, 200, 250],
-        lightColor: "#c2570c"
+        lightColor: "#2563eb"
       });
     }
     const current = await Notifications.getPermissionsAsync();
