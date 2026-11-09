@@ -17,7 +17,7 @@ async function bootstrap() {
     try {
       nestApp = await NestFactory.create(AppModule, new ExpressAdapter(server), {
         cors: true,
-        logger: ["error", "warn", "log"]
+        logger: ["error", "warn"]
       });
       nestApp.setGlobalPrefix("");
 

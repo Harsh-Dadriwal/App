@@ -1,12 +1,36 @@
 import { Injectable, ForbiddenException } from "@nestjs/common";
 import { SupabaseAdminService } from "../../common/supabase/supabase-admin.service";
 
+type Memberships = Array<Record<string, any>>;
+
+const MEMBERSHIPS_TTL_MS = 30_000;
+const MEMBERSHIPS_CACHE_LIMIT = 500;
+
 @Injectable()
 export class TenantsService {
+  private readonly membershipCache = new Map<string, { value: Memberships; expiresAt: number }>();
+
   constructor(private readonly supabaseAdmin: SupabaseAdminService) {}
 
-  async getMembershipsForUser(userId: string, accessToken: string) {
-    const supabase = this.supabaseAdmin.createUserClient(accessToken);
+  invalidateMemberships(userId: string) {
+    this.membershipCache.delete(userId);
+  }
+
+  /** `userId` always comes from the verified request actor, never from the query string. */
+  async getMembershipsForUser(userId: string): Promise<Memberships> {
+    const cached = this.membershipCache.get(userId);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.value;
+    }
+
+    const value = await this.loadMemberships(userId);
+    if (this.membershipCache.size >= MEMBERSHIPS_CACHE_LIMIT) this.membershipCache.clear();
+    this.membershipCache.set(userId, { value, expiresAt: Date.now() + MEMBERSHIPS_TTL_MS });
+    return value;
+  }
+
+  private async loadMemberships(userId: string): Promise<Memberships> {
+    const supabase = this.supabaseAdmin.getClient();
     const membershipResult = await supabase
       .from("tenant_memberships")
       .select(
@@ -47,16 +71,16 @@ export class TenantsService {
     })) as Array<Record<string, any>>;
   }
 
-  async switchTenantForUser(userId: string, tenantId: string, accessToken: string) {
-    const memberships = await this.getMembershipsForUser(userId, accessToken);
+  async switchTenantForUser(userId: string, tenantId: string) {
+    const memberships = await this.getMembershipsForUser(userId);
     const hasAccess = memberships.some((membership) => membership.tenant_id === tenantId);
 
     if (!hasAccess) {
       throw new ForbiddenException("You do not have access to this tenant.");
     }
 
-    const supabase = this.supabaseAdmin.createUserClient(accessToken);
-    const result = await supabase
+    const result = await this.supabaseAdmin
+      .getClient()
       .from("users")
       .update({ default_tenant_id: tenantId })
       .eq("id", userId);

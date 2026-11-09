@@ -1,4 +1,7 @@
 const UNAVAILABLE_MESSAGE = "This service is temporarily unavailable. Please try again shortly.";
+// Long enough for a serverless cold start (a couple of seconds); aborting sooner only
+// throws that work away and triggers slower fallbacks.
+const DEFAULT_TIMEOUT_MS = 10_000;
 const SERVER_ERROR_MESSAGE = "Something went wrong on our side. Please try again.";
 
 /** Keeps raw server/framework text (routes, status codes, stack-like messages) away from end users. */
@@ -75,7 +78,7 @@ export function createBackendRequester({ getBaseUrl, isConfigured, getAuthHeader
         requestBody = JSON.stringify(options.body);
       }
       const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-      const timeoutId = controller ? setTimeout(() => controller.abort(), options.timeoutMs ?? 2500) : null;
+      const timeoutId = controller ? setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS) : null;
 
       let response: Response;
       try {

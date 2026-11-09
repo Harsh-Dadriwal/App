@@ -26,6 +26,37 @@ export function createAuthGateway({
 }: AuthGatewayDependencies) {
   const pendingProfileRequests = new Map<string, Promise<BackendResult<UserProfile>>>();
 
+  // Loading the profile also brings back the person's workspaces in the same API call.
+  // They are kept for a few seconds so the follow-up workspace fetch costs nothing.
+  const PREFETCH_TTL_MS = 8_000;
+  const prefetchedMemberships = new Map<string, { value: TenantMembership[]; expiresAt: number }>();
+  // Set once the API answers 404 for /me/context (an older deployment): skip it from then on.
+  let contextEndpointMissing = false;
+
+  async function fetchProfileFromContext(): Promise<BackendResult<UserProfile> | null> {
+    if (contextEndpointMissing) {
+      return null;
+    }
+
+    const result = await backendRequest<{ profile: UserProfile | null; tenantMemberships: TenantMembership[] }>(
+      "/api/v1/me/context"
+    );
+
+    if (result.data?.profile) {
+      prefetchedMemberships.set(result.data.profile.id, {
+        value: result.data.tenantMemberships ?? [],
+        expiresAt: Date.now() + PREFETCH_TTL_MS
+      });
+      return { data: result.data.profile, error: null };
+    }
+
+    if (result.error && /feature is not available right now/i.test(result.error)) {
+      contextEndpointMissing = true;
+    }
+
+    return null;
+  }
+
   async function fetchAppProfile(authUserId: string): Promise<BackendResult<UserProfile>> {
     const existing = pendingProfileRequests.get(authUserId);
     if (existing) {
@@ -35,12 +66,22 @@ export function createAuthGateway({
     const promise = (async () => {
       try {
         if (isBackendApiConfigured()) {
-          const result = await backendRequest<UserProfile>(
-            `/api/v1/me/profile?authUserId=${encodeURIComponent(authUserId)}`
-          );
+          const fromContext = await fetchProfileFromContext();
 
-          if (result.data) {
-            return result;
+          if (fromContext?.data) {
+            return fromContext;
+          }
+
+          // Only an API without /me/context needs the older profile route; any other
+          // failure (offline, timeout) goes straight to the direct lookup below.
+          if (contextEndpointMissing) {
+            const result = await backendRequest<UserProfile>(
+              `/api/v1/me/profile?authUserId=${encodeURIComponent(authUserId)}`
+            );
+
+            if (result.data) {
+              return result;
+            }
           }
         }
 
@@ -99,6 +140,11 @@ export function createAuthGateway({
   async function fetchTenantMemberships(
     userId: string
   ): Promise<BackendResult<TenantMembership[]>> {
+    const prefetched = prefetchedMemberships.get(userId);
+    if (prefetched && prefetched.expiresAt > Date.now()) {
+      return { data: prefetched.value, error: null };
+    }
+
     if (isBackendApiConfigured()) {
       const result = await backendRequest<TenantMembership[]>(
         `/api/v1/me/tenants?userId=${encodeURIComponent(userId)}`
@@ -169,6 +215,8 @@ export function createAuthGateway({
     profileId: string,
     tenantId: string
   ): Promise<BackendResult<{ tenantId: string }>> {
+    prefetchedMemberships.delete(profileId);
+
     if (isBackendApiConfigured()) {
       const result = await backendRequest<{ tenantId: string }>(`/api/v1/me/tenants/switch`, {
         method: "POST",

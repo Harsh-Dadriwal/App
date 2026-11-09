@@ -10,8 +10,13 @@ type OrderItemScope = TenantScopedRow & {
   site_order_id: string;
 };
 
+const TENANT_IDS_TTL_MS = 30_000;
+const TENANT_IDS_CACHE_LIMIT = 500;
+
 @Injectable()
 export class TenantAccessService {
+  private readonly tenantIdCache = new Map<string, { ids: Set<string>; expiresAt: number }>();
+
   constructor(private readonly supabaseAdmin: SupabaseAdminService) {}
 
   private requireActorProfile(actor: RequestActor) {
@@ -22,6 +27,12 @@ export class TenantAccessService {
 
   async getActorTenantIds(actor: RequestActor) {
     this.requireActorProfile(actor);
+    const cacheKey = String(actor.appUserId);
+    const cached = this.tenantIdCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.ids;
+    }
+
     const result = await this.supabaseAdmin
       .getClient()
       .from("tenant_memberships")
@@ -33,11 +44,19 @@ export class TenantAccessService {
       throw new Error(result.error.message);
     }
 
-    return new Set((result.data ?? []).map((row) => row.tenant_id));
+    const ids = new Set((result.data ?? []).map((row) => row.tenant_id));
+    if (this.tenantIdCache.size >= TENANT_IDS_CACHE_LIMIT) this.tenantIdCache.clear();
+    this.tenantIdCache.set(cacheKey, { ids, expiresAt: Date.now() + TENANT_IDS_TTL_MS });
+    return ids;
   }
 
   async assertTenantAccess(actor: RequestActor, tenantId: string) {
-    const tenantIds = await this.getActorTenantIds(actor);
+    let tenantIds = await this.getActorTenantIds(actor);
+    if (!tenantIds.has(tenantId)) {
+      // The cached list may predate a membership that was just added: check once more.
+      this.tenantIdCache.delete(String(actor.appUserId));
+      tenantIds = await this.getActorTenantIds(actor);
+    }
     if (!tenantIds.has(tenantId)) {
       throw new ForbiddenException("You do not have access to this workspace.");
     }

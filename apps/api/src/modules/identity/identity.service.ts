@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { SupabaseAdminService } from "../../common/supabase/supabase-admin.service";
 import { TenantsService } from "../tenants/tenants.service";
 import type { RequestActor } from "../../common/auth/auth.types";
+import { ACTOR_PROFILE_COLUMNS, invalidateActorCache } from "../../common/auth/supabase-auth.guard";
 
 @Injectable()
 export class IdentityService {
@@ -10,13 +11,16 @@ export class IdentityService {
     private readonly tenantsService: TenantsService
   ) {}
 
-  async getProfile(actor: RequestActor, accessToken: string) {
-    const supabase = this.supabaseAdmin.createUserClient(accessToken);
-    const profileResult = await supabase
+  async getProfile(actor: RequestActor) {
+    // The auth guard has already read this row for the request.
+    if (actor.profile) {
+      return actor.profile;
+    }
+
+    const profileResult = await this.supabaseAdmin
+      .getClient()
       .from("users")
-      .select(
-        "id, auth_user_id, default_tenant_id, username, full_name, email, phone, role, city, state, company_name, verification_status, is_admin_verified"
-      )
+      .select(ACTOR_PROFILE_COLUMNS)
       .eq("auth_user_id", actor.authUserId)
       .maybeSingle();
 
@@ -27,19 +31,31 @@ export class IdentityService {
     return profileResult.data;
   }
 
-  async getTenantMemberships(actor: RequestActor, accessToken: string) {
+  async getTenantMemberships(actor: RequestActor) {
     if (!actor.appUserId) {
       throw new UnauthorizedException("Your profile could not be found. Please sign in again.");
     }
 
-    return this.tenantsService.getMembershipsForUser(actor.appUserId, accessToken);
+    return this.tenantsService.getMembershipsForUser(actor.appUserId);
   }
 
-  async switchTenant(actor: RequestActor, tenantId: string, accessToken: string) {
+  /** Profile and workspaces in one call, so signing in needs a single round trip. */
+  async getContext(actor: RequestActor) {
+    const profile = await this.getProfile(actor);
+    const tenantMemberships = actor.appUserId
+      ? await this.tenantsService.getMembershipsForUser(actor.appUserId)
+      : [];
+
+    return { profile, tenantMemberships };
+  }
+
+  async switchTenant(actor: RequestActor, tenantId: string) {
     if (!actor.appUserId) {
       throw new UnauthorizedException("Your profile could not be found. Please sign in again.");
     }
 
-    return this.tenantsService.switchTenantForUser(actor.appUserId, tenantId, accessToken);
+    const result = await this.tenantsService.switchTenantForUser(actor.appUserId, tenantId);
+    invalidateActorCache(actor.authUserId);
+    return result;
   }
 }

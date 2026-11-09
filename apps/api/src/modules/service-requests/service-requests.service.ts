@@ -162,18 +162,25 @@ export class ServiceRequestsService {
     const rows = (requests.data ?? []) as RequestRow[];
 
     let responses: ResponseRow[] = [];
+    let users = new Map<string, any>();
     if (rows.length) {
       let responseQuery = this.db.from("service_request_responses").select(RESPONSE_COLUMNS).in("service_request_id", rows.map((row) => row.id)).order("created_at");
       if (role === "electrician") responseQuery = responseQuery.eq("electrician_id", userId);
-      const responseResult = await responseQuery;
+      // The responses and the people named on the requests are independent: load them together.
+      const [responseResult, requestUsers] = await Promise.all([
+        responseQuery,
+        this.getUsers(rows.flatMap((row) => [row.customer_id, row.assigned_electrician_id]))
+      ]);
       if (responseResult.error) throw new Error(responseResult.error.message);
       responses = (responseResult.data ?? []) as ResponseRow[];
-    }
+      users = requestUsers;
 
-    const users = await this.getUsers([
-      ...rows.flatMap((row) => [row.customer_id, row.assigned_electrician_id]),
-      ...responses.map((response) => response.electrician_id)
-    ]);
+      // Only electricians who responded but are not already known need a second lookup.
+      const missing = responses.map((response) => response.electrician_id).filter((id) => id && !users.has(id));
+      if (missing.length) {
+        users = new Map([...users, ...(await this.getUsers(missing))]);
+      }
+    }
 
     return {
       role,
