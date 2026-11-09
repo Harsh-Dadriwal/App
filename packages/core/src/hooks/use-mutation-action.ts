@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 export type MutationResultLike =
   | void
@@ -24,11 +24,17 @@ export function useSharedMutationAction() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const runningRef = useRef(false);
 
   async function run(
     action: () => Promise<MutationResultLike>,
     successMessage?: string
   ) {
+    // A second tap or Enter while the first is still running must not submit twice.
+    if (runningRef.current) {
+      return false;
+    }
+    runningRef.current = true;
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -55,6 +61,7 @@ export function useSharedMutationAction() {
       setError(caughtError instanceof Error ? caughtError.message : "Action failed.");
       return false;
     } finally {
+      runningRef.current = false;
       setLoading(false);
     }
   }

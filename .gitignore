@@ -45,3 +45,7 @@ apps/api/dist/
 
 # OCR Data files
 *.traineddata
+
+# Production build made beside `next dev` (NEXT_DIST_DIR)
+/.next-build/
+

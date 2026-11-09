@@ -7,6 +7,7 @@ import { useMutationAction, useRows } from "@/components/data-view";
 import { useAuth } from "@/components/providers/auth-provider";
 import { SkeletonWorkspace, TopProgressBar } from "@/components/skeleton";
 import { useTheme } from "@/components/theme-provider";
+import { CommandPalette } from "@/components/command-palette";
 import { NavIcon } from "@/components/nav-icon";
 import { getRoleNavGroups, roleLabels } from "@/lib/navigation";
 import type { AppRole } from "@mahalaxmi/core/types/domain";
@@ -180,6 +181,9 @@ export function AppFrame({
         aria-hidden="true"
       />
 
+      <a className="skip-link" href="#main-content">Skip to content</a>
+      <CommandPalette role={role} onToggleTheme={toggleTheme} onSignOut={() => { setLoggingOut(true); void signOut(); }} />
+
       <aside className={`workspace-sidebar ${isSidebarOpen ? "is-open" : ""}`}>
         <div className="sidebar-brand">
           <span className="brand-mark">
@@ -290,6 +294,16 @@ export function AppFrame({
           </div>
           
           <div className="header-aside">
+            <button
+              type="button"
+              className="header-search"
+              onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }))}
+              aria-label="Search pages and actions (Ctrl or Command K)"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
+              <span>Search</span>
+              <kbd>⌘K</kbd>
+            </button>
             <button type="button" className="theme-toggle theme-toggle--icon" onClick={toggleTheme} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
               <ThemeIcon dark={theme === "dark"} />
             </button>
@@ -338,7 +352,7 @@ export function AppFrame({
           </div>
         </header>
 
-        <div className="page-content fade-in">
+        <div className="page-content fade-in" id="main-content" tabIndex={-1}>
           {errorMessage ? <p className="notice error">{errorMessage}</p> : null}
           {children}
         </div>

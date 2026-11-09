@@ -2,43 +2,46 @@
 
 import type { ReactNode } from "react";
 import { USER_ROLE, isRoleEnabled, type AppRole } from "@mahalaxmi/core/types/domain";
-import { ProjectNotesPage } from "@/components/pages/collaboration-pages";
-import {
-  ElectricianDashboardPage,
-  ElectricianProjectsPage,
-  ArchitectDashboardPage,
-  ArchitectProjectsPage,
-  AdminDashboardPage,
-  SupplierDashboardPage,
-  AdminUsersPage,
-  AdminPriceListPage
-} from "@/components/pages/contractor-pages";
-import {
-  CustomerDashboardPage,
-  DirectoryPage,
-  CustomerSitesPage,
-  CustomerBudgetPage
-} from "@/components/pages/customer-pages";
-import {
-  CustomerWalletPage,
-  CustomerSavingsPage,
-  CustomerReferralsPage,
-  AdminFintechPage
-} from "@/components/pages/fintech-pages";
-import { AdminCreditPage } from "@/components/pages/credit-pages";
-import {
-  AdminServiceRequestsPage,
-  CustomerServiceRequestsPage,
-  ElectricianServiceRequestsPage
-} from "@/components/pages/service-requests-pages";
-import { AdminOrderRequestsPage, MyOrdersPage, ShopPage } from "@/components/pages/shop-pages";
-import { AdminQuotationsPage, QuotationsPage } from "@/components/pages/quotation-pages";
-import { AdminSelectionsPage, SelectionsPage } from "@/components/pages/selection-pages";
-import { AccountPage } from "@/components/pages/account-page";
-import {
-  AdminPartnerIncentivesPage,
-  PartnerIncentivesPage
-} from "@/components/pages/partner-incentives-pages";
+import dynamic from "next/dynamic";
+import { SkeletonCards } from "@/components/skeleton";
+
+// Each page is its own chunk, loaded when it is first opened, so the first screen no
+// longer downloads the code of every page for every role.
+function lazyPage<P extends object>(load: () => Promise<React.ComponentType<P>>) {
+  return dynamic(load, { loading: () => <SkeletonCards count={3} /> });
+}
+
+const ProjectNotesPage = lazyPage(() => import("@/components/pages/collaboration-pages/notes").then((m) => m.ProjectNotesPage));
+const ElectricianDashboardPage = lazyPage(() => import("@/components/pages/contractor-pages/electrician").then((m) => m.ElectricianDashboardPage));
+const ElectricianProjectsPage = lazyPage(() => import("@/components/pages/contractor-pages/electrician").then((m) => m.ElectricianProjectsPage));
+const ArchitectDashboardPage = lazyPage(() => import("@/components/pages/contractor-pages/architect").then((m) => m.ArchitectDashboardPage));
+const ArchitectProjectsPage = lazyPage(() => import("@/components/pages/contractor-pages/architect").then((m) => m.ArchitectProjectsPage));
+const AdminDashboardPage = lazyPage(() => import("@/components/pages/contractor-pages/admin").then((m) => m.AdminDashboardPage));
+const SupplierDashboardPage = lazyPage(() => import("@/components/pages/contractor-pages/supplier").then((m) => m.SupplierDashboardPage));
+const AdminUsersPage = lazyPage(() => import("@/components/pages/contractor-pages/admin").then((m) => m.AdminUsersPage));
+const AdminPriceListPage = lazyPage(() => import("@/components/pages/contractor-pages/price-list").then((m) => m.AdminPriceListPage));
+const CustomerDashboardPage = lazyPage(() => import("@/components/pages/customer-pages").then((m) => m.CustomerDashboardPage));
+const DirectoryPage = lazyPage(() => import("@/components/pages/customer-pages").then((m) => m.DirectoryPage));
+const CustomerSitesPage = lazyPage(() => import("@/components/pages/customer-pages").then((m) => m.CustomerSitesPage));
+const CustomerBudgetPage = lazyPage(() => import("@/components/pages/customer-pages").then((m) => m.CustomerBudgetPage));
+const CustomerWalletPage = lazyPage(() => import("@/components/pages/fintech-pages").then((m) => m.CustomerWalletPage));
+const CustomerSavingsPage = lazyPage(() => import("@/components/pages/fintech-pages").then((m) => m.CustomerSavingsPage));
+const CustomerReferralsPage = lazyPage(() => import("@/components/pages/fintech-pages").then((m) => m.CustomerReferralsPage));
+const AdminFintechPage = lazyPage(() => import("@/components/pages/fintech-pages").then((m) => m.AdminFintechPage));
+const AdminCreditPage = lazyPage(() => import("@/components/pages/credit-pages").then((m) => m.AdminCreditPage));
+const AdminServiceRequestsPage = lazyPage(() => import("@/components/pages/service-requests-pages").then((m) => m.AdminServiceRequestsPage));
+const CustomerServiceRequestsPage = lazyPage(() => import("@/components/pages/service-requests-pages").then((m) => m.CustomerServiceRequestsPage));
+const ElectricianServiceRequestsPage = lazyPage(() => import("@/components/pages/service-requests-pages").then((m) => m.ElectricianServiceRequestsPage));
+const AdminOrderRequestsPage = lazyPage(() => import("@/components/pages/shop-pages").then((m) => m.AdminOrderRequestsPage));
+const MyOrdersPage = lazyPage(() => import("@/components/pages/shop-pages").then((m) => m.MyOrdersPage));
+const ShopPage = lazyPage(() => import("@/components/pages/shop-pages").then((m) => m.ShopPage));
+const AdminQuotationsPage = lazyPage(() => import("@/components/pages/quotation-pages").then((m) => m.AdminQuotationsPage));
+const QuotationsPage = lazyPage(() => import("@/components/pages/quotation-pages").then((m) => m.QuotationsPage));
+const AdminSelectionsPage = lazyPage(() => import("@/components/pages/selection-pages").then((m) => m.AdminSelectionsPage));
+const SelectionsPage = lazyPage(() => import("@/components/pages/selection-pages").then((m) => m.SelectionsPage));
+const AccountPage = lazyPage(() => import("@/components/pages/account-page").then((m) => m.AccountPage));
+const AdminPartnerIncentivesPage = lazyPage(() => import("@/components/pages/partner-incentives-pages").then((m) => m.AdminPartnerIncentivesPage));
+const PartnerIncentivesPage = lazyPage(() => import("@/components/pages/partner-incentives-pages").then((m) => m.PartnerIncentivesPage));
 
 type RolePageEntry = {
   title: string;

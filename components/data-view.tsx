@@ -83,6 +83,20 @@ type FetchResult<T> = {
   error: string | null;
 };
 
+// Two components asking for the same list at the same moment share one request. Refetches
+// after a change skip this, so they never receive a copy that started before the change.
+const inflightQueries = new Map<string, Promise<FetchResult<any>>>();
+
+function shareInflight<T>(key: string, start: () => Promise<FetchResult<T>>): Promise<FetchResult<T>> {
+  const running = inflightQueries.get(key);
+  if (running) return running as Promise<FetchResult<T>>;
+  const promise = start().finally(() => {
+    if (inflightQueries.get(key) === promise) inflightQueries.delete(key);
+  });
+  inflightQueries.set(key, promise);
+  return promise;
+}
+
 export function useRows<T>(
   fetcher: (client: NonNullable<Awaited<ReturnType<typeof getSupabaseBrowserClient>>>) => Promise<FetchResult<T>>,
   deps: DependencyList,
@@ -152,7 +166,9 @@ export function useRows<T>(
           .subscribe();
       }
 
-      const result = await trackQuery(fetcher(client));
+      const result = await trackQuery(
+        reloadKey === 0 && cacheKey ? shareInflight(cacheKey, () => fetcher(client)) : fetcher(client)
+      );
       if (!result.error) {
         writeQueryCache(cacheKey, result.data);
       }
