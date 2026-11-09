@@ -120,7 +120,8 @@ export function SelectionsPage({ ordersHref, quotationsHref, incentivesHref }: {
   const [form, setForm] = useState(EMPTY_FORM);
   const [picked, setPicked] = useState<PickedItem[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const role = selections.data[0]?.role;
+  // The signed-in role is known at once; waiting for the server would show a customer the professional's form first.
+  const role = profile?.role === "customer" ? "customer" : selections.data[0]?.role;
   const list = selections.data[0]?.selections ?? [];
   const from = `${profile?.full_name ?? "your electrician"}${profile?.role ? ` (${profile.role})` : ""}`;
 
