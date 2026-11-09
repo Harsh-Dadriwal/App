@@ -37,15 +37,15 @@ const tabConfig: Record<string, Array<{ key: MobileScreen; label: string; icon: 
   ],
   electrician: [
     { key: "dashboard", label: "Home", icon: "home" },
-    { key: "selections", label: "Selections", icon: "list" },
     { key: "shop", label: "Shop", icon: "shopping-bag" },
+    { key: "selections", label: "Selections", icon: "list" },
     { key: "quotations", label: "Quotes", icon: "file-text" },
     { key: "service-requests", label: "Jobs", icon: "tool" }
   ],
   architect: [
     { key: "dashboard", label: "Home", icon: "home" },
-    { key: "selections", label: "Selections", icon: "list" },
     { key: "shop", label: "Shop", icon: "shopping-bag" },
+    { key: "selections", label: "Selections", icon: "list" },
     { key: "quotations", label: "Quotes", icon: "file-text" },
     { key: "incentives", label: "Rewards", icon: "award" }
   ],

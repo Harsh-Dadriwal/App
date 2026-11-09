@@ -7,7 +7,8 @@ import { useMutationAction, useRows } from "@/components/data-view";
 import { useAuth } from "@/components/providers/auth-provider";
 import { SkeletonWorkspace, TopProgressBar } from "@/components/skeleton";
 import { useTheme } from "@/components/theme-provider";
-import { getRoleNav, roleLabels } from "@/lib/navigation";
+import { NavIcon } from "@/components/nav-icon";
+import { getRoleNavGroups, roleLabels } from "@/lib/navigation";
 import type { AppRole } from "@mahalaxmi/core/types/domain";
 import {
   listNotifications,
@@ -30,6 +31,18 @@ function LoadingView() {
   return <SkeletonWorkspace />;
 }
 
+function ThemeIcon({ dark }: { dark: boolean }) {
+  return dark ? (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+  ) : (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  );
+}
+
 export function AppFrame({
   role,
   title,
@@ -42,6 +55,7 @@ export function AppFrame({
   const pathname = usePathname();
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const { theme, toggleTheme } = useTheme();
 
   const {
@@ -202,32 +216,52 @@ export function AppFrame({
           </label>
         ) : null}
 
-        <nav className="sidebar-nav">
-          {getRoleNav(role).map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={pathname === item.href ? "nav-link is-active" : "nav-link"}
-            >
-              <span>{item.label}</span>
-              {navBadges[item.href] ? <span className="nav-badge">{navBadges[item.href]}</span> : null}
-            </Link>
+        <nav className="sidebar-nav" aria-label="Main menu">
+          {getRoleNavGroups(role).map((section) => (
+            <div className="nav-section" key={section.group}>
+              {section.items.length && section.group !== "Overview" ? <p className="nav-section-label">{section.group}</p> : null}
+              {section.items.map((item) => {
+                const active = pathname === item.href || (item.href !== `/${role}` && pathname.startsWith(`${item.href}/`));
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={active ? "nav-link is-active" : "nav-link"}
+                    aria-current={active ? "page" : undefined}
+                    onClick={() => setIsSidebarOpen(false)}
+                  >
+                    <NavIcon name={item.icon} />
+                    <span className="nav-link-label">{item.label}</span>
+                    {navBadges[item.href] ? <span className="nav-badge">{navBadges[item.href]}</span> : null}
+                  </Link>
+                );
+              })}
+            </div>
           ))}
         </nav>
 
         <div className="sidebar-profile">
-          <strong>{profile.full_name ?? "User"}</strong>
-          <span>{profile.email ?? profile.phone ?? roleLabels[role]}</span>
-          <button type="button" className="theme-toggle theme-toggle--sidebar" onClick={toggleTheme}>
-            <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>
-            <strong>{theme === "dark" ? "L" : "D"}</strong>
-          </button>
-          <button type="button" className="secondary-button" onClick={() => void signOut()}>
-            Log out
-          </button>
-          <Link className="sidebar-link-muted" href={`/${role}/account`}>
-            Account & privacy
-          </Link>
+          <div className="sidebar-user">
+            <span className="sidebar-avatar" aria-hidden="true">
+              {(profile.full_name ?? "U").split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}
+            </span>
+            <div className="sidebar-user-copy">
+              <strong>{profile.full_name ?? "User"}</strong>
+              <span>{profile.email ?? profile.phone ?? roleLabels[role]}</span>
+            </div>
+          </div>
+          <div className="sidebar-actions">
+            <button type="button" className="sidebar-action" onClick={toggleTheme} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} title={theme === "dark" ? "Light mode" : "Dark mode"}>
+              <ThemeIcon dark={theme === "dark"} />
+            </button>
+            <Link className="sidebar-action" href={`/${role}/account`} aria-label="Account and privacy" title="Account & privacy" onClick={() => setIsSidebarOpen(false)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+            </Link>
+            <button type="button" className="sidebar-action sidebar-action--logout" onClick={() => { setLoggingOut(true); void signOut(); }} disabled={loggingOut}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>
+              <span>{loggingOut ? "Logging out…" : "Log out"}</span>
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -256,9 +290,8 @@ export function AppFrame({
           </div>
           
           <div className="header-aside">
-            <button type="button" className="theme-toggle" onClick={toggleTheme} aria-label="Toggle light and dark mode">
-              <span>{theme === "dark" ? "Light" : "Dark"}</span>
-              <strong>{theme === "dark" ? "L" : "D"}</strong>
+            <button type="button" className="theme-toggle theme-toggle--icon" onClick={toggleTheme} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+              <ThemeIcon dark={theme === "dark"} />
             </button>
             <div className="header-user-card">
               <strong>{profile.full_name ?? "User"}</strong>

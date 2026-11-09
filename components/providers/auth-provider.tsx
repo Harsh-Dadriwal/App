@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode
 } from "react";
@@ -91,6 +92,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
   const [tenantMemberships, setTenantMemberships] = useState<TenantMembership[]>([]);
   const [activeTenant, setActiveTenant] = useState<ActiveTenant | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const signingOut = useRef(false);
 
   async function fetchTenantContext(profileValue: UserProfile | null) {
     if (!profileValue?.id) {
@@ -238,24 +240,41 @@ function AuthProvider({ children }: { children: ReactNode }) {
   }, [configured]);
 
   async function signOut() {
-    const supabase = await getSupabaseBrowserClient();
-
-    if (!supabase) {
+    if (signingOut.current) {
       return;
     }
+    signingOut.current = true;
+
+    // Clear the screen first, so the button always responds even on a slow connection.
+    setSession(null);
+    setProfile(null);
+    setTenantMemberships([]);
+    setActiveTenant(null);
+    setErrorMessage("");
+    writeSnapshot(null);
+    clearQueryCache();
 
     try {
-      await supabase.auth.signOut();
-    } catch (e) {
-      console.error("Supabase signOut error:", e);
+      const supabase = await getSupabaseBrowserClient();
+      if (supabase) {
+        // Revoke this device's session, but never wait on the network for long.
+        await Promise.race([
+          supabase.auth.signOut({ scope: "local" }).catch((e: unknown) => console.warn("Sign-out request failed:", e)),
+          new Promise((resolve) => setTimeout(resolve, 2500))
+        ]);
+      }
     } finally {
-      setSession(null);
-      setProfile(null);
-      setTenantMemberships([]);
-      setActiveTenant(null);
-      setErrorMessage("");
-      writeSnapshot(null);
-      clearQueryCache();
+      // If the request was slow or failed, the saved session would sign the person back in.
+      try {
+        for (const key of Object.keys(window.localStorage)) {
+          if (key.startsWith("sb-") && key.endsWith("-auth-token")) window.localStorage.removeItem(key);
+        }
+      } catch {
+        // Storage blocked: nothing was saved there.
+      }
+      signingOut.current = false;
+      // A full navigation also resets every in-memory cache and subscription.
+      window.location.replace("/auth");
     }
   }
 

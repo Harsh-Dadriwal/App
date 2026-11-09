@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode
 } from "react";
@@ -76,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [tenantMemberships, setTenantMemberships] = useState<TenantMembership[]>([]);
   const [activeTenant, setActiveTenant] = useState<ActiveTenant | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const signingOut = useRef(false);
 
   async function clearBrokenSession() {
     writeSnapshot(null);
@@ -222,14 +224,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function signOut() {
-    // Stop pushes to this phone while the session can still prove who it is.
-    await unregisterPushNotifications();
-    if (!supabase) return;
+    if (signingOut.current) return;
+    signingOut.current = true;
+
+    // Stop pushes to this phone while the session can still prove who it is, but never
+    // let a slow connection keep the person stuck on the screen.
+    const stopPushes = Promise.race([
+      unregisterPushNotifications().catch(() => undefined),
+      new Promise((resolve) => setTimeout(resolve, 2000))
+    ]);
+
     try {
-      await supabase.auth.signOut();
-    } catch (e) {
-      console.error("Mobile Supabase signOut error:", e);
-    } finally {
+      await stopPushes;
+      // Clear the screen before the network sign-out so the button always responds.
       setSession(null);
       setProfile(null);
       setTenantMemberships([]);
@@ -237,6 +244,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setErrorMessage("");
       writeSnapshot(null);
       clearQueryCache();
+      if (supabase) {
+        await Promise.race([
+          supabase.auth.signOut({ scope: "local" } as any).catch((e: unknown) => console.warn("Sign-out request failed:", e)),
+          new Promise((resolve) => setTimeout(resolve, 2500))
+        ]);
+      }
+    } finally {
+      // If the request was slow or failed, the saved session would sign the person back in.
+      try {
+        const keys = await AsyncStorage.getAllKeys();
+        const authKeys = keys.filter((key) => key.startsWith("sb-") && key.endsWith("-auth-token"));
+        if (authKeys.length) await AsyncStorage.multiRemove(authKeys);
+      } catch {
+        // Nothing more to clean up.
+      }
+      signingOut.current = false;
     }
   }
 

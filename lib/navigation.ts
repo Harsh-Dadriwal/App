@@ -102,3 +102,49 @@ export const roleNav: Record<AppRole, NavItem[]> = {
 export function getRoleNav(role: AppRole) {
   return (roleNav[role] ?? []).filter((item) => !item.showsRoles || item.showsRoles.some(isRoleEnabled));
 }
+
+export type NavIconName =
+  | "home" | "bag" | "box" | "file" | "list" | "tool" | "users" | "pin" | "chart"
+  | "wallet" | "gift" | "note" | "plus" | "briefcase" | "award" | "tag" | "store";
+
+/** Menu sections, in the order they appear. */
+export const NAV_GROUPS = ["Overview", "Shop & orders", "Work & sites", "Money & rewards", "People & setup"] as const;
+export type NavGroup = (typeof NAV_GROUPS)[number];
+
+// Keyed by the last part of the link (e.g. /customer/orders -> orders), so every role shares it.
+const NAV_META: Record<string, { icon: NavIconName; group: NavGroup }> = {
+  dashboard: { icon: "home", group: "Overview" },
+  shop: { icon: "bag", group: "Shop & orders" },
+  orders: { icon: "box", group: "Shop & orders" },
+  quotations: { icon: "file", group: "Shop & orders" },
+  selections: { icon: "list", group: "Shop & orders" },
+  "price-list": { icon: "tag", group: "Shop & orders" },
+  "service-requests": { icon: "tool", group: "Work & sites" },
+  new: { icon: "plus", group: "Work & sites" },
+  market: { icon: "store", group: "Work & sites" },
+  ongoing: { icon: "briefcase", group: "Work & sites" },
+  sites: { icon: "pin", group: "Work & sites" },
+  notes: { icon: "note", group: "Work & sites" },
+  wallet: { icon: "wallet", group: "Money & rewards" },
+  savings: { icon: "wallet", group: "Money & rewards" },
+  budget: { icon: "chart", group: "Money & rewards" },
+  referrals: { icon: "gift", group: "Money & rewards" },
+  incentives: { icon: "award", group: "Money & rewards" },
+  fintech: { icon: "wallet", group: "Money & rewards" },
+  credit: { icon: "wallet", group: "Money & rewards" },
+  professionals: { icon: "users", group: "People & setup" },
+  handymen: { icon: "tool", group: "People & setup" },
+  suppliers: { icon: "box", group: "People & setup" },
+  users: { icon: "users", group: "People & setup" }
+};
+
+function navMeta(href: string, role: AppRole) {
+  const last = href.split("/").filter(Boolean).pop() ?? "";
+  return href === `/${role}` ? NAV_META.dashboard : NAV_META[last] ?? { icon: "list" as NavIconName, group: "Work & sites" as NavGroup };
+}
+
+/** The menu for a role split into labelled sections, each item carrying its icon. */
+export function getRoleNavGroups(role: AppRole) {
+  const items = getRoleNav(role).map((item) => ({ ...item, ...navMeta(item.href, role) }));
+  return NAV_GROUPS.map((group) => ({ group, items: items.filter((item) => item.group === group) })).filter((section) => section.items.length);
+}
