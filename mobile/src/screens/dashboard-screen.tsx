@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { useState } from "react";
 import { Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { deleteMyAccount } from "@/lib/backend/auth-gateway";
 import { useAuth } from "@/providers/auth-provider";
@@ -27,8 +28,8 @@ const roleActions: Record<AppRole, Action[]> = {
     notes
   ],
   electrician: [
-    selections,
     { label: "Order materials", hint: "Live stock from the store", route: "shop", icon: "shopping-bag" },
+    selections,
     { label: "My orders", hint: "Track your orders", route: "orders", icon: "package" },
     quotations,
     { label: "Service requests", hint: "Jobs near you", route: "service-requests", icon: "tool" },
@@ -36,8 +37,8 @@ const roleActions: Record<AppRole, Action[]> = {
     notes
   ],
   architect: [
-    selections,
     { label: "Shop products", hint: "Live stock from the store", route: "shop", icon: "shopping-bag" },
+    selections,
     { label: "My orders", hint: "Track your orders", route: "orders", icon: "package" },
     quotations,
     { label: "Rewards", hint: "Partner incentives", route: "incentives", icon: "award" },
@@ -60,6 +61,16 @@ const roleActions: Record<AppRole, Action[]> = {
   plumber: [notes]
 };
 
+// Each quick action gets its own colour so the grid is easy to scan.
+const TILE_TONES = [
+  { icon: palette.brand, bg: "#e8efff" },
+  { icon: "#7c3aed", bg: "#f1eaff" },
+  { icon: "#0891b2", bg: "#e0f5fa" },
+  { icon: "#d97706", bg: "#fff3dc" },
+  { icon: "#059669", bg: "#dcf7ec" },
+  { icon: "#e11d48", bg: "#ffe4ea" }
+];
+
 function greeting() {
   const hour = new Date().getHours();
   return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -67,6 +78,7 @@ function greeting() {
 
 export function DashboardScreen() {
   const { profile, signOut } = useAuth();
+  const [loggingOut, setLoggingOut] = useState(false);
 
   // Google Play requires people to be able to delete their account from inside the app.
   function confirmDelete() {
@@ -122,7 +134,9 @@ export function DashboardScreen() {
 
       <SectionTitle title="Quick actions" />
       <View style={styles.grid}>
-        {actions.map((action) => (
+        {actions.map((action, index) => {
+          const tone = TILE_TONES[index % TILE_TONES.length];
+          return (
           <Pressable
             key={`${action.route}-${action.label}`}
             style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
@@ -130,13 +144,15 @@ export function DashboardScreen() {
             accessibilityRole="button"
             accessibilityLabel={action.label}
           >
-            <View style={styles.tileIcon}>
-              <Feather name={action.icon} size={20} color={palette.brand} />
+            <View style={[styles.tileIcon, { backgroundColor: tone.bg }]}>
+              <Feather name={action.icon} size={20} color={tone.icon} />
             </View>
             <Text style={styles.tileLabel} numberOfLines={2}>{action.label}</Text>
             <Text style={styles.tileHint} numberOfLines={1}>{action.hint}</Text>
+            <Feather name="arrow-up-right" size={16} color={tone.icon} style={styles.tileArrow} />
           </Pressable>
-        ))}
+          );
+        })}
       </View>
 
       <SectionTitle title="Your account" />
@@ -153,7 +169,16 @@ export function DashboardScreen() {
             </Text>
           </View>
         </View>
-        <AppButton label="Log out" icon="log-out" kind="secondary" onPress={() => void signOut()} />
+        <AppButton
+          label={loggingOut ? "Logging out…" : "Log out"}
+          icon="log-out"
+          kind="secondary"
+          loading={loggingOut}
+          onPress={() => {
+            setLoggingOut(true);
+            void signOut().finally(() => setLoggingOut(false));
+          }}
+        />
         <View style={styles.accountLinks}>
           <Pressable onPress={() => void Linking.openURL(`${WEB_APP_URL}/privacy`)} hitSlop={8} accessibilityRole="link">
             <Text style={styles.accountLink}>Privacy policy</Text>
@@ -187,6 +212,7 @@ const styles = StyleSheet.create({
     borderColor: palette.line,
     ...shadow
   },
+  tileArrow: { position: "absolute", top: 14, right: 14, opacity: 0.7 },
   tilePressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
   tileIcon: {
     width: 42,
