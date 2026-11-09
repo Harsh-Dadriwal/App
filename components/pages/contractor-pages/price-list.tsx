@@ -4,6 +4,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import { createPortal } from "react-dom";
 import { FormNotice, QueryState, useMutationAction, useRows } from "@/components/data-view";
 import { getServeUrl } from "@/lib/s3";
+import { getSupabaseBrowserClient } from "@mahalaxmi/core/supabase/client";
 import { getPriceList, savePriceListCategoryImage, syncPriceList } from "@/lib/backend/modules/inventory-gateway";
 import { formatPriceListAmount, type PriceList, type PriceListItem } from "@mahalaxmi/core/gateway/inventory-gateway";
 import {
@@ -109,10 +110,19 @@ export function AdminPriceListPage() {
   async function handleCategoryImage(name: string, file: File | undefined) {
     if (!file) return;
     await imageUpload.run(async () => {
+      const supabase = await getSupabaseBrowserClient();
+      const accessToken = supabase ? (await supabase.auth.getSession()).data.session?.access_token : undefined;
+      if (!accessToken) {
+        return { error: { message: "Please sign in again to upload images." } };
+      }
       const formData = new FormData();
       formData.append("file", file);
       formData.append("productSku", `price-list-${name}`);
-      const response = await fetch("/api/admin/upload-product-image", { method: "POST", body: formData });
+      const response = await fetch("/api/admin/upload-product-image", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: formData
+      });
       const uploaded = (await response.json()) as { error?: string; url?: string };
       if (!response.ok || !uploaded.url) {
         return { error: { message: uploaded.error ?? "Image upload failed." } };

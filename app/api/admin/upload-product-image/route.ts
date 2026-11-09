@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getS3BucketName, getS3Client, getS3PublicBaseUrl } from "@/lib/s3";
+import { requireShopAdmin } from "@/lib/server-auth";
 
 const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic"]);
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -11,6 +12,9 @@ function sanitizeSegment(value: string) {
 }
 
 export async function POST(request: NextRequest) {
+  const denied = await requireShopAdmin(request);
+  if (denied) return denied;
+
   try {
     const formData = await request.formData();
     const file = formData.get("file");

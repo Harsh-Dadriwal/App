@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { getS3Client, getS3BucketName } from "@/lib/s3";
 
+// The bucket also holds customers' private photos. Those are only ever shown through short
+// signed links from the API, never through this public image proxy.
+const PRIVATE_PREFIXES = ["quotations/", "project-media/", "uploads/"];
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -9,6 +13,11 @@ export async function GET(request: NextRequest) {
 
     if (!key || key.includes("..") || key.includes("\0")) {
       return NextResponse.json({ error: "Invalid or missing image key." }, { status: 400 });
+    }
+
+    const normalized = key.replace(/^\/+/, "").toLowerCase();
+    if (PRIVATE_PREFIXES.some((prefix) => normalized.startsWith(prefix))) {
+      return NextResponse.json({ error: "Image not found." }, { status: 404 });
     }
 
     const s3Client = getS3Client();
