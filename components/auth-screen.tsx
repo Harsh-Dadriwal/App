@@ -122,7 +122,7 @@ function UsernameHint({ state }: { state: ReturnType<typeof useUsernameCheck> })
 
 export function AuthScreen() {
   const router = useRouter();
-  const { refreshProfile } = useAuth();
+  const { refreshProfile, session, profile, isLoading } = useAuth();
   const [step, setStep] = useState<Step>("phone");
   const [emailMode, setEmailMode] = useState<EmailMode>("login");
   const [busy, setBusy] = useState(false);
@@ -151,6 +151,15 @@ export function AuthScreen() {
       setStep("reset");
     }
   }, []);
+
+  // Someone who is already signed in goes straight to their workspace. The password-reset
+  // link also carries a session, so it is left on its own form.
+  useEffect(() => {
+    if (isLoading || !session || !profile?.role || step === "reset") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("reset") === "true" || window.location.hash.includes("type=recovery")) return;
+    router.replace(`/${profile.role}`);
+  }, [isLoading, session, profile?.role, step, router]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
